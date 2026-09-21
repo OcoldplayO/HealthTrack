@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>HealthTrack 智能健康追踪</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .fade-in { animation: fadeIn 0.25s ease-out forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    /* 打字机光标闪烁 */
+    .typing-cursor::after { content: '▋'; animation: blink 1s infinite; color: #3b82f6; }
+    @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between select-none">
+
+  <!-- 顶部 Toast 提示框 -->
+  <div id="toast" class="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 transition-all duration-300 opacity-0 pointer-events-none -translate-y-4">
+    <div id="toast-body" class="bg-slate-900/90 backdrop-blur-md text-white px-5 py-2.5 rounded-2xl shadow-xl flex items-center space-x-2 text-sm font-medium">
+      <span id="toast-icon">✓</span>
+      <span id="toast-msg">操作成功</span>
+    </div>
+  </div>
+
+  <!-- 主容器 (移动端居中适配) -->
+  <div class="max-w-md w-full mx-auto min-h-screen flex flex-col bg-white sm:shadow-2xl sm:my-4 sm:rounded-3xl sm:min-h-[840px] sm:h-[840px] overflow-hidden relative border border-slate-100">
+
+    <!-- 顶部状态栏 -->
+    <header class="pt-6 pb-3 px-6 bg-white border-b border-slate-100 flex justify-between items-center shrink-0 z-10">
+      <div class="flex items-center space-x-2">
+        <div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-500/20">HT</div>
+        <div>
+          <h1 class="text-base font-bold text-slate-900 leading-none">HealthTrack</h1>
+          <p class="text-[10px] text-slate-400 mt-0.5">智能健康洞察系统</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button onclick="exportData()" title="导出数据" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-lg transition-colors flex items-center space-x-1">
+          <span>📥 导出</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 核心内容切换区 -->
+    <main class="flex-1 overflow-y-auto p-5 no-scrollbar bg-slate-50/50 relative" id="main-content">
+      
+      <!-- 1. 记一笔 (Log View) -->
+      <section id="view-log" class="fade-in space-y-4">
+        <div class="flex justify-between items-center">
+          <div class="flex items-center space-x-2">
+            <input type="date" id="input-date" class="bg-white border border-slate-200 text-slate-800 text-sm font-semibold rounded-xl px-3 py-1.5 outline-none focus:border-blue-500 shadow-sm" onchange="loadRecordForDate(this.value)">
+          </div>
+          <button onclick="setTodayDate()" class="text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors">今日</button>
+        </div>
+
+        <!-- 4 核心数字输入卡片 -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+            <label class="text-[10px] uppercase font-bold tracking-wider text-slate-400">晨起空腹体重 (kg)</label>
+            <input type="number" step="0.1" id="input-weight-am" placeholder="如 76.5" class="w-full bg-transparent text-xl font-bold text-slate-800 outline-none mt-1">
+          </div>
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+            <label class="text-[10px] uppercase font-bold tracking-wider text-slate-400">睡前体重 (kg)</label>
+            <input type="number" step="0.1" id="input-weight-pm" placeholder="如 77.7" class="w-full bg-transparent text-xl font-bold text-slate-800 outline-none mt-1">
+          </div>
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+            <label class="text-[10px] uppercase font-bold tracking-wider text-slate-400">腰围 (cm)</label>
+            <input type="number" step="0.1" id="input-waist" placeholder="如 78.0" class="w-full bg-transparent text-xl font-bold text-slate-800 outline-none mt-1">
+          </div>
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+            <label class="text-[10px] uppercase font-bold tracking-wider text-slate-400">睡眠时长 (h)</label>
+            <input type="number" step="0.1" id="input-sleep-hours" placeholder="如 6.8" class="w-full bg-transparent text-xl font-bold text-slate-800 outline-none mt-1">
+          </div>
+        </div>
+
+        <!-- 睡眠就寝时间点 -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="text-base">🌙</span>
+            <div>
+              <p class="text-xs font-bold text-slate-700">昨晚就寝时间</p>
+              <p class="text-[10px] text-slate-400">用于自动评定熬夜等级 (绿/黄/红)</p>
+            </div>
+          </div>
+          <input type="time" id="input-sleep-start" class="border border-slate-200 rounded-lg px-2 py-1 text-sm font-semibold outline-none focus:border-blue-500">
+        </div>
+
+        <!-- 自由文本区域 (支持多次增量记录) -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-slate-700 flex justify-between items-center">
+            <span>饮食、运动与身体感受</span>
+            <span class="text-[10px] font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">自动提取运动标签</span>
+          </label>
+          <textarea id="input-journal" rows="4" class="w-full bg-white text-slate-800 border border-slate-200 shadow-sm rounded-2xl p-3.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all resize-none leading-relaxed" placeholder="如：早上一杯安慕希25g糖。中午大碗炒饭300g。下午打篮球半小时，骑车3km..."></textarea>
+        </div>
+
+        <!-- 保存按钮 -->
+        <button onclick="saveCurrentRecord()" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white py-3.5 rounded-2xl font-bold shadow-lg shadow-blue-500/25 transition-all flex justify-center items-center space-x-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          <span>保存今日记录</span>
+        </button>
+      </section>
+
+      <!-- 2. 看板页 (Dashboard View) -->
+      <section id="view-dash" class="fade-in space-y-5 hidden">
+        <div class="flex justify-between items-center">
+          <h2 class="text-base font-bold text-slate-900">数据趋势看板</h2>
+          <div class="flex bg-slate-200/80 p-0.5 rounded-xl text-xs font-semibold">
+            <button onclick="switchDashRange(7)" id="btn-range-7" class="px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all">近7天</button>
+            <button onclick="switchDashRange(30)" id="btn-range-30" class="px-3 py-1 rounded-lg text-slate-600 transition-all">近30天</button>
+          </div>
+        </div>
+
+        <!-- 体重趋势图卡片 -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-[10px] uppercase font-bold text-slate-400">体重变化趋势 (kg)</p>
+              <p id="dash-weight-stat" class="text-xl font-black text-slate-900">--</p>
+            </div>
+            <div class="flex items-center space-x-3 text-[10px] text-slate-500">
+              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-blue-600 mr-1"></span>晨起空腹</span>
+              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-amber-500 mr-1"></span>睡前</span>
+            </div>
+          </div>
+          <div class="h-44 w-full">
+            <canvas id="chart-weight"></canvas>
+          </div>
+        </div>
+
+        <!-- 睡眠时长与熬夜分级柱状图 -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-[10px] uppercase font-bold text-slate-400">睡眠作息与质量 (小时)</p>
+              <p id="dash-sleep-stat" class="text-xl font-black text-slate-900">--</p>
+            </div>
+            <div class="flex items-center space-x-2 text-[10px] text-slate-500">
+              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-emerald-500 mr-1"></span>正常</span>
+              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-amber-400 mr-1"></span>轻度</span>
+              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-rose-500 mr-1"></span>熬夜</span>
+            </div>
+          </div>
+          <div class="h-36 w-full">
+            <canvas id="chart-sleep"></canvas>
+          </div>
+        </div>
+
+        <!-- 历史流水与运动标签列表 -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <p class="text-xs font-bold text-slate-700">近期活动打卡流水</p>
+          <div id="dash-activities-list" class="space-y-2 text-xs max-h-48 overflow-y-auto no-scrollbar">
+            <!-- 动态注入 -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. AI 洞察页 (Insight View) -->
+      <section id="view-insight" class="fade-in space-y-4 hidden">
+        <div class="flex justify-between items-center">
+          <div class="flex items-center space-x-1.5">
+            <span class="text-lg">✨</span>
+            <h2 class="text-base font-bold text-slate-900">AI 智能健康复盘</h2>
+          </div>
+        </div>
+
+        <!-- 分析周期选择胶囊 -->
+        <div class="flex space-x-2">
+          <button onclick="setInsightDays(7)" id="pill-7" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 7 天</button>
+          <button onclick="setInsightDays(30)" id="pill-30" class="flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">近 30 天</button>
+          <button onclick="setInsightDays(60)" id="pill-60" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 60 天</button>
+        </div>
+
+        <button onclick="generateInsightStream()" id="btn-generate-insight" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 rounded-2xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex justify-center items-center space-x-2">
+          <span>🚀 生成阶段深度洞察</span>
+        </button>
+
+        <!-- 洞察渲染卡片 (SSE 流式输出) -->
+        <div class="bg-white border border-indigo-100 rounded-2xl p-5 shadow-sm space-y-3 min-h-[300px]">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <span class="text-xs font-bold text-indigo-600 flex items-center space-x-1">
+              <span>💡 关联分析与归因结论</span>
+            </span>
+            <span id="insight-status-tag" class="text-[10px] text-slate-400">点击上方按钮开始</span>
+          </div>
+
+          <div id="insight-content" class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+            欢迎来到 AI 洞察页面！系统会自动提取你在选定周期内的体重走势、熬夜红黄绿分布、以及饮食运动日记，并由大模型进行深度因果归因与复盘。
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 底部 Tab 导航 -->
+    <nav class="shrink-0 flex border-t border-slate-100 bg-white/95 backdrop-blur-md pb-6 pt-2 px-6 justify-between z-10">
+      <button onclick="switchTab('log')" id="tab-log" class="flex flex-col items-center flex-1 text-blue-600 font-bold transition-colors">
+        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        <span class="text-[10px]">记一笔</span>
+      </button>
+      <button onclick="switchTab('dash')" id="tab-dash" class="flex flex-col items-center flex-1 text-slate-400 hover:text-slate-700 transition-colors">
+        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+        <span class="text-[10px]">看板</span>
+      </button>
+      <button onclick="switchTab('insight')" id="tab-insight" class="flex flex-col items-center flex-1 text-slate-400 hover:text-slate-700 transition-colors relative">
+        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+        <span class="text-[10px]">洞察</span>
+      </button>
+    </nav>
+  </div>
+
+  <script>
+    let currentTab = 'log';
+    let dashRange = 7;
+    let insightDays = 30;
+    let weightChart = null;
+    let sleepChart = null;
+
+    // 初始化
+    window.addEventListener('DOMContentLoaded', () => {
+      setTodayDate();
+    });
+
+    function showToast(msg, isSuccess = true) {
+      const toast = document.getElementById('toast');
+      const icon = document.getElementById('toast-icon');
+      const msgEl = document.getElementById('toast-msg');
+      icon.innerText = isSuccess ? '✓' : '✕';
+      msgEl.innerText = msg;
+      toast.classList.remove('opacity-0', '-translate-y-4', 'pointer-events-none');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', '-translate-y-4', 'pointer-events-none');
+      }, 2000);
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      ['log', 'dash', 'insight'].forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const btn = document.getElementById(`tab-${t}`);
+        if (t === tab) {
+          view.classList.remove('hidden');
+          btn.classList.add('text-blue-600', 'font-bold');
+          btn.classList.remove('text-slate-400');
+        } else {
+          view.classList.add('hidden');
+          btn.classList.remove('text-blue-600', 'font-bold');
+          btn.classList.add('text-slate-400');
+        }
+      });
+
+      if (tab === 'dash') {
+        loadDashboardData(dashRange);
+      }
+    }
+
+    function setTodayDate() {
+      const now = new Date();
+      const str = now.toISOString().split('T')[0];
+      document.getElementById('input-date').value = str;
+      loadRecordForDate(str);
+    }
+
+    async function loadRecordForDate(dateStr) {
+      try {
+        const res = await fetch(`/api/v1/records/history?start_date=${dateStr}&end_date=${dateStr}`);
+        const json = await res.json();
+        if (json.code === 200 && json.data && json.data.length > 0) {
+          const rec = json.data[0];
+          document.getElementById('input-weight-am').value = rec.weight_am || '';
+          document.getElementById('input-weight-pm').value = rec.weight_pm || '';
+          document.getElementById('input-waist').value = rec.waist_size || '';
+          document.getElementById('input-sleep-hours').value = rec.sleep_hours || '';
+          document.getElementById('input-sleep-start').value = rec.sleep_start_time || '';
+          document.getElementById('input-journal').value = rec.journal_text || '';
+        } else {
+          // 清空输入框
+          document.getElementById('input-weight-am').value = '';
+          document.getElementById('input-weight-pm').value = '';
+          document.getElementById('input-waist').value = '';
+          document.getElementById('input-sleep-hours').value = '';
+          document.getElementById('input-sleep-start').value = '';
+          document.getElementById('input-journal').value = '';
+        }
+      } catch (err) {
+        console.error("加载单日记录失败", err);
+      }
+    }
+
+    async function saveCurrentRecord() {
+      const dateStr = document.getElementById('input-date').value;
+      const wAm = document.getElementById('input-weight-am').value;
+      const wPm = document.getElementById('input-weight-pm').value;
+      const waist = document.getElementById('input-waist').value;
+      const sleepHours = document.getElementById('input-sleep-hours').value;
+      const sleepStart = document.getElementById('input-sleep-start').value;
+      const journal = document.getElementById('input-journal').value;
+
+      const payload = {
+        record_date: dateStr,
+        weight_am: wAm ? parseFloat(wAm) : null,
+        weight_pm: wPm ? parseFloat(wPm) : null,
+        waist_size: waist ? parseFloat(waist) : null,
+        sleep_hours: sleepHours ? parseFloat(sleepHours) : null,
+        sleep_start_time: sleepStart ? sleepStart : null,
+        journal_text: journal ? journal : null,
+      };
+
+      try {
+        const res = await fetch('/api/v1/records', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (json.code === 200) {
+          showToast('✓ 保存成功');
+        } else {
+          showToast(json.message || '保存失败', false);
+        }
+      } catch (err) {
+        showToast('网络错误，请重试', false);
+      }
+    }
+
+    function switchDashRange(days) {
+      dashRange = days;
+      document.getElementById('btn-range-7').className = days === 7 ? 'px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all' : 'px-3 py-1 rounded-lg text-slate-600 transition-all';
+      document.getElementById('btn-range-30').className = days === 30 ? 'px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all' : 'px-3 py-1 rounded-lg text-slate-600 transition-all';
+      loadDashboardData(days);
+    }
+
+    async function loadDashboardData(days) {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(end.getDate() - (days - 1));
+
+      const startStr = start.toISOString().split('T')[0];
+      const endStr = end.toISOString().split('T')[0];
+
+      const res = await fetch(`/api/v1/records/history?start_date=${startStr}&end_date=${endStr}`);
+      const json = await res.json();
+      if (json.code !== 200) return;
+
+      const records = json.data || [];
+      renderDashboardCharts(records);
+    }
+
+    function renderDashboardCharts(records) {
+      const labels = records.map(r => r.record_date.slice(5)); // MM-DD
+      const weightAmData = records.map(r => r.weight_am);
+      const weightPmData = records.map(r => r.weight_pm);
+      const sleepHoursData = records.map(r => r.sleep_hours);
+      const sleepColors = records.map(r => {
+        if (r.sleep_tag === 'RED') return '#f43f5e'; // rose-500
+        if (r.sleep_tag === 'YELLOW') return '#fbbf24'; // amber-400
+        return '#10b981'; // emerald-500
+      });
+
+      // 1. 体重趋势图
+      const ctxWeight = document.getElementById('chart-weight').getContext('2d');
+      if (weightChart) weightChart.destroy();
+      weightChart = new Chart(ctxWeight, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: '晨起体重',
+              data: weightAmData,
+              borderColor: '#2563eb',
+              backgroundColor: '#2563eb',
+              tension: 0.3,
+              spanGaps: true
+            },
+            {
+              label: '睡前体重',
+              data: weightPmData,
+              borderColor: '#f59e0b',
+              backgroundColor: '#f59e0b',
+              tension: 0.3,
+              spanGaps: true
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: false, ticks: { font: { size: 10 } } },
+            x: { ticks: { font: { size: 10 } } }
+          }
+        }
+      });
+
+      // 2. 睡眠柱状图
+      const ctxSleep = document.getElementById('chart-sleep').getContext('2d');
+      if (sleepChart) sleepChart.destroy();
+      sleepChart = new Chart(ctxSleep, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: sleepHoursData,
+            backgroundColor: sleepColors,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, max: 12, ticks: { font: { size: 10 } } },
+            x: { ticks: { font: { size: 10 } } }
+          }
+        }
+      });
+
+      // 3. 活动流水
+      const listEl = document.getElementById('dash-activities-list');
+      listEl.innerHTML = '';
+      if (records.length === 0) {
+        listEl.innerHTML = '<p class="text-slate-400 text-center py-2">暂无记录</p>';
+      } else {
+        records.slice().reverse().forEach(r => {
+          if (r.journal_text || r.activity_tags) {
+            let tagsHtml = '';
+            if (r.activity_tags) {
+              try {
+                const tags = JSON.parse(r.activity_tags);
+                tagsHtml = tags.map(t => `<span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">${t}</span>`).join('');
+              } catch(e){}
+            }
+            listEl.innerHTML += `
+              <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="font-bold text-slate-800">${r.record_date}</span>
+                  <div>${tagsHtml}</div>
+                </div>
+                <p class="text-slate-600 line-clamp-2">${r.journal_text || '无文字备注'}</p>
+              </div>
+            `;
+          }
+        });
+      }
+    }
+
+    function setInsightDays(days) {
+      insightDays = days;
+      ['7', '30', '60'].forEach(d => {
+        const el = document.getElementById(`pill-${d}`);
+        if (parseInt(d) === days) {
+          el.className = 'flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all';
+        } else {
+          el.className = 'flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+        }
+      });
+    }
+
+    async function generateInsightStream() {
+      const contentEl = document.getElementById('insight-content');
+      const statusTag = document.getElementById('insight-status-tag');
+      const btn = document.getElementById('btn-generate-insight');
+
+      const end = new Date();
+      const start = new Date();
+      start.setDate(end.getDate() - (insightDays - 1));
+
+      const startStr = start.toISOString().split('T')[0];
+      const endStr = end.toISOString().split('T')[0];
+
+      contentEl.innerHTML = '';
+      contentEl.classList.add('typing-cursor');
+      statusTag.innerText = 'AI 思考分析中...';
+      btn.disabled = true;
+      btn.classList.add('opacity-50');
+
+      try {
+        const response = await fetch(`/api/v1/insights/stream?start_date=${startStr}&end_date=${endStr}`);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+          for (let line of lines) {
+            line = line.trim();
+            if (line.startsWith('data:')) {
+              const dataStr = line.replace('data:', '').trim();
+              if (dataStr) {
+                try {
+                  const data = JSON.parse(dataStr);
+                  if (data.delta) {
+                    contentEl.innerText += data.delta;
+                  }
+                  if (data.status === 'done') {
+                    statusTag.innerText = '分析完成';
+                  }
+                } catch(e){}
+              }
+            }
+          }
+        }
+      } catch (err) {
+        contentEl.innerText = '连接 AI 洞察服务失败，请检查服务状态。';
+        statusTag.innerText = '生成异常';
+      } finally {
+        contentEl.classList.remove('typing-cursor');
+        btn.disabled = false;
+        btn.classList.remove('opacity-50');
+      }
+    }
+
+    function exportData() {
+      window.location.href = '/api/v1/export';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+server:
+  port: 8080
+  dev_mode: true # 开发模式下直接读取 web/static 文件，改 HTML 刷新即生效
+
+database:
+  path: "./health.db"
+  backup_dir: "./backups"
+
+ai:
+  # 推荐使用 DeepSeek (性价比极高，支持中文深度分析)
+  base_url: "https://api.deepseek.com/v1"
+  api_key: "your_api_key_here" # 请在此处填写你的 API Key
+  model: "deepseek-chat"

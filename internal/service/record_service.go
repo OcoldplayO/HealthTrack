@@ -1,0 +1,106 @@
+package service
+
+import (
+	"encoding/json"
+	"fmt"
+	"healthtrack/internal/model"
+	"healthtrack/internal/repository"
+	"regexp"
+	"strings"
+	"time"
+)
+
+type RecordService struct {
+	repo *repository.RecordRepository
+}
+
+func NewRecordService(repo *repository.RecordRepository) *RecordService {
+	return &RecordService{repo: repo}
+}
+
+// GetTodayRecord 获取今日记录
+func (s *RecordService) GetTodayRecord(userID int64) (*model.HealthRecord, error) {
+	today := time.Now().Format("2006-01-02")
+	return s.repo.GetByDate(userID, today)
+}
+
+// SaveRecord 保存或合并记录
+func (s *RecordService) SaveRecord(userID int64, dto *model.SaveRecordDTO) (*model.HealthRecord, error) {
+	if err := dto.Validate(); err != nil {
+		return nil, err
+	}
+
+	// 1. 计算熬夜颜色等级
+	sleepTag := "GREEN"
+	if dto.SleepStartTime != nil && *dto.SleepStartTime != "" {
+		sleepTag = model.CalculateSleepTag(*dto.SleepStartTime)
+	}
+
+	// 2. 自动从日记文本中提取运动胶囊标签
+	var activityTags string
+	if dto.JournalText != nil && *dto.JournalText != "" {
+		tags := extractActivityTags(*dto.JournalText)
+		if len(tags) > 0 {
+			tagBytes, _ := json.Marshal(tags)
+			activityTags = string(tagBytes)
+		}
+	}
+
+	return s.repo.SaveOrMerge(userID, dto, sleepTag, activityTags)
+}
+
+// GetHistoryRecords 获取指定区间历史数据
+func (s *RecordService) GetHistoryRecords(userID int64, startDate, endDate string) ([]*model.HealthRecord, error) {
+	if startDate == "" {
+		startDate = time.Now().AddDate(0, 0, -6).Format("2006-01-02")
+	}
+	if endDate == "" {
+		endDate = time.Now().Format("2006-01-02")
+	}
+
+	if startDate > endDate {
+		return nil, fmt.Errorf("开始日期不能晚于结束日期")
+	}
+
+	return s.repo.GetRange(userID, startDate, endDate)
+}
+
+// GetAllRecords 导出全量数据
+func (s *RecordService) GetAllRecords(userID int64) ([]*model.HealthRecord, error) {
+	return s.repo.GetAll(userID)
+}
+
+// extractActivityTags 智能关键词运动标签提取
+func extractActivityTags(text string) []string {
+	var tags []string
+	lower := strings.ToLower(text)
+
+	// 规则库：关键词与对应图标标签
+	rules := []struct {
+		pattern string
+		tag     string
+	}{
+		{`篮球`, "🏀 篮球"},
+		{`骑车|骑行|单车`, "🚴 骑行"},
+		{`跑步|慢跑|夜跑`, "🏃 跑步"},
+		{`散步|快走|走步|步`, "🚶 散步/步行"},
+		{`健身|无氧|举铁|哑铃|深蹲|卧推|硬拉`, "🏋️ 力量训练"},
+		{`俯卧撑|引体向上|卷腹|平板支撑`, "💪 徒手抗阻"},
+		{`游泳`, "🏊 游泳"},
+		{`羽毛球`, "🏸 羽毛球"},
+		{`乒乓球`, "🏓 乒乓球"},
+		{`跳绳`, "🪢 跳绳"},
+		{`瑜伽|拉伸`, "🧘 瑜伽/拉伸"},
+		{`足球`, "⚽ 足球"},
+	}
+
+	// 尝试提取时间/距离后缀 (如 "打篮球半小时", "骑车 3km")
+	for _, rule := range rules {
+		re := regexp.MustCompile(rule.pattern)
+		if re.MatchString(lower) {
+			tags = append(tags, rule.tag)
+		}
+	}
+
+	return tags
+}
