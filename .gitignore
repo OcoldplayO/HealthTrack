@@ -1,0 +1,27 @@
+# 编译生成的可执行文件与临时文件
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# SQLite 本地数据库文件与热日志（严禁提交个人隐私数据）
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+backups/
+
+# 敏感配置文件（包含大模型 API Key，严禁提交到代码仓）
+config.yaml
+.env
+*.local.yaml
+
+# 编辑器与操作系统缓存
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
