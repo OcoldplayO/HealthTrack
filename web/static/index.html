@@ -13,7 +13,6 @@
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     .fade-in { animation: fadeIn 0.25s ease-out forwards; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-    /* 打字机光标闪烁 */
     .typing-cursor::after { content: '▋'; animation: blink 1s infinite; color: #3b82f6; }
     @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
   </style>
@@ -41,8 +40,8 @@
         </div>
       </div>
       <div class="flex items-center space-x-2">
-        <button onclick="exportData()" title="导出数据" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-lg transition-colors flex items-center space-x-1">
-          <span>📥 导出</span>
+        <button onclick="exportData()" title="导出 Excel/CSV 表格" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-lg transition-colors flex items-center space-x-1">
+          <span>📥 导出 Excel</span>
         </button>
       </div>
     </header>
@@ -222,7 +221,6 @@
     let weightChart = null;
     let sleepChart = null;
 
-    // 初始化
     window.addEventListener('DOMContentLoaded', () => {
       setTodayDate();
     });
@@ -282,7 +280,6 @@
           document.getElementById('input-sleep-start').value = rec.sleep_start_time || '';
           document.getElementById('input-journal').value = rec.journal_text || '';
         } else {
-          // 清空输入框
           document.getElementById('input-weight-am').value = '';
           document.getElementById('input-weight-pm').value = '';
           document.getElementById('input-waist').value = '';
@@ -355,15 +352,32 @@
     }
 
     function renderDashboardCharts(records) {
-      const labels = records.map(r => r.record_date.slice(5)); // MM-DD
+      const labels = records.map(r => r.record_date.slice(5));
       const weightAmData = records.map(r => r.weight_am);
       const weightPmData = records.map(r => r.weight_pm);
       const sleepHoursData = records.map(r => r.sleep_hours);
       const sleepColors = records.map(r => {
-        if (r.sleep_tag === 'RED') return '#f43f5e'; // rose-500
-        if (r.sleep_tag === 'YELLOW') return '#fbbf24'; // amber-400
-        return '#10b981'; // emerald-500
+        if (r.sleep_tag === 'RED') return '#f43f5e';
+        if (r.sleep_tag === 'YELLOW') return '#fbbf24';
+        return '#10b981';
       });
+
+      // 统计均值
+      const validWeights = weightAmData.filter(v => v !== null && v !== undefined);
+      if (validWeights.length > 0) {
+        const latest = validWeights[validWeights.length - 1];
+        document.getElementById('dash-weight-stat').innerText = `${latest} kg`;
+      } else {
+        document.getElementById('dash-weight-stat').innerText = '--';
+      }
+
+      const validSleeps = sleepHoursData.filter(v => v !== null && v !== undefined);
+      if (validSleeps.length > 0) {
+        const avgSleep = (validSleeps.reduce((a, b) => a + b, 0) / validSleeps.length).toFixed(1);
+        document.getElementById('dash-sleep-stat').innerText = `${avgSleep} 小时 (均值)`;
+      } else {
+        document.getElementById('dash-sleep-stat').innerText = '--';
+      }
 
       // 1. 体重趋势图
       const ctxWeight = document.getElementById('chart-weight').getContext('2d');

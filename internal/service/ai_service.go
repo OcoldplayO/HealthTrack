@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"healthtrack/internal/config"
@@ -16,6 +17,9 @@ import (
 	"strings"
 	"time"
 )
+
+//go:embed default_prompt.txt
+var defaultPromptTemplate string
 
 type AIService struct {
 	cfg  *config.AIConfig
@@ -96,7 +100,6 @@ func calculateStats(startDate, endDate string, records []*model.HealthRecord) *M
 
 	var firstWeight, lastWeight *float64
 	for _, r := range records {
-		// 统计体重趋势
 		w := r.WeightAM
 		if w == nil {
 			w = r.WeightPM
@@ -108,7 +111,6 @@ func calculateStats(startDate, endDate string, records []*model.HealthRecord) *M
 			lastWeight = w
 		}
 
-		// 统计睡眠等级
 		switch r.SleepTag {
 		case "GREEN":
 			stats.GreenDays++
@@ -120,7 +122,6 @@ func calculateStats(startDate, endDate string, records []*model.HealthRecord) *M
 			stats.GreenDays++
 		}
 
-		// 统计运动天数
 		if r.ActivityTags != "" && r.ActivityTags != "[]" {
 			stats.WorkoutDays++
 		}
@@ -141,13 +142,14 @@ func calculateStats(startDate, endDate string, records []*model.HealthRecord) *M
 }
 
 func (s *AIService) buildPrompt(stats *MacroStats, records []*model.HealthRecord) (string, error) {
-	templateBytes, err := os.ReadFile("prompts/insight_v1.txt")
-	if err != nil {
-		return "", err
+	var tpl string
+	// 优先读取磁盘文件，若无则使用内置内嵌模板
+	if data, err := os.ReadFile("prompts/insight_v1.txt"); err == nil {
+		tpl = string(data)
+	} else {
+		tpl = defaultPromptTemplate
 	}
-	tpl := string(templateBytes)
 
-	// 替换宏观数据
 	tpl = strings.ReplaceAll(tpl, "{{.StartDate}}", stats.StartDate)
 	tpl = strings.ReplaceAll(tpl, "{{.EndDate}}", stats.EndDate)
 	tpl = strings.ReplaceAll(tpl, "{{.TotalDays}}", fmt.Sprintf("%d", stats.TotalDays))
@@ -160,7 +162,6 @@ func (s *AIService) buildPrompt(stats *MacroStats, records []*model.HealthRecord
 	tpl = strings.ReplaceAll(tpl, "{{.RedDays}}", fmt.Sprintf("%d", stats.RedDays))
 	tpl = strings.ReplaceAll(tpl, "{{.WorkoutDays}}", fmt.Sprintf("%d", stats.WorkoutDays))
 
-	// 替换微观流水
 	var logBuilder strings.Builder
 	for _, r := range records {
 		am := "--"
@@ -284,7 +285,6 @@ func (s *AIService) streamDemoInsight(prompt string, stats *MacroStats, w http.R
 *(提示: 当前为本地演示分析。若要体验实时大模型深度分析，请在 `+"`config.yaml`"+` 中填入你的 DeepSeek 或 GLM 的 API Key)*`,
 		stats.StartDate, stats.EndDate, stats.TotalDays, stats.ValidDays, stats.WeightDelta, stats.GreenDays, stats.YellowDays, stats.RedDays, stats.WorkoutDays)
 
-	// 模拟流式逐字打字机效果
 	runes := []rune(demoText)
 	chunkSize := 4
 	for i := 0; i < len(runes); i += chunkSize {

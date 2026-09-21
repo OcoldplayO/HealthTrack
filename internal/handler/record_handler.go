@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"healthtrack/internal/model"
@@ -29,7 +31,7 @@ func (h *RecordHandler) GetToday(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := int64(1) // MVP 默认为用户 1
+	userID := int64(1)
 	record, err := h.recordService.GetTodayRecord(userID)
 	if err != nil {
 		slog.Error("获取今日记录失败", "err", err)
@@ -113,8 +115,8 @@ func (h *RecordHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ExportData 导出全量 JSON 数据
-func (h *RecordHandler) ExportData(w http.ResponseWriter, r *http.Request) {
+// ExportCSV 导出 Excel / WPS 友好的 CSV 表格 (带 UTF-8 BOM，防止乱码)
+func (h *RecordHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 	userID := int64(1)
 	records, err := h.recordService.GetAllRecords(userID)
 	if err != nil {
@@ -122,7 +124,67 @@ func (h *RecordHandler) ExportData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=healthtrack_export_%s.json", time.Now().Format("20060102")))
+	var buf bytes.Buffer
+	// 写入 UTF-8 BOM，确保 Excel/WPS 打开中文不乱码
+	buf.WriteString("\xef\xbb\xbf")
+
+	writer := csv.NewWriter(&buf)
+	// 写入表头
+	writer.Write([]string{
+		"记录日期", "晨起空腹体重(kg)", "睡前体重(kg)", "腰围(cm)",
+		"睡眠时长(小时)", "就寝时间", "起床时间", "熬夜等级", "运动标签", "饮食运动与日记备注",
+	})
+
+	for _, rec := range records {
+		wAm := ""
+		if rec.WeightAM != nil {
+			wAm = fmt.Sprintf("%.1f", *rec.WeightAM)
+		}
+		wPm := ""
+		if rec.WeightPM != nil {
+			wPm = fmt.Sprintf("%.1f", *rec.WeightPM)
+		}
+		waist := ""
+		if rec.WaistSize != nil {
+			waist = fmt.Sprintf("%.1f", *rec.WaistSize)
+		}
+		sh := ""
+		if rec.SleepHours != nil {
+			sh = fmt.Sprintf("%.1f", *rec.SleepHours)
+		}
+		sStart := ""
+		if rec.SleepStartTime != nil {
+			sStart = *rec.SleepStartTime
+		}
+		sEnd := ""
+		if rec.SleepEndTime != nil {
+			sEnd = *rec.SleepEndTime
+		}
+
+		writer.Write([]string{
+			rec.RecordDate, wAm, wPm, waist,
+			sh, sStart, sEnd, rec.SleepTag, rec.ActivityTags, rec.JournalText,
+		})
+	}
+	writer.Flush()
+
+	fileName := fmt.Sprintf("HealthTrack_健康数据导出_%s.csv", time.Now().Format("20060102"))
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
+	w.WriteHeader(http.StatusOK)
+	w.Write(buf.Bytes())
+}
+
+// ExportJSON 导出全量 JSON 备份
+func (h *RecordHandler) ExportJSON(w http.ResponseWriter, r *http.Request) {
+	userID := int64(1)
+	records, err := h.recordService.GetAllRecords(userID)
+	if err != nil {
+		writeJSON(w, http.StatusOK, model.Error(model.CodeDBError, err.Error()))
+		return
+	}
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=healthtrack_backup_%s.json", time.Now().Format("20060102")))
 	writeJSON(w, http.StatusOK, model.Success(records))
 }
 

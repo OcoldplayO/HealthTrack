@@ -30,8 +30,7 @@ func main() {
 	// 2. 加载配置
 	cfg, err := config.LoadConfig("config.yaml")
 	if err != nil {
-		slog.Error("加载配置失败", "err", err)
-		os.Exit(1)
+		slog.Warn("未找到外部 config.yaml，使用默认内置配置", "err", err)
 	}
 
 	// 3. 初始化 SQLite 数据库与自动备份
@@ -56,23 +55,30 @@ func main() {
 	mux.HandleFunc("/api/v1/records", recordHandler.SaveRecord)
 	mux.HandleFunc("/api/v1/records/history", recordHandler.GetHistory)
 	mux.HandleFunc("/api/v1/insights/stream", recordHandler.StreamInsight)
-	mux.HandleFunc("/api/v1/export", recordHandler.ExportData)
+	mux.HandleFunc("/api/v1/export", recordHandler.ExportCSV)      // 默认导出 Excel 友好的 CSV
+	mux.HandleFunc("/api/v1/export/json", recordHandler.ExportJSON) // 备份专用的 JSON 导出
 	mux.HandleFunc("/healthz", recordHandler.Healthz)
 
-	// 前端静态页面分发
+	// 前端静态页面分发（安全自适应：优先磁盘，若无磁盘文件则无缝走内存内嵌）
+	var staticHandler http.Handler
 	if cfg.Server.DevMode {
-		slog.Info("运行于开发模式 (DevMode: true)，静态资源从本地磁盘实时加载")
-		fileServer := http.FileServer(http.Dir("web/static"))
-		mux.Handle("/", fileServer)
-	} else {
-		slog.Info("运行于生产模式 (DevMode: false)，静态资源从内嵌二进制内存加载")
+		if _, err := os.Stat("web/static/index.html"); err == nil {
+			slog.Info("运行于开发模式: 从本地磁盘实时读取 web/static")
+			staticHandler = http.FileServer(http.Dir("web/static"))
+		}
+	}
+
+	if staticHandler == nil {
+		slog.Info("运行于单二进制内嵌模式: 从内存二进制直接加载静态页面")
 		staticSub, err := fs.Sub(web.StaticFS, "static")
 		if err != nil {
 			slog.Error("加载内嵌静态资源失败", "err", err)
 			os.Exit(1)
 		}
-		mux.Handle("/", http.FileServer(http.FS(staticSub)))
+		staticHandler = http.FileServer(http.FS(staticSub))
 	}
+
+	mux.Handle("/", staticHandler)
 
 	// 6. HTTP 服务与优雅停机
 	serverAddr := fmt.Sprintf(":%d", cfg.Server.Port)
@@ -80,11 +86,10 @@ func main() {
 		Addr:         serverAddr,
 		Handler:      mux,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 60 * time.Second, // 预留 AI SSE 流式传输时间
+		WriteTimeout: 60 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// 后台协程启动监听
 	go func() {
 		slog.Info("服务已成功启动", "url", fmt.Sprintf("http://localhost:%d", cfg.Server.Port))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -93,7 +98,6 @@ func main() {
 		}
 	}()
 
-	// 7. 优雅停机信号捕获
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
