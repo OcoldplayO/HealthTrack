@@ -7,7 +7,38 @@ import (
 	"time"
 )
 
-// HealthRecord 对应 SQLite 数据库实体
+// ExerciseDetail 运动明细
+type ExerciseDetail struct {
+	Type      string `json:"type"`      // none, cardio, strength
+	Duration  int    `json:"duration"`  // 时长 (分钟)
+	Intensity string `json:"intensity"` // light, medium, failure
+	Items     string `json:"items"`     // 备注，如 "骑行 3km" 或 "腿部深蹲"
+}
+
+// ColdShowerDetail 冷水澡记录
+type ColdShowerDetail struct {
+	Enabled  bool   `json:"enabled"`  // 是否打卡
+	Timing   string `json:"timing"`   // morning, post_workout, evening
+	Duration int    `json:"duration"` // 时长 (分钟)
+	Feeling  string `json:"feeling"`  // refreshed, neutral, shivering
+}
+
+// ConcertaDetail 专注达服药与多维效能记录
+type ConcertaDetail struct {
+	Taken          bool     `json:"taken"`           // 今日是否服药
+	Time           string   `json:"time"`            // 服药时间点 (HH:mm)
+	Dose           int      `json:"dose"`            // 剂量 (18, 36, 54)
+	FocusWork      int      `json:"focus_work"`      // 工作启动力与心流 (1-5)
+	FocusStudy     int      `json:"focus_study"`     // 阅读与工作记忆 (1-5)
+	DailyTasks     int      `json:"daily_tasks"`     // 琐事耐受度 (1-5)
+	SocialPatience int      `json:"social"`          // 社交情绪平稳度 (1-5)
+	GamingReaction int      `json:"gaming"`          // 竞技反应度 (1-5)
+	CrashTime      string   `json:"crash_time"`      // 断崖疲劳点 (HH:mm)
+	SideEffects    []string `json:"side_effects"`    // ["appetite_loss", "thirst", "palpitation"]
+	Compensations  []string `json:"compensations"`   // ["monster_energy", "sugar_craving"]
+}
+
+// HealthRecord 核心健康记录实体（对齐 SQLite 数据库实体）
 type HealthRecord struct {
 	ID             int64      `json:"id"`
 	UserID         int64      `json:"user_id"`
@@ -21,20 +52,32 @@ type HealthRecord struct {
 	SleepTag       string     `json:"sleep_tag"`        // 'GREEN', 'YELLOW', 'RED'
 	JournalText    string     `json:"journal_text"`     // 饮食、运动日记
 	ActivityTags   string     `json:"activity_tags"`    // 提取的标签 JSON
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+
+	// 扩展生物黑客结构化对象
+	Exercise   *ExerciseDetail   `json:"exercise,omitempty"`
+	ColdShower *ColdShowerDetail `json:"cold_shower,omitempty"`
+	Concerta   *ConcertaDetail   `json:"concerta,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
+
+// Record 别名对齐 SYSTEM_DESIGN.md
+type Record = HealthRecord
 
 // SaveRecordDTO 前端提交的请求载荷
 type SaveRecordDTO struct {
-	RecordDate     string   `json:"record_date"`
-	WeightAM       *float64 `json:"weight_am"`
-	WeightPM       *float64 `json:"weight_pm"`
-	WaistSize      *float64 `json:"waist_size"`
-	SleepStartTime *string  `json:"sleep_start_time"`
-	SleepEndTime   *string  `json:"sleep_end_time"`
-	SleepHours     *float64 `json:"sleep_hours"`
-	JournalText    *string  `json:"journal_text"`
+	RecordDate     string            `json:"record_date"`
+	WeightAM       *float64          `json:"weight_am"`
+	WeightPM       *float64          `json:"weight_pm"`
+	WaistSize      *float64          `json:"waist_size"`
+	SleepStartTime *string           `json:"sleep_start_time"` // 昨晚就寝时间 (sleep_bed_time)
+	SleepEndTime   *string           `json:"sleep_end_time"`   // 今晨起床时间 (sleep_wake_time)
+	SleepHours     *float64          `json:"sleep_hours"`      // 睡眠时长 (sleep_duration)
+	JournalText    *string           `json:"journal_text"`     // 饮食日记
+	Exercise       *ExerciseDetail   `json:"exercise"`
+	ColdShower     *ColdShowerDetail `json:"cold_shower"`
+	Concerta       *ConcertaDetail   `json:"concerta"`
 }
 
 // CalculateSleepTag 根据入睡时间计算熬夜等级 (GREEN <= 24:00, YELLOW <= 01:00, RED > 01:00)
@@ -99,3 +142,4 @@ func (dto *SaveRecordDTO) Validate() error {
 	}
 	return nil
 }
+

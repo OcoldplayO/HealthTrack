@@ -15,6 +15,92 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .typing-cursor::after { content: '▋'; animation: blink 1s infinite; color: #3b82f6; }
     @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+    /* 胶囊与标签交互样式 */
+    .pill-btn {
+      padding: 0.35rem 0.75rem;
+      border-radius: 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background-color: #f1f5f9;
+      color: #475569;
+      transition: all 0.15s ease;
+      border: 1px solid transparent;
+    }
+    .pill-btn.active {
+      background-color: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+    }
+    .pill-sm-btn {
+      padding: 0.25rem 0.6rem;
+      border-radius: 0.5rem;
+      font-size: 0.7rem;
+      font-weight: 500;
+      background-color: #f1f5f9;
+      color: #64748b;
+      transition: all 0.15s ease;
+      border: 1px solid transparent;
+    }
+    .pill-sm-btn.active {
+      background-color: #3b82f6;
+      color: #ffffff;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      background-color: #f1f5f9;
+      color: #475569;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+      border: 1px solid #e2e8f0;
+    }
+    .chip.active {
+      background-color: #dbeafe;
+      color: #1d4ed8;
+      border-color: #93c5fd;
+      font-weight: 600;
+    }
+    .chip-warn.active {
+      background-color: #fee2e2;
+      color: #b91c1c;
+      border-color: #fca5a5;
+      font-weight: 600;
+    }
+
+    .badge-green {
+      background-color: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .badge-yellow {
+      background-color: #fffbeb;
+      color: #d97706;
+      border: 1px solid #fde68a;
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .badge-red {
+      background-color: #fef2f2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between select-none">
@@ -58,45 +144,191 @@
           <button onclick="setTodayDate()" class="text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors">今日</button>
         </div>
 
-        <!-- 4 核心数字输入卡片 -->
-        <div class="grid grid-cols-2 gap-3">
-          <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
-            <label class="text-[10px] uppercase font-bold tracking-wider text-slate-400">晨起空腹体重 (kg)</label>
-            <input type="number" step="0.1" id="input-weight-am" placeholder="如 76.5" class="w-full bg-transparent text-xl font-bold text-slate-800 outline-none mt-1">
+        <!-- 3 核心形态指标输入卡片 (体重与腰围) -->
+        <div class="grid grid-cols-3 gap-2.5">
+          <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+            <label class="text-[9px] uppercase font-bold tracking-wider text-slate-400">晨起空腹(kg)</label>
+            <input type="number" step="0.1" id="input-weight-am" placeholder="如 76.5" class="w-full bg-transparent text-lg font-bold text-slate-800 outline-none mt-1">
           </div>
-          <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
-            <label class="text-[10px] uppercase font-bold tracking-wider text-slate-400">睡前体重 (kg)</label>
-            <input type="number" step="0.1" id="input-weight-pm" placeholder="如 77.7" class="w-full bg-transparent text-xl font-bold text-slate-800 outline-none mt-1">
+          <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+            <label class="text-[9px] uppercase font-bold tracking-wider text-slate-400">睡前体重(kg)</label>
+            <input type="number" step="0.1" id="input-weight-pm" placeholder="如 77.7" class="w-full bg-transparent text-lg font-bold text-slate-800 outline-none mt-1">
           </div>
-          <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
-            <label class="text-[10px] uppercase font-bold tracking-wider text-slate-400">腰围 (cm)</label>
-            <input type="number" step="0.1" id="input-waist" placeholder="如 78.0" class="w-full bg-transparent text-xl font-bold text-slate-800 outline-none mt-1">
-          </div>
-          <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
-            <label class="text-[10px] uppercase font-bold tracking-wider text-slate-400">睡眠时长 (h)</label>
-            <input type="number" step="0.1" id="input-sleep-hours" placeholder="如 6.8" class="w-full bg-transparent text-xl font-bold text-slate-800 outline-none mt-1">
+          <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+            <label class="text-[9px] uppercase font-bold tracking-wider text-slate-400">腰围(cm)</label>
+            <input type="number" step="0.1" id="input-waist" placeholder="如 78.0" class="w-full bg-transparent text-lg font-bold text-slate-800 outline-none mt-1">
           </div>
         </div>
 
-        <!-- 睡眠就寝时间点 -->
-        <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <span class="text-base">🌙</span>
-            <div>
-              <p class="text-xs font-bold text-slate-700">昨晚就寝时间</p>
-              <p class="text-[10px] text-slate-400">用于自动评定熬夜等级 (绿/黄/红)</p>
+        <!-- 睡眠双时间联动计算卡片 -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+              <span>🌙</span>
+              <span>睡眠节律与自动核算</span>
+            </span>
+            <span id="sleepTagBadge" class="badge-green">🟢 未熬夜</span>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label class="text-[10px] font-semibold text-slate-500">昨晚就寝时间</label>
+              <input type="time" id="sleepBedTime" value="00:30" class="w-full border border-slate-200 rounded-xl px-2.5 py-1.5 text-sm font-bold text-slate-800 outline-none focus:border-blue-500 bg-slate-50/50" oninput="handleSleepCalculation()">
+            </div>
+            <div class="space-y-1">
+              <label class="text-[10px] font-semibold text-slate-500">今晨起床时间</label>
+              <input type="time" id="sleepWakeTime" value="07:15" class="w-full border border-slate-200 rounded-xl px-2.5 py-1.5 text-sm font-bold text-slate-800 outline-none focus:border-blue-500 bg-slate-50/50" oninput="handleSleepCalculation()">
             </div>
           </div>
-          <input type="time" id="input-sleep-start" class="border border-slate-200 rounded-lg px-2 py-1 text-sm font-semibold outline-none focus:border-blue-500">
+          <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-xs text-slate-500">
+            <span>自动推算时长 (可微调):</span>
+            <div class="flex items-center space-x-1 font-bold text-slate-800">
+              <input type="number" step="0.1" id="sleepDuration" class="w-14 bg-slate-100 px-2 py-0.5 rounded-lg text-center font-bold text-blue-600 outline-none focus:ring-1 focus:ring-blue-500" value="6.8">
+              <span class="text-xs text-slate-400">小时</span>
+            </div>
+          </div>
         </div>
 
-        <!-- 自由文本区域 (支持多次增量记录) -->
+        <!-- 自由文本区域 (饮食、身体感受) -->
         <div class="space-y-1.5">
           <label class="text-xs font-bold text-slate-700 flex justify-between items-center">
-            <span>饮食、运动与身体感受</span>
-            <span class="text-[10px] font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">自动提取运动标签</span>
+            <span>饮食日记与身体感受</span>
+            <span class="text-[10px] font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">自由文本 · 抓大放小</span>
           </label>
-          <textarea id="input-journal" rows="4" class="w-full bg-white text-slate-800 border border-slate-200 shadow-sm rounded-2xl p-3.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all resize-none leading-relaxed" placeholder="如：早上一杯安慕希25g糖。中午大碗炒饭300g。下午打篮球半小时，骑车3km..."></textarea>
+          <textarea id="input-journal" rows="3" class="w-full bg-white text-slate-800 border border-slate-200 shadow-sm rounded-2xl p-3.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all resize-none leading-relaxed" placeholder="如：早上一杯纯黑咖啡+鸡蛋2个。午餐牛肉原生米饭。晚上轻微高钠炒菜..."></textarea>
+        </div>
+
+        <!-- 🧬 专项生理与习惯打卡折叠面板 -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden transition-all">
+          <div class="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 transition-colors" onclick="toggleBiohackPanel()">
+            <span class="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+              <span>🧬</span>
+              <span>专项生理与习惯打卡 (运动 / 专注达 / 冷水澡)</span>
+            </span>
+            <span id="accordionIcon" class="text-xs text-slate-400 transform transition-transform">▼</span>
+          </div>
+
+          <div id="biohackBody" class="p-4 pt-1 space-y-4 border-t border-slate-100 hidden">
+            <!-- 1. 运动模块 -->
+            <div class="space-y-2.5 pb-3 border-b border-slate-100">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700 flex items-center space-x-1">
+                  <span>🏋️</span>
+                  <span>运动训练</span>
+                </span>
+              </div>
+              <div class="flex space-x-2" id="exerciseTypePills">
+                <button type="button" class="pill-btn active" data-val="none" onclick="setExerciseType('none')">无运动</button>
+                <button type="button" class="pill-btn" data-val="cardio" onclick="setExerciseType('cardio')">有氧运动</button>
+                <button type="button" class="pill-btn" data-val="strength" onclick="setExerciseType('strength')">力量抗阻</button>
+              </div>
+              <div id="exerciseSubForm" class="space-y-2 pt-1 hidden">
+                <div class="flex items-center justify-between text-xs text-slate-500">
+                  <span>强度:</span>
+                  <div class="flex space-x-1.5" id="exerciseIntensityPills">
+                    <button type="button" class="pill-sm-btn active" data-val="light" onclick="setExerciseIntensity('light')">轻松</button>
+                    <button type="button" class="pill-sm-btn" data-val="medium" onclick="setExerciseIntensity('medium')">中等</button>
+                    <button type="button" class="pill-sm-btn" data-val="failure" onclick="setExerciseIntensity('failure')">力竭/过载</button>
+                  </div>
+                </div>
+                <div class="flex space-x-2 text-xs">
+                  <input type="number" id="exerciseDuration" placeholder="时长(分)" class="w-24 border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-blue-500" value="40">
+                  <input type="text" id="exerciseItems" placeholder="备注，如 骑行3km / 腿部深蹲" class="flex-1 border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-blue-500">
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. 专注达 (Concerta) 模块 -->
+            <div class="space-y-2.5 pb-3 border-b border-slate-100">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700 flex items-center space-x-1">
+                  <span>💊</span>
+                  <span>专注达服药追踪</span>
+                </span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="concertaEnabled" class="sr-only peer" onchange="toggleConcerta(this.checked)">
+                  <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              <div id="concertaSubForm" class="space-y-2.5 pt-1 hidden">
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                  <div class="flex items-center space-x-1.5">
+                    <span class="text-slate-500">时间:</span>
+                    <input type="time" id="concertaTime" value="08:00" class="border border-slate-200 rounded-lg px-2 py-0.5 outline-none font-semibold focus:border-blue-500">
+                  </div>
+                  <div class="flex items-center space-x-1.5">
+                    <span class="text-slate-500">剂量:</span>
+                    <select id="concertaDose" class="border border-slate-200 rounded-lg px-2 py-0.5 outline-none font-semibold focus:border-blue-500 bg-white">
+                      <option value="18">18mg</option>
+                      <option value="36" selected>36mg</option>
+                      <option value="54">54mg</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="space-y-1">
+                  <div class="flex justify-between text-xs text-slate-600 font-medium">
+                    <span>工作启动力与心流:</span>
+                    <span id="focusWorkText" class="font-bold text-blue-600">4分</span>
+                  </div>
+                  <input type="range" id="focusWork" min="1" max="5" value="4" class="w-full accent-blue-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer" oninput="document.getElementById('focusWorkText').innerText = this.value + '分'">
+                </div>
+                <div class="space-y-1">
+                  <span class="text-[10px] text-slate-400 font-semibold block">副作用表现:</span>
+                  <div class="flex flex-wrap gap-1.5" id="concertaSideEffects">
+                    <span class="chip" data-key="appetite_loss" onclick="toggleChip(this)">食欲抑制</span>
+                    <span class="chip" data-key="thirst" onclick="toggleChip(this)">口干</span>
+                    <span class="chip" data-key="crash" onclick="toggleChip(this)">晚间疲劳Crash</span>
+                  </div>
+                </div>
+                <div class="space-y-1">
+                  <span class="text-[10px] text-slate-400 font-semibold block">晚间代偿手段:</span>
+                  <div class="flex flex-wrap gap-1.5" id="concertaCompensations">
+                    <span class="chip chip-warn" data-key="monster_energy" onclick="toggleChip(this)">魔爪/高咖啡因</span>
+                    <span class="chip chip-warn" data-key="sugar_craving" onclick="toggleChip(this)">高糖暴食冲动</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. 冷水澡模块 -->
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700 flex items-center space-x-1">
+                  <span>🚿</span>
+                  <span>冷水澡刺激</span>
+                </span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="coldShowerEnabled" class="sr-only peer" onchange="toggleColdShower(this.checked)">
+                  <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              <div id="coldShowerSubForm" class="space-y-2 pt-1 hidden">
+                <div class="flex items-center justify-between text-xs text-slate-500">
+                  <span>时段:</span>
+                  <div class="flex space-x-1.5" id="csTimingPills">
+                    <button type="button" class="pill-sm-btn active" data-val="morning" onclick="setColdShowerTiming('morning')">晨起即刻</button>
+                    <button type="button" class="pill-sm-btn" data-val="post_workout" onclick="setColdShowerTiming('post_workout')">训练后</button>
+                    <button type="button" class="pill-sm-btn" data-val="evening" onclick="setColdShowerTiming('evening')">睡前</button>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between text-xs text-slate-500">
+                  <span>时长:</span>
+                  <div class="flex items-center space-x-1">
+                    <input type="number" id="coldShowerDuration" value="2" class="w-14 border border-slate-200 rounded-lg px-2 py-0.5 text-center font-bold text-blue-600 outline-none">
+                    <span>分钟</span>
+                  </div>
+                </div>
+                <div class="space-y-1">
+                  <span class="text-[10px] text-slate-400 font-semibold block">即刻体感:</span>
+                  <div class="flex flex-wrap gap-1.5" id="csFeelingPills">
+                    <button type="button" class="pill-sm-btn active" data-val="refreshed" onclick="setColdShowerFeeling('refreshed')">🟢 神清气爽</button>
+                    <button type="button" class="pill-sm-btn" data-val="neutral" onclick="setColdShowerFeeling('neutral')">🟡 无明显感觉</button>
+                    <button type="button" class="pill-sm-btn" data-val="shivering" onclick="setColdShowerFeeling('shivering')">🔴 寒冷困倦</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
         </div>
 
         <!-- 保存按钮 -->
@@ -221,6 +453,16 @@
     let weightChart = null;
     let sleepChart = null;
 
+    // 生物黑客交互状态
+    let exerciseState = {
+      type: 'none',
+      intensity: 'light'
+    };
+    let coldShowerState = {
+      timing: 'morning',
+      feeling: 'refreshed'
+    };
+
     window.addEventListener('DOMContentLoaded', () => {
       setTodayDate();
     });
@@ -267,6 +509,131 @@
       loadRecordForDate(str);
     }
 
+    // 睡眠跨日联动核算与三色熬夜标签自动计算
+    function handleSleepCalculation() {
+      const bedTime = document.getElementById('sleepBedTime').value;
+      const wakeTime = document.getElementById('sleepWakeTime').value;
+      if (!bedTime || !wakeTime) return;
+
+      const [bH, bM] = bedTime.split(':').map(Number);
+      const [wH, wM] = wakeTime.split(':').map(Number);
+
+      let bedMinutes = bH * 60 + bM;
+      let wakeMinutes = wH * 60 + wM;
+
+      if (wakeMinutes <= bedMinutes) {
+        wakeMinutes += 1440; // 跨过午夜
+      }
+
+      const hours = ((wakeMinutes - bedMinutes) / 60).toFixed(1);
+      document.getElementById('sleepDuration').value = hours;
+
+      // 熬夜分级评定 (<=24:00 绿; <=01:00 黄; >01:00 红)
+      const badge = document.getElementById('sleepTagBadge');
+      if (bH >= 18 || bH === 0) {
+        badge.className = 'badge-green';
+        badge.innerText = '🟢 未熬夜';
+      } else if (bH === 1 && bM === 0) {
+        badge.className = 'badge-yellow';
+        badge.innerText = '🟡 轻度熬夜';
+      } else {
+        badge.className = 'badge-red';
+        badge.innerText = '🔴 重度熬夜';
+      }
+    }
+
+    // 折叠面板切换
+    function toggleBiohackPanel() {
+      const body = document.getElementById('biohackBody');
+      const icon = document.getElementById('accordionIcon');
+      if (body.classList.contains('hidden')) {
+        body.classList.remove('hidden');
+        icon.style.transform = 'rotate(180deg)';
+      } else {
+        body.classList.add('hidden');
+        icon.style.transform = 'rotate(0deg)';
+      }
+    }
+
+    // 运动打卡交互
+    function setExerciseType(type) {
+      exerciseState.type = type;
+      const pills = document.querySelectorAll('#exerciseTypePills .pill-btn');
+      pills.forEach(p => {
+        if (p.getAttribute('data-val') === type) {
+          p.classList.add('active');
+        } else {
+          p.classList.remove('active');
+        }
+      });
+      const sub = document.getElementById('exerciseSubForm');
+      if (type === 'none') {
+        sub.classList.add('hidden');
+      } else {
+        sub.classList.remove('hidden');
+      }
+    }
+
+    function setExerciseIntensity(intensity) {
+      exerciseState.intensity = intensity;
+      const pills = document.querySelectorAll('#exerciseIntensityPills .pill-sm-btn');
+      pills.forEach(p => {
+        if (p.getAttribute('data-val') === intensity) {
+          p.classList.add('active');
+        } else {
+          p.classList.remove('active');
+        }
+      });
+    }
+
+    // 专注达交互
+    function toggleConcerta(enabled) {
+      const sub = document.getElementById('concertaSubForm');
+      if (enabled) {
+        sub.classList.remove('hidden');
+      } else {
+        sub.classList.add('hidden');
+      }
+    }
+
+    function toggleChip(el) {
+      el.classList.toggle('active');
+    }
+
+    // 冷水澡交互
+    function toggleColdShower(enabled) {
+      const sub = document.getElementById('coldShowerSubForm');
+      if (enabled) {
+        sub.classList.remove('hidden');
+      } else {
+        sub.classList.add('hidden');
+      }
+    }
+
+    function setColdShowerTiming(timing) {
+      coldShowerState.timing = timing;
+      const pills = document.querySelectorAll('#csTimingPills .pill-sm-btn');
+      pills.forEach(p => {
+        if (p.getAttribute('data-val') === timing) {
+          p.classList.add('active');
+        } else {
+          p.classList.remove('active');
+        }
+      });
+    }
+
+    function setColdShowerFeeling(feeling) {
+      coldShowerState.feeling = feeling;
+      const pills = document.querySelectorAll('#csFeelingPills .pill-sm-btn');
+      pills.forEach(p => {
+        if (p.getAttribute('data-val') === feeling) {
+          p.classList.add('active');
+        } else {
+          p.classList.remove('active');
+        }
+      });
+    }
+
     async function loadRecordForDate(dateStr) {
       try {
         const res = await fetch(`/api/v1/records/history?start_date=${dateStr}&end_date=${dateStr}`);
@@ -276,16 +643,100 @@
           document.getElementById('input-weight-am').value = rec.weight_am || '';
           document.getElementById('input-weight-pm').value = rec.weight_pm || '';
           document.getElementById('input-waist').value = rec.waist_size || '';
-          document.getElementById('input-sleep-hours').value = rec.sleep_hours || '';
-          document.getElementById('input-sleep-start').value = rec.sleep_start_time || '';
           document.getElementById('input-journal').value = rec.journal_text || '';
+
+          // 回显睡眠时间与时长
+          if (rec.sleep_start_time) {
+            document.getElementById('sleepBedTime').value = rec.sleep_start_time;
+          } else {
+            document.getElementById('sleepBedTime').value = '00:30';
+          }
+          if (rec.sleep_end_time) {
+            document.getElementById('sleepWakeTime').value = rec.sleep_end_time;
+          } else {
+            document.getElementById('sleepWakeTime').value = '07:15';
+          }
+          if (rec.sleep_hours) {
+            document.getElementById('sleepDuration').value = rec.sleep_hours;
+          }
+
+          // 重新计算标签
+          handleSleepCalculation();
+          if (rec.sleep_hours) {
+            document.getElementById('sleepDuration').value = rec.sleep_hours;
+          }
+
+          // 回显运动
+          if (rec.exercise && rec.exercise.type && rec.exercise.type !== 'none') {
+            setExerciseType(rec.exercise.type);
+            setExerciseIntensity(rec.exercise.intensity || 'light');
+            document.getElementById('exerciseDuration').value = rec.exercise.duration || 40;
+            document.getElementById('exerciseItems').value = rec.exercise.items || '';
+          } else {
+            setExerciseType('none');
+          }
+
+          // 回显专注达
+          if (rec.concerta && rec.concerta.taken) {
+            document.getElementById('concertaEnabled').checked = true;
+            toggleConcerta(true);
+            document.getElementById('concertaTime').value = rec.concerta.time || '08:00';
+            document.getElementById('concertaDose').value = rec.concerta.dose || '36';
+            document.getElementById('focusWork').value = rec.concerta.focus_work || 4;
+            document.getElementById('focusWorkText').innerText = (rec.concerta.focus_work || 4) + '分';
+
+            // 副作用
+            const seKeys = rec.concerta.side_effects || [];
+            document.querySelectorAll('#concertaSideEffects .chip').forEach(c => {
+              if (seKeys.includes(c.getAttribute('data-key'))) {
+                c.classList.add('active');
+              } else {
+                c.classList.remove('active');
+              }
+            });
+
+            // 晚间代偿
+            const compKeys = rec.concerta.compensations || [];
+            document.querySelectorAll('#concertaCompensations .chip').forEach(c => {
+              if (compKeys.includes(c.getAttribute('data-key'))) {
+                c.classList.add('active');
+              } else {
+                c.classList.remove('active');
+              }
+            });
+          } else {
+            document.getElementById('concertaEnabled').checked = false;
+            toggleConcerta(false);
+            document.querySelectorAll('#concertaSideEffects .chip, #concertaCompensations .chip').forEach(c => c.classList.remove('active'));
+          }
+
+          // 回显冷水澡
+          if (rec.cold_shower && rec.cold_shower.enabled) {
+            document.getElementById('coldShowerEnabled').checked = true;
+            toggleColdShower(true);
+            setColdShowerTiming(rec.cold_shower.timing || 'morning');
+            setColdShowerFeeling(rec.cold_shower.feeling || 'refreshed');
+            document.getElementById('coldShowerDuration').value = rec.cold_shower.duration || 2;
+          } else {
+            document.getElementById('coldShowerEnabled').checked = false;
+            toggleColdShower(false);
+          }
+
         } else {
           document.getElementById('input-weight-am').value = '';
           document.getElementById('input-weight-pm').value = '';
           document.getElementById('input-waist').value = '';
-          document.getElementById('input-sleep-hours').value = '';
-          document.getElementById('input-sleep-start').value = '';
           document.getElementById('input-journal').value = '';
+          document.getElementById('sleepBedTime').value = '00:30';
+          document.getElementById('sleepWakeTime').value = '07:15';
+          handleSleepCalculation();
+
+          setExerciseType('none');
+          document.getElementById('concertaEnabled').checked = false;
+          toggleConcerta(false);
+          document.querySelectorAll('#concertaSideEffects .chip, #concertaCompensations .chip').forEach(c => c.classList.remove('active'));
+          document.getElementById('coldShowerEnabled').checked = false;
+          toggleColdShower(false);
         }
       } catch (err) {
         console.error("加载单日记录失败", err);
@@ -297,9 +748,57 @@
       const wAm = document.getElementById('input-weight-am').value;
       const wPm = document.getElementById('input-weight-pm').value;
       const waist = document.getElementById('input-waist').value;
-      const sleepHours = document.getElementById('input-sleep-hours').value;
-      const sleepStart = document.getElementById('input-sleep-start').value;
+      const sleepHours = document.getElementById('sleepDuration').value;
+      const sleepStart = document.getElementById('sleepBedTime').value;
+      const sleepEnd = document.getElementById('sleepWakeTime').value;
       const journal = document.getElementById('input-journal').value;
+
+      // 组装运动详情
+      let exercisePayload = {
+        type: exerciseState.type,
+        duration: parseInt(document.getElementById('exerciseDuration').value) || 0,
+        intensity: exerciseState.intensity,
+        items: document.getElementById('exerciseItems').value || ''
+      };
+
+      // 组装专注达详情
+      const concertaTaken = document.getElementById('concertaEnabled').checked;
+      let concertaPayload = null;
+      if (concertaTaken) {
+        const sideEffects = [];
+        document.querySelectorAll('#concertaSideEffects .chip.active').forEach(c => {
+          sideEffects.push(c.getAttribute('data-key'));
+        });
+        const compensations = [];
+        document.querySelectorAll('#concertaCompensations .chip.active').forEach(c => {
+          compensations.push(c.getAttribute('data-key'));
+        });
+
+        concertaPayload = {
+          taken: true,
+          time: document.getElementById('concertaTime').value || '08:00',
+          dose: parseInt(document.getElementById('concertaDose').value) || 36,
+          focus_work: parseInt(document.getElementById('focusWork').value) || 4,
+          focus_study: 4,
+          daily_tasks: 4,
+          social: 4,
+          gaming: 4,
+          crash_time: '18:00',
+          side_effects: sideEffects,
+          compensations: compensations
+        };
+      } else {
+        concertaPayload = { taken: false };
+      }
+
+      // 组装冷水澡详情
+      const coldShowerEnabled = document.getElementById('coldShowerEnabled').checked;
+      let coldShowerPayload = {
+        enabled: coldShowerEnabled,
+        timing: coldShowerState.timing,
+        duration: parseInt(document.getElementById('coldShowerDuration').value) || 2,
+        feeling: coldShowerState.feeling
+      };
 
       const payload = {
         record_date: dateStr,
@@ -308,7 +807,11 @@
         waist_size: waist ? parseFloat(waist) : null,
         sleep_hours: sleepHours ? parseFloat(sleepHours) : null,
         sleep_start_time: sleepStart ? sleepStart : null,
+        sleep_end_time: sleepEnd ? sleepEnd : null,
         journal_text: journal ? journal : null,
+        exercise: exercisePayload,
+        cold_shower: coldShowerPayload,
+        concerta: concertaPayload
       };
 
       try {
@@ -447,14 +950,24 @@
         listEl.innerHTML = '<p class="text-slate-400 text-center py-2">暂无记录</p>';
       } else {
         records.slice().reverse().forEach(r => {
-          if (r.journal_text || r.activity_tags) {
+          if (r.journal_text || r.activity_tags || (r.exercise && r.exercise.type !== 'none') || (r.concerta && r.concerta.taken) || (r.cold_shower && r.cold_shower.enabled)) {
             let tagsHtml = '';
             if (r.activity_tags) {
               try {
                 const tags = JSON.parse(r.activity_tags);
-                tagsHtml = tags.map(t => `<span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">${t}</span>`).join('');
+                tagsHtml += tags.map(t => `<span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">${t}</span>`).join('');
               } catch(e){}
             }
+            if (r.exercise && r.exercise.type !== 'none') {
+              tagsHtml += `<span class="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">🏋️ ${r.exercise.type}</span>`;
+            }
+            if (r.concerta && r.concerta.taken) {
+              tagsHtml += `<span class="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">💊 专注达${r.concerta.dose}mg</span>`;
+            }
+            if (r.cold_shower && r.cold_shower.enabled) {
+              tagsHtml += `<span class="bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">🚿 冷水澡</span>`;
+            }
+
             listEl.innerHTML += `
               <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
                 <div class="flex justify-between items-center mb-1">
@@ -544,3 +1057,4 @@
   </script>
 </body>
 </html>
+

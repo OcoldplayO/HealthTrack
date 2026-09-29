@@ -52,6 +52,11 @@ func InitDB(dbPath, backupDir string) (*DBManager, error) {
 	return mgr, nil
 }
 
+// AutoMigrate 确保数据库表结构平滑演进
+func (m *DBManager) AutoMigrate() error {
+	return m.migrate()
+}
+
 func (m *DBManager) migrate() error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS health_records (
@@ -74,9 +79,26 @@ func (m *DBManager) migrate() error {
 
 	CREATE INDEX IF NOT EXISTS idx_records_user_date ON health_records(user_id, record_date);
 	`
-	_, err := m.DB.Exec(schema)
-	return err
+	if _, err := m.DB.Exec(schema); err != nil {
+		return err
+	}
+
+	// 平滑增量扩展字段 (忽略已存在列错误，保证向后兼容)
+	alterStatements := []string{
+		`ALTER TABLE health_records ADD COLUMN sleep_bed_time TEXT DEFAULT '';`,
+		`ALTER TABLE health_records ADD COLUMN sleep_wake_time TEXT DEFAULT '';`,
+		`ALTER TABLE health_records ADD COLUMN exercise_json TEXT DEFAULT '{}';`,
+		`ALTER TABLE health_records ADD COLUMN cold_shower_json TEXT DEFAULT '{}';`,
+		`ALTER TABLE health_records ADD COLUMN concerta_json TEXT DEFAULT '{}';`,
+	}
+
+	for _, stmt := range alterStatements {
+		_, _ = m.DB.Exec(stmt)
+	}
+
+	return nil
 }
+
 
 func (m *DBManager) Close() error {
 	if m.DB != nil {

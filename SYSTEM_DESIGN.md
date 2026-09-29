@@ -86,7 +86,7 @@
 
 * 🟢 **绿灯项（原生/微加工食材，Clean Foods）**：纯肉、蛋、水产、原生米饭、土豆、燕麦、天然蔬果。
 * 🟡 **黄灯项（常规烹饪加工品）**：带油盐炒菜、调味米粉、板栗、复合主食。
-* 🔴 **红灯项（超加工食品 UPF / 精制糖油混合物 / 高钠）**：月饼、含糖饮料（可乐）、糕点、深加工膨化、极高钠霉豆腐。
+* 🔴 **红灯项（超加工食品 UPF / 精制糖油混合物 / 高钠）**：月饼、含糖饮料（可乐）、糕点、深加工膨化、极高钠霉豆腐、薯片、辣条、汉堡等。
 * **8:2 弹性维持原则**：若周期内绿灯原生食材摄入频次与体积占比达到 **$70\% \sim 80\%$**，红灯安慰性食物维持在 **$20\% \sim 30\%$**，系统判定为健康度优秀且可持续，消除断糖心理焦虑。
 
 ### 2.6 运动分类与次日肌肉水肿归因机制
@@ -122,7 +122,7 @@
 
 ## 三、 数据模型与持久层规范
 
-> ⚠️ **强制声明**：真实工程中，核心数据表名**唯一确定为 `records`**（严禁新建或更名为 `health_records`）！持久层统一由 `internal/repository/db.go` 与 `internal/repository/record_repo.go` 实现，严禁新建 `migration/` 包！
+> ⚠️ **强制声明**：真实工程中，核心数据表名**唯一确定为 `records`**。持久层统一由 `internal/repository/db.go` 与 `internal/repository/record_repo.go` 实现，严禁新建 `migration/` 包！
 
 ### 3.1 实体模型定义 (`internal/model/record.go`)
 
@@ -946,12 +946,12 @@ Thumbs.db
 ### 1. 唯一事实源原则 (Single Source of Truth)
 
 * 所有的表名、列名、目录架构以本规范（`v2.0.0 Unified`）为**最高也是唯一裁决标准**。
-* 数据库表名**必须为 `records`**，数据必须存放在 **`data/health.db`**，构建输出必须是 **`bin/healthtrack.exe`**。
+* 数据库表名**为 `records`**，数据存放在 **`data/health.db`**，构建输出必须是 **`bin/healthtrack.exe`**。
 
 ### 2. 真实数据保护红线 (Data Protection)
 
 * **严禁删除、清空、覆写 `data/` 目录！**
-* 严禁执行任何 `DROP TABLE`、`TRUNCATE` 或破坏现有 32KB 数据库中已有列的操作。所有数据库升级必须走 `ALTER TABLE ... ADD COLUMN`。
+* 严禁执行任何 `DROP TABLE`、`TRUNCATE` 或破坏现有数据库中已有列的操作。所有数据库升级必须走 `ALTER TABLE ... ADD COLUMN`。
 
 ### 3. “不确定即暂停提问”熔断机制 (Stop & Ask)
 
