@@ -101,6 +101,44 @@
       font-size: 0.75rem;
       font-weight: 700;
     }
+
+    /* Markdown 渲染排版增强 */
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .markdown-body h3 {
+      font-size: 0.95rem;
+      color: #1e293b;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 0.25rem;
+    }
+    .markdown-body ul {
+      list-style-type: disc;
+      padding-left: 1.25rem;
+      margin-top: 0.35rem;
+      margin-bottom: 0.5rem;
+      space-y: 0.25rem;
+    }
+    .markdown-body li {
+      margin-bottom: 0.35rem;
+      line-height: 1.6;
+    }
+    .markdown-body p {
+      margin-bottom: 0.6rem;
+      line-height: 1.65;
+    }
+    .markdown-body strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+    .markdown-body hr {
+      border: 0;
+      border-top: 1px solid #e2e8f0;
+      margin: 0.75rem 0;
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between select-none">
@@ -421,8 +459,8 @@
             <span id="insight-status-tag" class="text-[10px] text-slate-400">点击上方按钮开始</span>
           </div>
 
-          <div id="insight-content" class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-            欢迎来到 AI 洞察页面！系统会自动提取你在选定周期内的体重走势、熬夜红黄绿分布、以及饮食运动日记，并由大模型进行深度因果归因与复盘。
+          <div id="insight-content" class="text-sm text-slate-700 leading-relaxed markdown-body">
+            <p>欢迎来到 AI 洞察页面！系统会自动提取你在选定周期内的体重走势、夜间呼吸失水、熬夜红黄绿分布、以及饮食运动日记，并由大模型进行深度因果归因与复盘。</p>
           </div>
         </div>
       </section>
@@ -994,60 +1032,207 @@
       });
     }
 
+    // 轻量原生 Markdown 解析器 (支持标题、列表、粗体、分割线、行内强调与段落)
+    function renderMarkdown(md) {
+      if (!md) return '';
+
+      // 1. 转义基础 HTML 字符
+      let safe = md
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      const lines = safe.split('\n');
+      let html = '';
+      let inList = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+
+        // 粗体
+        line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        // 行内代码
+        line = line.replace(/`([^`]+)`/g, '<code class="bg-slate-100 px-1 py-0.5 rounded text-xs text-indigo-600">$1</code>');
+
+        // 标题
+        if (/^### (.*$)/.test(line)) {
+          if (inList) { html += '</ul>'; inList = false; }
+          html += line.replace(/^### (.*$)/, '<h3 class="font-bold text-slate-800 text-sm mt-3 mb-1.5 pb-1 border-b border-slate-100">$1</h3>');
+          continue;
+        }
+        if (/^## (.*$)/.test(line)) {
+          if (inList) { html += '</ul>'; inList = false; }
+          html += line.replace(/^## (.*$)/, '<h2 class="font-bold text-slate-900 text-base mt-4 mb-2">$1</h2>');
+          continue;
+        }
+        if (/^# (.*$)/.test(line)) {
+          if (inList) { html += '</ul>'; inList = false; }
+          html += line.replace(/^# (.*$)/, '<h1 class="font-bold text-slate-900 text-lg mt-4 mb-2">$1</h1>');
+          continue;
+        }
+
+        // 分割线
+        if (/^---$/.test(line.trim())) {
+          if (inList) { html += '</ul>'; inList = false; }
+          html += '<hr class="my-3 border-slate-200">';
+          continue;
+        }
+
+        // 无序列表项 (- 或 *)
+        if (/^[*-]\s+(.*$)/.test(line)) {
+          if (!inList) {
+            html += '<ul class="list-disc pl-5 my-1.5 space-y-1 text-slate-700 text-xs leading-relaxed">';
+            inList = true;
+          }
+          html += line.replace(/^[*-]\s+(.*$)/, '<li>$1</li>');
+          continue;
+        }
+
+        // 普通文本或空行
+        if (inList) {
+          html += '</ul>';
+          inList = false;
+        }
+
+        if (line.trim() === '') {
+          continue;
+        }
+
+        html += `<p class="my-1.5 text-slate-700 text-xs leading-relaxed">${line}</p>`;
+      }
+
+      if (inList) {
+        html += '</ul>';
+      }
+
+      return html;
+    }
+
     async function generateInsightStream() {
       const contentEl = document.getElementById('insight-content');
       const statusTag = document.getElementById('insight-status-tag');
       const btn = document.getElementById('btn-generate-insight');
 
-      const end = new Date();
-      const start = new Date();
-      start.setDate(end.getDate() - (insightDays - 1));
-
-      const startStr = start.toISOString().split('T')[0];
-      const endStr = end.toISOString().split('T')[0];
+      const originalBtnText = btn.innerHTML;
+      btn.disabled = true;
+      btn.classList.add('opacity-50', 'cursor-not-allowed');
+      btn.innerHTML = `<span>⏳ AI 正在全盘深度分析中...</span>`;
 
       contentEl.innerHTML = '';
       contentEl.classList.add('typing-cursor');
-      statusTag.innerText = 'AI 思考分析中...';
-      btn.disabled = true;
-      btn.classList.add('opacity-50');
+      statusTag.innerText = 'AI 正在推导生理因果...';
+
+      // 双通道分离状态
+      let thinkingText = '';
+      let responseText = '';
+
+      // 核心渲染函数：合并调度思考流与正文流
+      function updateUI() {
+        let fullHTML = '';
+
+        // 1. 如果存在思考内容，渲染可折叠的灰色现代卡片
+        if (thinkingText) {
+          // 正文未输出时默认展开思考过程；正文一旦开始输出，自动收起折叠框
+          const isOpen = !responseText ? 'open' : '';
+          fullHTML += `
+            <details class="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500" ${isOpen}>
+              <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">
+                💭 深度思维链推导 (${thinkingText.length} 字)
+              </summary>
+              <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${thinkingText}</div>
+            </details>
+          `;
+        }
+
+        // 2. 如果存在正文，通过 Markdown 渲染引擎输出排版
+        if (responseText) {
+          fullHTML += renderMarkdown(responseText);
+        }
+
+        contentEl.innerHTML = fullHTML;
+      }
 
       try {
-        const response = await fetch(`/api/v1/insights/stream?start_date=${startStr}&end_date=${endStr}`);
+        const response = await fetch(`/api/v1/insights/stream?days=${insightDays}`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
         const reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
+        let buffer = '';
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // 保留未完整的最后一行
+
           for (let line of lines) {
             line = line.trim();
-            if (line.startsWith('data:')) {
-              const dataStr = line.replace('data:', '').trim();
-              if (dataStr) {
-                try {
-                  const data = JSON.parse(dataStr);
-                  if (data.delta) {
-                    contentEl.innerText += data.delta;
-                  }
-                  if (data.status === 'done') {
-                    statusTag.innerText = '分析完成';
-                  }
-                } catch(e){}
+            if (!line || !line.startsWith('data:')) continue;
+
+            const dataStr = line.slice(5).trim();
+            if (dataStr === '[DONE]') {
+              statusTag.innerText = '复盘完成';
+              continue;
+            }
+
+            try {
+              const parsed = JSON.parse(dataStr);
+              if (parsed.error) {
+                responseText += `\n> ⚠️ **服务提示**: ${parsed.error}\n`;
+                updateUI();
+              } else if (parsed.choices && parsed.choices.length > 0) {
+                const delta = parsed.choices[0].delta || {};
+
+                let hasUpdate = false;
+                // 分流 1：提取思考链
+                if (delta.reasoning_content) {
+                  thinkingText += delta.reasoning_content;
+                  hasUpdate = true;
+                }
+                // 分流 2：提取正式正文
+                if (delta.content) {
+                  responseText += delta.content;
+                  hasUpdate = true;
+                }
+
+                if (hasUpdate) {
+                  updateUI();
+                }
               }
+            } catch (e) {
+              // 忽略个别心跳非 JSON 帧
             }
           }
         }
+
+        // 流式正常传输结束判断
+        if (responseText || thinkingText) {
+          updateUI();
+          statusTag.innerText = '复盘完成';
+        } else {
+          contentEl.innerHTML = '<p class="text-slate-400">未能获取到分析内容，请检查后端大模型连接。</p>';
+          statusTag.innerText = '暂无分析内容';
+        }
       } catch (err) {
-        contentEl.innerText = '连接 AI 洞察服务失败，请检查服务状态。';
-        statusTag.innerText = '生成异常';
+        // 保护性容错：只要已经有文字打出，就不抹除内容报大红字，只在末尾优雅追加提示
+        if (responseText || thinkingText) {
+          responseText += `\n\n> ⚠️ *[网络连接已完成或阶段传输结束]*`;
+          updateUI();
+          statusTag.innerText = '分析完成(部分)';
+        } else {
+          contentEl.innerHTML = `<p class="text-red-500">连接 AI 洞察服务失败: ${err.message}</p>`;
+          statusTag.innerText = '生成异常';
+        }
       } finally {
         contentEl.classList.remove('typing-cursor');
         btn.disabled = false;
-        btn.classList.remove('opacity-50');
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        btn.innerHTML = originalBtnText;
       }
     }
 

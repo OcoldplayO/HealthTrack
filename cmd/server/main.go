@@ -45,7 +45,9 @@ func main() {
 	// 4. 依赖注入与分层装配
 	recordRepo := repository.NewRecordRepository(dbMgr.DB)
 	recordService := service.NewRecordService(recordRepo)
+	insightService := service.NewInsightService(recordRepo)
 	aiService := service.NewAIService(&cfg.AI, recordRepo)
+	aiHandler := handler.NewAIHandler(cfg, insightService, recordService)
 	recordHandler := handler.NewRecordHandler(recordService, aiService)
 
 	// 5. 路由注册
@@ -55,7 +57,7 @@ func main() {
 	mux.HandleFunc("/api/v1/records/today", recordHandler.GetToday)
 	mux.HandleFunc("/api/v1/records", recordHandler.SaveRecord)
 	mux.HandleFunc("/api/v1/records/history", recordHandler.GetHistory)
-	mux.HandleFunc("/api/v1/insights/stream", recordHandler.StreamInsight)
+	mux.HandleFunc("/api/v1/insights/stream", aiHandler.StreamInsight)
 	mux.HandleFunc("/api/v1/export", recordHandler.ExportCSV)
 	mux.HandleFunc("/api/v1/export/json", recordHandler.ExportJSON)
 	mux.HandleFunc("/healthz", recordHandler.Healthz)
@@ -87,8 +89,11 @@ func main() {
 	server := &http.Server{
 		Addr:         serverAddr,
 		Handler:      mux,
+		//读取客户端请求超时
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 60 * time.Second,
+		//写入响应超时，0 表示不设置写超时，长连接 SSE 由客户端主动断开或传输完毕为止
+		WriteTimeout: 0,
+		//空闲连接复用超时
 		IdleTimeout:  60 * time.Second,
 	}
 

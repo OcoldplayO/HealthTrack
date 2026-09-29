@@ -65,6 +65,16 @@ func (s *RecordService) GetHistoryRecords(userID int64, startDate, endDate strin
 	return s.repo.GetRange(userID, startDate, endDate)
 }
 
+// GetRecentRecords 按天数获取近 N 天的历史记录 (升序排列)
+func (s *RecordService) GetRecentRecords(userID int64, days int) ([]*model.HealthRecord, error) {
+	if days <= 0 {
+		days = 30
+	}
+	endDate := time.Now().Format("2006-01-02")
+	startDate := time.Now().AddDate(0, 0, -(days - 1)).Format("2006-01-02")
+	return s.repo.GetRange(userID, startDate, endDate)
+}
+
 // GetAllRecords 导出全量数据
 func (s *RecordService) GetAllRecords(userID int64) ([]*model.HealthRecord, error) {
 	return s.repo.GetAll(userID)

@@ -9,9 +9,10 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	AI       AIConfig       `yaml:"ai"`
+	ProjectRoot string         `yaml:"-"`
+	Server      ServerConfig   `yaml:"server"`
+	Database    DatabaseConfig `yaml:"database"`
+	AI          AIConfig       `yaml:"ai"`
 }
 
 type ServerConfig struct {
@@ -117,6 +118,8 @@ func LoadConfig(configName string) (*Config, error) {
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("解析配置文件失败: %w", err)
 	}
+
+	cfg.ProjectRoot = root
 
 	// 环境变量优先级覆盖（适合容器化/CI 部署）
 	if envKey := os.Getenv("AI_API_KEY"); envKey != "" {
