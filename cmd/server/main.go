@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -27,7 +28,7 @@ func main() {
 
 	slog.Info("HealthTrack 智能健康系统正在启动...")
 
-	// 2. 加载配置
+	// 2. 加载配置（内部自动使用 FindProjectRoot 锚定项目根目录）
 	cfg, err := config.LoadConfig("config.yaml")
 	if err != nil {
 		slog.Warn("未找到外部 config.yaml，使用默认内置配置", "err", err)
@@ -55,21 +56,22 @@ func main() {
 	mux.HandleFunc("/api/v1/records", recordHandler.SaveRecord)
 	mux.HandleFunc("/api/v1/records/history", recordHandler.GetHistory)
 	mux.HandleFunc("/api/v1/insights/stream", recordHandler.StreamInsight)
-	mux.HandleFunc("/api/v1/export", recordHandler.ExportCSV)      // 默认导出 Excel 友好的 CSV
-	mux.HandleFunc("/api/v1/export/json", recordHandler.ExportJSON) // 备份专用的 JSON 导出
+	mux.HandleFunc("/api/v1/export", recordHandler.ExportCSV)
+	mux.HandleFunc("/api/v1/export/json", recordHandler.ExportJSON)
 	mux.HandleFunc("/healthz", recordHandler.Healthz)
 
-	// 前端静态页面分发（安全自适应：优先磁盘，若无磁盘文件则无缝走内存内嵌）
+	// 前端静态页面分发（开发模式下根据 ProjectRoot 读取磁盘，生产模式走内嵌内存）
 	var staticHandler http.Handler
 	if cfg.Server.DevMode {
-		if _, err := os.Stat("web/static/index.html"); err == nil {
-			slog.Info("运行于开发模式: 从本地磁盘实时读取 web/static")
-			staticHandler = http.FileServer(http.Dir("web/static"))
+		staticDir := filepath.Join(config.FindProjectRoot(), "web", "static")
+		if _, err := os.Stat(filepath.Join(staticDir, "index.html")); err == nil {
+			slog.Info("运行于开发模式: 从本地磁盘实时读取 web/static", "dir", staticDir)
+			staticHandler = http.FileServer(http.Dir(staticDir))
 		}
 	}
 
 	if staticHandler == nil {
-		slog.Info("运行于单二进制内嵌模式: 从内存二进制直接加载静态页面")
+		slog.Info("运行于单二进制内嵌模式: 从内存直接加载静态页面")
 		staticSub, err := fs.Sub(web.StaticFS, "static")
 		if err != nil {
 			slog.Error("加载内嵌静态资源失败", "err", err)
@@ -80,7 +82,7 @@ func main() {
 
 	mux.Handle("/", staticHandler)
 
-	// 6. HTTP 服务与优雅停机
+	// 6. HTTP 服务启动
 	serverAddr := fmt.Sprintf(":%d", cfg.Server.Port)
 	server := &http.Server{
 		Addr:         serverAddr,
@@ -98,6 +100,7 @@ func main() {
 		}
 	}()
 
+	// 7. 优雅停机信号捕获
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit

@@ -1,5 +1,5 @@
 # 编译生成的可执行文件与临时文件
-bin/
+/bin/
 *.exe
 *.exe~
 *.dll
@@ -7,6 +7,13 @@ bin/
 *.dylib
 
 # SQLite 本地数据库文件与热日志（严禁提交个人隐私数据）
+/data/*.db
+/data/*.db-journal
+/data/*.db-wal
+/data/*.db-shm
+/data/backups/
+!/data/.gitkeep
+
 *.db
 *.db-journal
 *.db-wal

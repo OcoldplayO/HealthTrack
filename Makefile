@@ -2,12 +2,12 @@
 
 # 本地直接运行
 run:
-	go run cmd/server/main.go
+	go run ./cmd/server/main.go
 
 # 编译 Windows 64位单一可执行文件
 build-win:
 	@echo "正在编译 Windows 单一二进制文件..."
-	go build -ldflags="-s -w" -o bin/healthtrack.exe cmd/server/main.go
+	go build -ldflags="-s -w" -o bin/healthtrack.exe ./cmd/server/main.go
 	@echo "编译完成: bin/healthtrack.exe"
 
 # 跨平台编译 Linux 64位独立可执行文件 (零 CGO 依赖，纯裸机可跑)
@@ -16,9 +16,10 @@ build-linux:
 	SET CGO_ENABLED=0
 	SET GOOS=linux
 	SET GOARCH=amd64
-	go build -ldflags="-s -w" -o bin/healthtrack cmd/server/main.go
+	go build -ldflags="-s -w" -o bin/healthtrack ./cmd/server/main.go
 	@echo "编译完成: bin/healthtrack"
 
-# 清理编译文件
+# 仅清理 bin 目录下的编译产物，绝对禁止触碰 data/ 目录
 clean:
-	@if exist bin rmdir /s /q bin
+	@if exist bin\healthtrack.exe del /f /q bin\healthtrack.exe
+	@if exist bin\healthtrack del /f /q bin\healthtrack

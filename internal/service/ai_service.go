@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -144,7 +145,8 @@ func calculateStats(startDate, endDate string, records []*model.HealthRecord) *M
 func (s *AIService) buildPrompt(stats *MacroStats, records []*model.HealthRecord) (string, error) {
 	var tpl string
 	// 优先读取磁盘文件，若无则使用内置内嵌模板
-	if data, err := os.ReadFile("prompts/insight_v1.txt"); err == nil {
+	promptPath := filepath.Join(config.FindProjectRoot(), "prompts", "insight_v1.txt")
+	if data, err := os.ReadFile(promptPath); err == nil {
 		tpl = string(data)
 	} else {
 		tpl = defaultPromptTemplate
