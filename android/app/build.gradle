@@ -6,6 +6,14 @@ android {
     namespace 'com.healthtrack.app'
     compileSdk 34
 
+    // Android 10+ 私有 filesDir 带有 noexec 限制。保持 JNI 库解压，
+    // 使服务进程从系统管理、可执行的 nativeLibraryDir 启动。
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     defaultConfig {
         applicationId 'com.healthtrack.app'
         minSdk 26

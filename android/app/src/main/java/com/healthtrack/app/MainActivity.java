@@ -104,7 +104,7 @@ public final class MainActivity extends Activity {
             try {
                 File filesDir = getFilesDir();
                 File configFile = new File(filesDir, CONFIG_FILE);
-                File serverBin = new File(getApplicationInfo().nativeLibraryDir, "libserver.so");
+                File serverBin = new File(getApplicationInfo().nativeLibraryDir, "libhealthtrack.so");
 
                 // 用户已修改的配置不能被 APK 更新覆盖。
                 if (!configFile.exists()) {
@@ -112,8 +112,8 @@ public final class MainActivity extends Activity {
                 }
 
                 // 原生库目录由系统解压并允许执行；filesDir 在部分设备上带 noexec 挂载。
-                if (!serverBin.isFile()) {
-                    throw new IOException("未找到内置服务程序: " + serverBin.getAbsolutePath());
+                if (!serverBin.exists()) {
+                    throw new IOException("未找到原生二进制库，路径: " + serverBin.getAbsolutePath());
                 }
                 startServer(serverBin, configFile, filesDir);
 
@@ -131,13 +131,13 @@ public final class MainActivity extends Activity {
         });
     }
 
-    private void startServer(File serverFile, File configFile, File filesDir) throws IOException {
+    private void startServer(File serverBin, File configFile, File filesDir) throws IOException {
         if (serverProcess != null && serverProcess.isAlive()) {
             return;
         }
 
         ProcessBuilder processBuilder = new ProcessBuilder(Arrays.asList(
-                serverFile.getAbsolutePath(),
+                serverBin.getAbsolutePath(),
                 "-config", configFile.getAbsolutePath(),
                 "-data-dir", filesDir.getAbsolutePath(),
                 "-port", "8080"));
@@ -182,9 +182,9 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void copyAsset(String assetName, File target) throws IOException {
+    private void writeBundledConfig(File target) throws IOException {
         File temporary = new File(target.getParentFile(), target.getName() + ".tmp");
-        try (InputStream input = getAssets().open(assetName);
+        try (InputStream input = getAssets().open(CONFIG_ASSET);
              FileOutputStream output = new FileOutputStream(temporary, false)) {
             byte[] buffer = new byte[16 * 1024];
             int count;
@@ -218,7 +218,7 @@ public final class MainActivity extends Activity {
      */
     private void copyConfigAssetOrWriteFallback(File target) throws IOException {
         try {
-            copyAsset(CONFIG_ASSET, target);
+            writeBundledConfig(target);
         } catch (FileNotFoundException error) {
             writeTextAtomically(FALLBACK_CONFIG, target);
         }
