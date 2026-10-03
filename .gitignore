@@ -33,6 +33,10 @@ config.yaml
 .DS_Store
 Thumbs.db
 
+# Android 签名密钥（私钥，泄露等于他人可伪造本应用的更新包）
+*.jks
+*.keystore
+
 # Android Gradle 临时缓存与输出目录
 .gradle/
 android/.gradle/

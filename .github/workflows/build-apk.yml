@@ -42,8 +42,23 @@ jobs:
           java-version: "17"
           cache: gradle
 
+      - name: Decode signing keystore
+        run: |
+          set -euo pipefail
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "::error::缺少 Secret ANDROID_KEYSTORE_BASE64，无法进行固定签名构建"
+            exit 1
+          fi
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | tr -d '\n\r' | base64 -d > "$RUNNER_TEMP/healthtrack-release.jks"
+          test -s "$RUNNER_TEMP/healthtrack-release.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/healthtrack-release.jks" >> "$GITHUB_ENV"
+
       - name: Build debug APK
         working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           chmod +x ./gradlew
           ./gradlew assembleDebug --stacktrace

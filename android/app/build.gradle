@@ -2,6 +2,11 @@ plugins {
     id 'com.android.application'
 }
 
+// 固定签名：CI 会把 base64 密钥还原成文件，再用环境变量把路径与口令传进来。
+// 本地未提供这些变量时保持默认行为，不影响本地构建。
+def keystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
+def hasFixedKeystore = keystorePath != null && file(keystorePath).exists()
+
 android {
     namespace 'com.healthtrack.app'
     compileSdk 34
@@ -22,10 +27,30 @@ android {
         versionName '1.0.0'
     }
 
+    signingConfigs {
+        fixed {
+            if (hasFixedKeystore) {
+                storeFile file(keystorePath)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            // 与 release 共用同一把固定密钥，保证每次构建证书指纹一致，可直接覆盖安装。
+            if (hasFixedKeystore) {
+                signingConfig signingConfigs.fixed
+            }
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasFixedKeystore) {
+                signingConfig signingConfigs.fixed
+            }
         }
     }
 
