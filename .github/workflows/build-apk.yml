@@ -91,6 +91,7 @@ jobs:
             HealthTrack APK 已自动构建完成，请查收附件并安装到手机。
 
             版本号：v${{ env.VERSION }}
+            版本代码（versionCode）：${{ github.run_number }}
             提交哈希：${{ github.sha }}
             提交信息：${{ github.event.head_commit.message }}
             仓库：${{ github.repository }}
