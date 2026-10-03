@@ -1,0 +1,251 @@
+package com.healthtrack.app;
+
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
+import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public final class MainActivity extends Activity {
+    private static final String SERVER_ASSET = "server";
+    private static final String CONFIG_ASSET = "config.yaml";
+    private static final String SERVER_FILE = "healthtrack-server";
+    private static final String CONFIG_FILE = "config.yaml";
+    private static final String HEALTH_URL = "http://127.0.0.1:8080/healthz";
+    private static final String APP_URL = "http://127.0.0.1:8080";
+
+    private final ExecutorService startupExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    private WebView webView;
+    private TextView statusView;
+    private Process serverProcess;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        enableFullscreen();
+        setContentView(createContentView());
+        startServerAndLoadWebView();
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private View createContentView() {
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.WHITE);
+
+        webView = new WebView(this);
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.getSettings().setDomStorageEnabled(true);
+        webView.getSettings().setAllowFileAccess(false);
+        webView.getSettings().setAllowContentAccess(false);
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return false;
+            }
+        });
+        root.addView(webView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+
+        statusView = new TextView(this);
+        statusView.setText("正在启动 HealthTrack…");
+        statusView.setTextColor(Color.rgb(71, 85, 105));
+        statusView.setTextSize(16);
+        statusView.setGravity(Gravity.CENTER);
+        statusView.setPadding(36, 24, 36, 24);
+        statusView.setBackgroundColor(Color.WHITE);
+        root.addView(statusView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+
+        return root;
+    }
+
+    private void enableFullscreen() {
+        Window window = getWindow();
+        window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        window.getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
+
+    private void startServerAndLoadWebView() {
+        startupExecutor.execute(() -> {
+            try {
+                File filesDir = getFilesDir();
+                File configFile = new File(filesDir, CONFIG_FILE);
+                File serverFile = new File(filesDir, SERVER_FILE);
+
+                // 用户已修改的配置不能被 APK 更新覆盖。
+                if (!configFile.exists()) {
+                    copyAsset(CONFIG_ASSET, configFile);
+                }
+
+                // 每次冷启动更新内置二进制；此时旧进程已不在运行。
+                copyAsset(SERVER_ASSET, serverFile);
+                makeExecutable(serverFile);
+                startServer(serverFile, configFile, filesDir);
+
+                if (!waitForServer()) {
+                    throw new IOException("服务未能在 15 秒内启动。请重新打开应用。\n日志：" + new File(filesDir, "server.log"));
+                }
+
+                mainHandler.post(() -> {
+                    statusView.setVisibility(View.GONE);
+                    webView.loadUrl(APP_URL);
+                });
+            } catch (Exception error) {
+                mainHandler.post(() -> showStartupError(error));
+            }
+        });
+    }
+
+    private void startServer(File serverFile, File configFile, File filesDir) throws IOException {
+        if (serverProcess != null && serverProcess.isAlive()) {
+            return;
+        }
+
+        ProcessBuilder processBuilder = new ProcessBuilder(Arrays.asList(
+                serverFile.getAbsolutePath(),
+                "-config", configFile.getAbsolutePath(),
+                "-data-dir", filesDir.getAbsolutePath(),
+                "-port", "8080"));
+        processBuilder.directory(filesDir);
+        processBuilder.redirectErrorStream(true);
+        processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(new File(filesDir, "server.log")));
+        serverProcess = processBuilder.start();
+    }
+
+    private boolean waitForServer() {
+        for (int attempt = 0; attempt < 60; attempt++) {
+            if (serverProcess == null || !serverProcess.isAlive()) {
+                return false;
+            }
+            if (isHealthy()) {
+                return true;
+            }
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private boolean isHealthy() {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(HEALTH_URL).openConnection();
+            connection.setConnectTimeout(500);
+            connection.setReadTimeout(500);
+            connection.setRequestMethod("GET");
+            return connection.getResponseCode() == HttpURLConnection.HTTP_OK;
+        } catch (IOException ignored) {
+            return false;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private void copyAsset(String assetName, File target) throws IOException {
+        File temporary = new File(target.getParentFile(), target.getName() + ".tmp");
+        try (InputStream input = getAssets().open(assetName);
+             FileOutputStream output = new FileOutputStream(temporary, false)) {
+            byte[] buffer = new byte[16 * 1024];
+            int count;
+            while ((count = input.read(buffer)) != -1) {
+                output.write(buffer, 0, count);
+            }
+            output.getFD().sync();
+        }
+
+        if (target.exists() && !target.delete()) {
+            throw new IOException("无法替换文件: " + target.getAbsolutePath());
+        }
+        if (!temporary.renameTo(target)) {
+            try (InputStream input = new FileInputStream(temporary);
+                 FileOutputStream output = new FileOutputStream(target, false)) {
+                byte[] buffer = new byte[16 * 1024];
+                int count;
+                while ((count = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, count);
+                }
+            }
+            if (!temporary.delete()) {
+                temporary.deleteOnExit();
+            }
+        }
+    }
+
+    private void makeExecutable(File serverFile) throws IOException, InterruptedException {
+        if (!serverFile.setExecutable(true, true)) {
+            Process chmod = new ProcessBuilder("chmod", "755", serverFile.getAbsolutePath()).start();
+            if (chmod.waitFor() != 0) {
+                throw new IOException("无法为 Go 服务文件设置执行权限");
+            }
+        }
+    }
+
+    private void showStartupError(Exception error) {
+        statusView.setText("HealthTrack 启动失败\n\n" + error.getMessage());
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (serverProcess != null) {
+            serverProcess.destroy();
+            try {
+                if (!serverProcess.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                    serverProcess.destroyForcibly();
+                }
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                serverProcess.destroyForcibly();
+            }
+            serverProcess = null;
+        }
+        startupExecutor.shutdownNow();
+        if (webView != null) {
+            webView.destroy();
+        }
+        super.onDestroy();
+    }
+}

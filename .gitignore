@@ -32,3 +32,11 @@ config.yaml
 *~
 .DS_Store
 Thumbs.db
+
+# Android Gradle 临时缓存与输出目录
+.gradle/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.log
