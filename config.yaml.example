@@ -1,4 +1,5 @@
 server:
+  # Android WebView 默认访问 127.0.0.1:8080
   port: 8080
   dev_mode: false
 
@@ -7,7 +8,6 @@ database:
   backup_dir: "data/backups"
 
 ai:
-  # 推荐使用 DeepSeek 或 智谱 GLM
   base_url: "https://api.deepseek.com/v1"
-  api_key: "your_api_key_here" # 请在此处填写你的 API Key
+  api_key: ""
   model: "deepseek-chat"

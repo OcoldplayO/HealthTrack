@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -20,6 +21,17 @@ import (
 )
 
 func main() {
+	var (
+		configPath string
+		dataDir    string
+		port       int
+	)
+
+	flag.StringVar(&configPath, "config", "", "配置文件路径；未指定时使用项目根目录的 config.yaml")
+	flag.StringVar(&dataDir, "data-dir", "", "数据库和备份数据目录；指定后数据库固定为 <data-dir>/health.db")
+	flag.IntVar(&port, "port", 0, "HTTP 监听端口；0 表示使用 config.yaml 中的 server.port")
+	flag.Parse()
+
 	// 1. 初始化结构化日志
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -28,11 +40,27 @@ func main() {
 
 	slog.Info("HealthTrack 智能健康系统正在启动...")
 
-	// 2. 加载配置（内部自动使用 FindProjectRoot 锚定项目根目录）
-	cfg, err := config.LoadConfig("config.yaml")
+	// 2. 加载配置；不存在时会自动创建不含 API Key 的模板。
+	cfg, err := config.LoadConfig(configPath, dataDir)
 	if err != nil {
-		slog.Warn("未找到外部 config.yaml，使用默认内置配置", "err", err)
+		slog.Error("加载配置失败", "err", err)
+		os.Exit(1)
 	}
+
+	if port > 0 {
+		cfg.Server.Port = port
+	}
+	if cfg.Server.Port <= 0 || cfg.Server.Port > 65535 {
+		slog.Error("无效的 HTTP 端口", "port", cfg.Server.Port)
+		os.Exit(1)
+	}
+
+	resolvedConfigPath, err := config.ResolveConfigPath(configPath)
+	if err != nil {
+		slog.Error("解析配置文件路径失败", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("配置加载完成", "config", resolvedConfigPath, "database", cfg.Database.Path, "backup_dir", cfg.Database.BackupDir, "port", cfg.Server.Port)
 
 	// 3. 初始化 SQLite 数据库与自动备份
 	dbMgr, err := repository.InitDB(cfg.Database.Path, cfg.Database.BackupDir)
@@ -62,13 +90,15 @@ func main() {
 	mux.HandleFunc("/api/v1/export/json", recordHandler.ExportJSON)
 	mux.HandleFunc("/healthz", recordHandler.Healthz)
 
-	// 前端静态页面分发（开发模式下根据 ProjectRoot 读取磁盘，生产模式走内嵌内存）
+	// 前端静态页面分发（开发模式读取磁盘，生产模式走内嵌内存）。
 	var staticHandler http.Handler
 	if cfg.Server.DevMode {
-		staticDir := filepath.Join(config.FindProjectRoot(), "web", "static")
+		staticDir := filepath.Join(cfg.ProjectRoot, "web", "static")
 		if _, err := os.Stat(filepath.Join(staticDir, "index.html")); err == nil {
 			slog.Info("运行于开发模式: 从本地磁盘实时读取 web/static", "dir", staticDir)
 			staticHandler = http.FileServer(http.Dir(staticDir))
+		} else {
+			slog.Warn("开发模式静态资源不存在，回退到内嵌资源", "dir", staticDir)
 		}
 	}
 
@@ -87,18 +117,18 @@ func main() {
 	// 6. HTTP 服务启动
 	serverAddr := fmt.Sprintf(":%d", cfg.Server.Port)
 	server := &http.Server{
-		Addr:         serverAddr,
-		Handler:      mux,
+		Addr:    serverAddr,
+		Handler: mux,
 		//读取客户端请求超时
-		ReadTimeout:  15 * time.Second,
+		ReadTimeout: 15 * time.Second,
 		//写入响应超时，0 表示不设置写超时，长连接 SSE 由客户端主动断开或传输完毕为止
 		WriteTimeout: 0,
 		//空闲连接复用超时
-		IdleTimeout:  60 * time.Second,
+		IdleTimeout: 60 * time.Second,
 	}
 
 	go func() {
-		slog.Info("服务已成功启动", "url", fmt.Sprintf("http://localhost:%d", cfg.Server.Port))
+		slog.Info("服务已成功启动", "url", fmt.Sprintf("http://127.0.0.1:%d", cfg.Server.Port))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("HTTP 服务异常退出", "err", err)
 			os.Exit(1)
