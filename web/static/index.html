@@ -1367,6 +1367,11 @@
           responseText += `\n\n> ⚠️ *[网络连接已完成或阶段传输结束]*`;
           updateUI();
           statusTag.innerText = '分析完成(部分)';
+        } else if (err instanceof TypeError) {
+          // TypeError 表示请求在传输层就失败了（本地服务未启动/连接被拒），
+          // 与"服务端返回了错误"是两回事，分开提示避免误导。
+          contentEl.innerHTML = `<p class="text-red-500">无法连接本地服务（${location.host}）。请确认 HealthTrack 程序正在运行，然后重试。</p>`;
+          statusTag.innerText = '本地服务未连接';
         } else {
           contentEl.innerHTML = `<p class="text-red-500">连接 AI 洞察服务失败: ${err.message}</p>`;
           statusTag.innerText = '生成异常';

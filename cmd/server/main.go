@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -146,9 +147,18 @@ func main() {
 		IdleTimeout: 60 * time.Second,
 	}
 
+	// 先显式绑定端口，再宣告启动成功。否则端口被占用时会先打出「服务已成功启动」
+	// 紧接着异常退出，让人误以为服务是好的，只是功能坏了。
+	listener, err := net.Listen("tcp", serverAddr)
+	if err != nil {
+		slog.Error("HTTP 服务启动失败，端口可能已被占用", "addr", serverAddr, "err", err)
+		reportStartupFailure(fmt.Sprintf("HTTP 服务启动失败 (%s): %v", serverAddr, err))
+		os.Exit(1)
+	}
+	slog.Info("服务已成功启动", "url", fmt.Sprintf("http://127.0.0.1:%d", cfg.Server.Port))
+
 	go func() {
-		slog.Info("服务已成功启动", "url", fmt.Sprintf("http://127.0.0.1:%d", cfg.Server.Port))
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			slog.Error("HTTP 服务异常退出", "err", err)
 			os.Exit(1)
 		}
@@ -168,4 +178,23 @@ func main() {
 	}
 
 	slog.Info("HealthTrack 服务已安全停止")
+}
+
+// reportStartupFailure 把启动失败原因写入可执行文件同目录的日志文件。
+// 双击运行时控制台窗口会随进程退出瞬间关闭，用户看不到任何错误信息，
+// 落盘一份日志才能事后排查。
+func reportStartupFailure(reason string) {
+	fmt.Fprintln(os.Stderr, reason)
+
+	exePath, err := os.Executable()
+	if err != nil {
+		return
+	}
+
+	logPath := filepath.Join(filepath.Dir(exePath), "healthtrack-startup-error.log")
+	entry := fmt.Sprintf("%s %s\n", time.Now().Format(time.RFC3339), reason)
+	if err := os.WriteFile(logPath, []byte(entry), 0600); err != nil {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "详情已写入: %s\n", logPath)
 }

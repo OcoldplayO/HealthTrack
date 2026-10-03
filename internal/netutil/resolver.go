@@ -9,11 +9,12 @@ import (
 	"time"
 )
 
-// androidFallbackDNS 为 Android 上的纯 Go 解析器提供备选 DNS 服务器，按顺序尝试。
+// androidFallbackDNS 为 Android 上的纯 Go 解析器提供备选 DNS 服务器（阿里/腾讯/Google），
+// 按顺序尝试，前者不可达时自动切换。
 var androidFallbackDNS = []string{
-	"223.5.5.5:53",   // 阿里 DNS
-	"119.29.29.29:53", // 腾讯 DNS
-	"8.8.8.8:53",     // Google DNS
+	"223.5.5.5:53",
+	"119.29.29.29:53",
+	"8.8.8.8:53",
 }
 
 // ConfigureResolver 修正 Android 环境下域名无法解析的问题。
