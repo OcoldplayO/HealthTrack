@@ -19,11 +19,15 @@ android {
         }
     }
 
+    def versionCodeEnv = System.getenv('VERSION_CODE')
+
     defaultConfig {
         applicationId 'com.healthtrack.app'
         minSdk 26
         targetSdk 34
-        versionCode 1
+        // versionCode 由 CI 注入（GITHUB_RUN_NUMBER），保证每次构建严格递增可覆盖安装；
+        // 本地未提供该环境变量时回退为固定值 1，不影响本地构建。
+        versionCode (versionCodeEnv != null ? versionCodeEnv.toInteger() : 1)
         versionName '1.0.0'
     }
 
