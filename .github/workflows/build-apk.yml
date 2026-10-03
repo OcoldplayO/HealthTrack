@@ -53,6 +53,13 @@ jobs:
           test -s "$RUNNER_TEMP/healthtrack-release.jks"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/healthtrack-release.jks" >> "$GITHUB_ENV"
 
+      - name: Stamp versionName with build date
+        run: |
+          set -euo pipefail
+          BUILD_DATE=$(TZ=Asia/Shanghai date +%Y%m%d)
+          sed -i "s/versionName '\([^']*\)'/versionName '\1-${BUILD_DATE}'/" android/app/build.gradle
+          grep "versionName '" android/app/build.gradle
+
       - name: Build debug APK
         working-directory: android
         env:
