@@ -164,11 +164,50 @@
         </div>
       </div>
       <div class="flex items-center space-x-2">
+        <button onclick="openSettings()" title="AI 设置" aria-label="AI 设置" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 transition-colors flex items-center justify-center text-base">
+          ⚙️
+        </button>
         <button onclick="exportData()" title="导出 Excel/CSV 表格" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-lg transition-colors flex items-center space-x-1">
           <span>📥 导出 Excel</span>
         </button>
       </div>
     </header>
+
+    <!-- AI 配置弹窗：真实 API Key 不会回显，仅允许用户替换它。 -->
+    <div id="settings-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeSettingsOnBackdrop(event)">
+      <section class="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div>
+            <h2 id="settings-title" class="font-bold text-slate-900">AI 服务设置</h2>
+            <p class="text-xs text-slate-400 mt-0.5">配置仅保存在本机应用私有目录</p>
+          </div>
+          <button onclick="closeSettings()" aria-label="关闭设置" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500">✕</button>
+        </div>
+        <div class="p-5 space-y-4">
+          <div>
+            <label for="setting-base-url" class="block text-xs font-bold text-slate-600 mb-1.5">API Base URL</label>
+            <input id="setting-base-url" type="url" placeholder="https://api.deepseek.com/v1" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+          </div>
+          <div>
+            <label for="setting-model" class="block text-xs font-bold text-slate-600 mb-1.5">模型名称</label>
+            <input id="setting-model" type="text" placeholder="deepseek-chat" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+          </div>
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <label for="setting-api-key" class="block text-xs font-bold text-slate-600">API Key</label>
+              <button type="button" onclick="toggleAPIKeyVisibility()" id="toggle-api-key" class="text-xs text-blue-600 hover:text-blue-700">显示</button>
+            </div>
+            <input id="setting-api-key" type="password" autocomplete="off" placeholder="留空则保留当前 API Key" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+            <p id="api-key-status" class="text-[11px] text-slate-400 mt-1.5">正在读取配置…</p>
+          </div>
+          <p id="settings-feedback" class="hidden text-xs rounded-xl px-3 py-2.5"></p>
+          <div class="grid grid-cols-2 gap-3 pt-1">
+            <button id="test-config-btn" type="button" onclick="testAIConfig()" class="py-2.5 rounded-xl border border-blue-200 text-blue-600 font-bold text-sm hover:bg-blue-50 transition-colors">测试连接</button>
+            <button id="save-config-btn" type="button" onclick="saveAIConfig()" class="py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">保存配置</button>
+          </div>
+        </div>
+      </section>
+    </div>
 
     <!-- 核心内容切换区 -->
     <main class="flex-1 overflow-y-auto p-5 no-scrollbar bg-slate-50/50 relative" id="main-content">
@@ -517,6 +556,110 @@
         toast.classList.remove('opacity-100', 'translate-y-0');
         toast.classList.add('opacity-0', '-translate-y-4', 'pointer-events-none');
       }, 2000);
+    }
+
+    function settingsPayload() {
+      const payload = {
+        base_url: document.getElementById('setting-base-url').value.trim(),
+        model: document.getElementById('setting-model').value.trim()
+      };
+      const apiKey = document.getElementById('setting-api-key').value;
+      // 空白字段不发送，后端会保留已保存的 Key，避免掩码值覆盖真实 Key。
+      if (apiKey.trim()) payload.api_key = apiKey;
+      return payload;
+    }
+
+    function setSettingsFeedback(message, isSuccess) {
+      const feedback = document.getElementById('settings-feedback');
+      feedback.textContent = message;
+      feedback.className = `text-xs rounded-xl px-3 py-2.5 ${isSuccess ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`;
+    }
+
+    function setSettingsBusy(buttonId, busy, busyText) {
+      const button = document.getElementById(buttonId);
+      if (!button.dataset.originalText) button.dataset.originalText = button.textContent;
+      button.disabled = busy;
+      button.classList.toggle('opacity-50', busy);
+      button.classList.toggle('cursor-not-allowed', busy);
+      button.textContent = busy ? busyText : button.dataset.originalText;
+    }
+
+    async function openSettings() {
+      const modal = document.getElementById('settings-modal');
+      modal.classList.remove('hidden');
+      document.getElementById('settings-feedback').classList.add('hidden');
+      document.getElementById('setting-api-key').value = '';
+
+      try {
+        const response = await fetch('/api/config');
+        const json = await response.json();
+        if (!response.ok || json.code !== 200) throw new Error(json.message || '读取配置失败');
+
+        const config = json.data;
+        document.getElementById('setting-base-url').value = config.base_url || '';
+        document.getElementById('setting-model').value = config.model || '';
+        document.getElementById('api-key-status').textContent = config.api_key_configured
+          ? `当前 Key：${config.api_key_masked}（留空可保留）`
+          : '尚未配置 API Key';
+      } catch (error) {
+        setSettingsFeedback(error.message || '读取配置失败，请稍后重试', false);
+      }
+    }
+
+    function closeSettings() {
+      document.getElementById('settings-modal').classList.add('hidden');
+    }
+
+    function closeSettingsOnBackdrop(event) {
+      if (event.target === event.currentTarget) closeSettings();
+    }
+
+    function toggleAPIKeyVisibility() {
+      const input = document.getElementById('setting-api-key');
+      const toggle = document.getElementById('toggle-api-key');
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      toggle.textContent = show ? '隐藏' : '显示';
+    }
+
+    async function testAIConfig() {
+      setSettingsBusy('test-config-btn', true, '测试中…');
+      try {
+        const response = await fetch('/api/config/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(settingsPayload())
+        });
+        const json = await response.json();
+        if (!response.ok || json.code !== 200) throw new Error(json.message || '连接测试失败');
+        setSettingsFeedback('✓ ' + json.message, true);
+      } catch (error) {
+        setSettingsFeedback(error.message || '连接测试失败', false);
+      } finally {
+        setSettingsBusy('test-config-btn', false);
+      }
+    }
+
+    async function saveAIConfig() {
+      setSettingsBusy('save-config-btn', true, '保存中…');
+      try {
+        const response = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(settingsPayload())
+        });
+        const json = await response.json();
+        if (!response.ok || json.code !== 200) throw new Error(json.message || '保存失败');
+
+        setSettingsFeedback('✓ ' + json.message, true);
+        showToast('AI 配置已保存并立即生效');
+        document.getElementById('setting-api-key').value = '';
+        document.getElementById('api-key-status').textContent = 'API Key 已更新（不会在页面中回显）';
+      } catch (error) {
+        setSettingsFeedback(error.message || '保存失败，请稍后重试', false);
+      } finally {
+        setSettingsBusy('save-config-btn', false);
+      }
     }
 
     function switchTab(tab) {
@@ -1242,4 +1385,3 @@
   </script>
 </body>
 </html>
-

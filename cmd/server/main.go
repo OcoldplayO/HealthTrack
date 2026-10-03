@@ -61,6 +61,7 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("配置加载完成", "config", resolvedConfigPath, "database", cfg.Database.Path, "backup_dir", cfg.Database.BackupDir, "port", cfg.Server.Port)
+	runtimeConfigs := config.NewRuntimeStore(cfg, resolvedConfigPath)
 
 	// 3. 初始化 SQLite 数据库与自动备份
 	dbMgr, err := repository.InitDB(cfg.Database.Path, cfg.Database.BackupDir)
@@ -74,8 +75,9 @@ func main() {
 	recordRepo := repository.NewRecordRepository(dbMgr.DB)
 	recordService := service.NewRecordService(recordRepo)
 	insightService := service.NewInsightService(recordRepo)
-	aiService := service.NewAIService(&cfg.AI, recordRepo)
-	aiHandler := handler.NewAIHandler(cfg, insightService, recordService)
+	aiService := service.NewAIService(runtimeConfigs, recordRepo)
+	aiHandler := handler.NewAIHandler(runtimeConfigs, insightService, recordService)
+	configHandler := handler.NewConfigHandler(runtimeConfigs)
 	recordHandler := handler.NewRecordHandler(recordService, aiService)
 
 	// 5. 路由注册
@@ -89,6 +91,17 @@ func main() {
 	mux.HandleFunc("/api/v1/export", recordHandler.ExportCSV)
 	mux.HandleFunc("/api/v1/export/json", recordHandler.ExportJSON)
 	mux.HandleFunc("/healthz", recordHandler.Healthz)
+	mux.HandleFunc("/api/config", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			configHandler.Get(w, r)
+		case http.MethodPost:
+			configHandler.Update(w, r)
+		default:
+			configHandler.Get(w, r)
+		}
+	})
+	mux.HandleFunc("/api/config/test", configHandler.Test)
 
 	// 前端静态页面分发（开发模式读取磁盘，生产模式走内嵌内存）。
 	var staticHandler http.Handler
@@ -115,7 +128,9 @@ func main() {
 	mux.Handle("/", staticHandler)
 
 	// 6. HTTP 服务启动
-	serverAddr := fmt.Sprintf(":%d", cfg.Server.Port)
+	// 配置接口包含敏感信息，服务仅监听本机回环地址。
+	// Android WebView 与桌面浏览器均通过 127.0.0.1 访问。
+	serverAddr := fmt.Sprintf("127.0.0.1:%d", cfg.Server.Port)
 	server := &http.Server{
 		Addr:    serverAddr,
 		Handler: mux,

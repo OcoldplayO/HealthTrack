@@ -18,16 +18,17 @@ import (
 )
 
 type AIHandler struct {
-	cfg     *config.Config
+	configs *config.RuntimeStore
 	insight *service.InsightService
 	repoSvc *service.RecordService
 }
 
-func NewAIHandler(cfg *config.Config, insight *service.InsightService, repoSvc *service.RecordService) *AIHandler {
-	return &AIHandler{cfg: cfg, insight: insight, repoSvc: repoSvc}
+func NewAIHandler(configs *config.RuntimeStore, insight *service.InsightService, repoSvc *service.RecordService) *AIHandler {
+	return &AIHandler{configs: configs, insight: insight, repoSvc: repoSvc}
 }
 
 func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
+	cfg := h.configs.Snapshot()
 	// 1. 设置标准 SSE 响应头
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -73,7 +74,7 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 	fullUserContent := fmt.Sprintf("%s\n\n%s", string(promptTpl), dataContext)
 
 	// 如果未配置 API Key 或为占位符，输出提示
-	if h.cfg.AI.APIKey == "" || strings.Contains(h.cfg.AI.APIKey, "your_api_key") {
+	if cfg.AI.APIKey == "" || strings.Contains(cfg.AI.APIKey, "your_api_key") {
 		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"未检测到有效的大模型 API Key，请在 config.yaml 中配置 AI.APIKey。\"}}]}\n\n")
 		fmt.Fprintf(w, "data: [DONE]\n\n")
 		flusher.Flush()
@@ -82,7 +83,7 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 
 	// 5. 组装请求 Payload (完全兼容 OpenAI 协议规范)
 	requestBody := map[string]interface{}{
-		"model":       h.cfg.AI.Model,
+		"model":       cfg.AI.Model,
 		"stream":      true,
 		"temperature": 0.4,
 		"messages": []map[string]string{
@@ -97,7 +98,7 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 统一在 BaseURL 后安全拼接 /chat/completions
-	reqURL := strings.TrimRight(h.cfg.AI.BaseURL, "/") + "/chat/completions"
+	reqURL := strings.TrimRight(cfg.AI.BaseURL, "/") + "/chat/completions"
 	req, err := http.NewRequestWithContext(r.Context(), "POST", reqURL, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		fmt.Fprintf(w, "data: {\"error\":\"创建 AI 请求失败: %s\"}\n\n", err.Error())
@@ -105,11 +106,11 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req.Header.Set("Authorization", "Bearer "+h.cfg.AI.APIKey)
+	req.Header.Set("Authorization", "Bearer "+cfg.AI.APIKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	// 核心修复：长连接 SSE 流式转发不能设死客户端全局超时，设为 0 由大模型自然传输结束
-    client := &http.Client{Timeout: 0}
+	client := &http.Client{Timeout: 0}
 	resp, err := client.Do(req)
 	if err != nil {
 		slog.Error("上游大模型通信失败", "err", err)

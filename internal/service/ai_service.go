@@ -23,19 +23,20 @@ import (
 var defaultPromptTemplate string
 
 type AIService struct {
-	cfg  *config.AIConfig
-	repo *repository.RecordRepository
+	configs *config.RuntimeStore
+	repo    *repository.RecordRepository
 }
 
-func NewAIService(cfg *config.AIConfig, repo *repository.RecordRepository) *AIService {
+func NewAIService(configs *config.RuntimeStore, repo *repository.RecordRepository) *AIService {
 	return &AIService{
-		cfg:  cfg,
-		repo: repo,
+		configs: configs,
+		repo:    repo,
 	}
 }
 
 // StreamInsight 流式生成 AI 洞察并实时写入 http 响应
 func (s *AIService) StreamInsight(ctx context.Context, userID int64, startDate, endDate string, w http.ResponseWriter) error {
+	cfg := s.configs.Snapshot()
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return fmt.Errorf("当前连接不支持流式输出 (Streaming not supported)")
@@ -62,12 +63,12 @@ func (s *AIService) StreamInsight(ctx context.Context, userID int64, startDate, 
 	}
 
 	// 4. 若未配置 API Key，输出本地智能分析与配置提示
-	if s.cfg.APIKey == "" || strings.Contains(s.cfg.APIKey, "your_api_key") {
+	if cfg.AI.APIKey == "" || strings.Contains(cfg.AI.APIKey, "your_api_key") {
 		return s.streamDemoInsight(promptContent, stats, w, flusher)
 	}
 
 	// 5. 调用外部大模型 API (兼容 DeepSeek / GLM / OpenAI)
-	return s.callOpenAIStream(ctx, promptContent, w, flusher)
+	return s.callOpenAIStream(ctx, cfg.AI, promptContent, w, flusher)
 }
 
 type MacroStats struct {
@@ -190,12 +191,12 @@ func (s *AIService) buildPrompt(stats *MacroStats, records []*model.HealthRecord
 	return tpl, nil
 }
 
-func (s *AIService) callOpenAIStream(ctx context.Context, prompt string, w http.ResponseWriter, flusher http.Flusher) error {
-	baseURL := strings.TrimRight(s.cfg.BaseURL, "/")
+func (s *AIService) callOpenAIStream(ctx context.Context, cfg config.AIConfig, prompt string, w http.ResponseWriter, flusher http.Flusher) error {
+	baseURL := strings.TrimRight(cfg.BaseURL, "/")
 	apiURL := baseURL + "/chat/completions"
 
 	reqBody := map[string]any{
-		"model": s.cfg.Model,
+		"model": cfg.Model,
 		"messages": []map[string]string{
 			{"role": "user", "content": prompt},
 		},
@@ -214,7 +215,7 @@ func (s *AIService) callOpenAIStream(ctx context.Context, prompt string, w http.
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+s.cfg.APIKey)
+	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
 
 	client := &http.Client{Timeout: 45 * time.Second}
 	resp, err := client.Do(req)
