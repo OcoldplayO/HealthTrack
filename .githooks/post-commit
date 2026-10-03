@@ -1,0 +1,19 @@
+#!/bin/sh
+# 在每次 git commit 成功后自动重新编译 Windows 可执行文件。
+# 不使用 -s -w：避免 Windows Defender 将剥离符号的 Go 二进制误报为病毒。
+
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+cd "$REPO_ROOT"
+
+mkdir -p bin
+
+echo "[post-commit] 编译中: go build ./cmd/server -> bin/HealthTrack.exe"
+
+if go build -o bin/HealthTrack.exe ./cmd/server; then
+    echo "[post-commit] 编译完成: bin/HealthTrack.exe"
+else
+    echo "[post-commit] 编译失败，请检查代码。" >&2
+    exit 1
+fi

@@ -48,6 +48,39 @@ jobs:
           chmod +x ./gradlew
           ./gradlew assembleDebug --stacktrace
 
+      - name: Rename APK with version and commit hash
+        run: |
+          VERSION=$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" android/app/build.gradle | head -n1)
+          SHORT_SHA="${GITHUB_SHA::7}"
+          APK=$(ls android/app/build/outputs/apk/debug/*.apk | head -n1)
+          APK_NAME="HealthTrack-v${VERSION}-${SHORT_SHA}.apk"
+          cp "$APK" "$APK_NAME"
+          echo "APK_NAME=$APK_NAME" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=$SHORT_SHA" >> "$GITHUB_ENV"
+          echo "Renamed to $APK_NAME"
+
+      - name: Send APK via QQ email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.qq.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "HealthTrack APK 构建完成 v${{ env.VERSION }} (${{ env.SHORT_SHA }})"
+          to: ${{ secrets.MAIL_TO }}
+          from: ${{ secrets.MAIL_USERNAME }}
+          body: |
+            HealthTrack APK 已自动构建完成，请查收附件并安装到手机。
+
+            版本号：v${{ env.VERSION }}
+            提交哈希：${{ github.sha }}
+            提交信息：${{ github.event.head_commit.message }}
+            仓库：${{ github.repository }}
+            运行链接：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          attachments: ${{ env.APK_NAME }}
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v5
         with:
