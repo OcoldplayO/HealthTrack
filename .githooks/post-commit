@@ -2,18 +2,35 @@
 # 在每次 git commit 成功后自动重新编译 Windows 可执行文件。
 # 不使用 -s -w：避免 Windows Defender 将剥离符号的 Go 二进制误报为病毒。
 
-set -e
-
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
-cd "$REPO_ROOT"
+cd "$REPO_ROOT" || exit 0
 
-mkdir -p bin
+if ! mkdir -p bin; then
+    echo "[post-commit] 无法创建 bin 目录，跳过自动编译。" >&2
+    exit 1
+fi
 
 echo "[post-commit] 编译中: go build ./cmd/server -> bin/HealthTrack.exe"
 
-if go build -o bin/HealthTrack.exe ./cmd/server; then
+BUILD_LOG="$(go build -o bin/HealthTrack.exe ./cmd/server 2>&1)"
+STATUS=$?
+
+if [ "$STATUS" -eq 0 ]; then
     echo "[post-commit] 编译完成: bin/HealthTrack.exe"
-else
-    echo "[post-commit] 编译失败，请检查代码。" >&2
-    exit 1
+    exit 0
 fi
+
+echo "$BUILD_LOG" >&2
+echo "[post-commit] 本次提交已成功，仅自动编译失败，bin/HealthTrack.exe 未更新。" >&2
+
+# 写不进去多是被占用或被安全软件拦截，这与代码错误是两回事，需要分开提示。
+if printf '%s' "$BUILD_LOG" | grep -qiE "access is denied|being used by another process|拒绝访问|另一个程序正在使用|permission denied"; then
+    echo "[post-commit] 原因：无法写入 bin/HealthTrack.exe，文件被占用或被安全软件拦截。" >&2
+    echo "[post-commit] 常见于 Windows Defender 正在扫描或隔离刚生成的 exe。可加排除项后重试：" >&2
+    echo "[post-commit]   Add-MpPreference -ExclusionPath '$REPO_ROOT/bin'   # 需管理员 PowerShell" >&2
+    echo "[post-commit] 手动重试：go build -o bin/HealthTrack.exe ./cmd/server" >&2
+else
+    echo "[post-commit] 原因：代码编译错误，请按上方报错修复后重新提交。" >&2
+fi
+
+exit 1
