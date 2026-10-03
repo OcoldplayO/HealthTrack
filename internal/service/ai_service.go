@@ -221,7 +221,7 @@ func (s *AIService) callOpenAIStream(ctx context.Context, cfg config.AIConfig, p
 	resp, err := client.Do(req)
 	if err != nil {
 		slog.Error("请求 AI API 失败", "err", err)
-		sendSSEEvent(w, flusher, "连接 AI 接口超时，请检查网络或 API Key 设置。", "error")
+		sendSSEEvent(w, flusher, fmt.Sprintf("连接 AI 接口失败：%v。请检查网络或 API Base URL。", err), "error")
 		return err
 	}
 	defer resp.Body.Close()

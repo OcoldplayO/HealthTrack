@@ -15,12 +15,16 @@ import (
 
 	"healthtrack/internal/config"
 	"healthtrack/internal/handler"
+	"healthtrack/internal/netutil"
 	"healthtrack/internal/repository"
 	"healthtrack/internal/service"
 	"healthtrack/web"
 )
 
 func main() {
+	// 必须在任何网络请求之前执行：修复 Android 上的 DNS 解析。
+	netutil.ConfigureResolver()
+
 	var (
 		configPath string
 		dataDir    string
