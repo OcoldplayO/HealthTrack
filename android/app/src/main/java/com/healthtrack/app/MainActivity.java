@@ -30,9 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
-    private static final String SERVER_ASSET = "server";
     private static final String CONFIG_ASSET = "config.yaml";
-    private static final String SERVER_FILE = "healthtrack-server";
     // 保持与 Go 配置结构一致；AI 的详细配置由服务端默认值补全。
     private static final String FALLBACK_CONFIG = "server:\n"
             + "  port: 8080\n"
@@ -106,17 +104,18 @@ public final class MainActivity extends Activity {
             try {
                 File filesDir = getFilesDir();
                 File configFile = new File(filesDir, CONFIG_FILE);
-                File serverFile = new File(filesDir, SERVER_FILE);
+                File serverBin = new File(getApplicationInfo().nativeLibraryDir, "libserver.so");
 
                 // 用户已修改的配置不能被 APK 更新覆盖。
                 if (!configFile.exists()) {
                     copyConfigAssetOrWriteFallback(configFile);
                 }
 
-                // 每次冷启动更新内置二进制；此时旧进程已不在运行。
-                copyAsset(SERVER_ASSET, serverFile);
-                makeExecutable(serverFile);
-                startServer(serverFile, configFile, filesDir);
+                // 原生库目录由系统解压并允许执行；filesDir 在部分设备上带 noexec 挂载。
+                if (!serverBin.isFile()) {
+                    throw new IOException("未找到内置服务程序: " + serverBin.getAbsolutePath());
+                }
+                startServer(serverBin, configFile, filesDir);
 
                 if (!waitForServer()) {
                     throw new IOException("服务未能在 15 秒内启动。请重新打开应用。\n日志：" + new File(filesDir, "server.log"));
@@ -247,15 +246,6 @@ public final class MainActivity extends Activity {
             }
             if (!temporary.delete()) {
                 temporary.deleteOnExit();
-            }
-        }
-    }
-
-    private void makeExecutable(File serverFile) throws IOException, InterruptedException {
-        if (!serverFile.setExecutable(true, true)) {
-            Process chmod = new ProcessBuilder("chmod", "755", serverFile.getAbsolutePath()).start();
-            if (chmod.waitFor() != 0) {
-                throw new IOException("无法为 Go 服务文件设置执行权限");
             }
         }
     }
