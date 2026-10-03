@@ -20,7 +20,9 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Package Android configuration template
-        run: cp config.yaml.example android/app/src/main/assets/config.yaml
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp config.yaml.example android/app/src/main/assets/config.yaml
 
       - name: Set up Go
         uses: actions/setup-go@v6
