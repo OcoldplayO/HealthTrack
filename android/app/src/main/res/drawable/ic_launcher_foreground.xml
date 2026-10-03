@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 留出安全区，避免不同厂商的蒙版裁到心率线。 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,83C50.9,80.2 29,61.5 29,45.3C29,36.2 35.5,30 43.4,30C48.1,30 52.2,32.2 54,36.1C55.8,32.2 59.9,30 64.6,30C72.5,30 79,36.2 79,45.3C79,61.5 57.1,80.2 54,83Z" />
+    <path
+        android:fillColor="#3949AB"
+        android:pathData="M34,53L43.2,53L47.2,45L52.5,61L57.1,51L61,55L74,55L74,59L59.3,59L56.2,55.9L51.5,67L46.8,52.9L45.7,55L34,55Z" />
+</vector>

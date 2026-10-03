@@ -18,6 +18,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -32,6 +33,12 @@ public final class MainActivity extends Activity {
     private static final String SERVER_ASSET = "server";
     private static final String CONFIG_ASSET = "config.yaml";
     private static final String SERVER_FILE = "healthtrack-server";
+    // 保持与 Go 配置结构一致；AI 的详细配置由服务端默认值补全。
+    private static final String FALLBACK_CONFIG = "server:\n"
+            + "  port: 8080\n"
+            + "ai: {}\n"
+            // 保留 ai_config 空节点，兼容旧版/外部配置约定；当前服务读取 ai 节点。
+            + "ai_config: {}\n";
     private static final String CONFIG_FILE = "config.yaml";
     private static final String HEALTH_URL = "http://127.0.0.1:8080/healthz";
     private static final String APP_URL = "http://127.0.0.1:8080";
@@ -103,7 +110,7 @@ public final class MainActivity extends Activity {
 
                 // 用户已修改的配置不能被 APK 更新覆盖。
                 if (!configFile.exists()) {
-                    copyAsset(CONFIG_ASSET, configFile);
+                    copyConfigAssetOrWriteFallback(configFile);
                 }
 
                 // 每次冷启动更新内置二进制；此时旧进程已不在运行。
@@ -199,6 +206,44 @@ public final class MainActivity extends Activity {
                 while ((count = input.read(buffer)) != -1) {
                     output.write(buffer, 0, count);
                 }
+            }
+            if (!temporary.delete()) {
+                temporary.deleteOnExit();
+            }
+        }
+    }
+
+    /**
+     * APK 构建配置异常时，assets 中可能没有 config.yaml。配置缺失不能阻断
+     * 首次启动，因此仅对该资产使用安全的本地默认配置兜底。
+     */
+    private void copyConfigAssetOrWriteFallback(File target) throws IOException {
+        try {
+            copyAsset(CONFIG_ASSET, target);
+        } catch (FileNotFoundException error) {
+            writeTextAtomically(FALLBACK_CONFIG, target);
+        }
+    }
+
+    private void writeTextAtomically(String content, File target) throws IOException {
+        File temporary = new File(target.getParentFile(), target.getName() + ".tmp");
+        try (FileOutputStream output = new FileOutputStream(temporary, false)) {
+            output.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            output.getFD().sync();
+        }
+
+        if (target.exists() && !target.delete()) {
+            throw new IOException("无法替换文件: " + target.getAbsolutePath());
+        }
+        if (!temporary.renameTo(target)) {
+            try (InputStream input = new FileInputStream(temporary);
+                 FileOutputStream output = new FileOutputStream(target, false)) {
+                byte[] buffer = new byte[16 * 1024];
+                int count;
+                while ((count = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, count);
+                }
+                output.getFD().sync();
             }
             if (!temporary.delete()) {
                 temporary.deleteOnExit();
