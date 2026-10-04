@@ -62,13 +62,12 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 	// 3. 构建预计算特征上下文
 	dataContext := h.insight.BuildPromptContext(records)
 
-	// 4. 读取提示词模板 prompts/insight_v1.txt
+	// 4. 读取提示词模板 prompts/insight_v1.txt。
+	// 磁盘读取失败（例如 Android 端 prompts 目录未打包进 APK）时，回退到内嵌的默认模板，避免报“模板文件不存在”。
 	promptPath := filepath.Join(config.FindProjectRoot(), "prompts", "insight_v1.txt")
 	promptTpl, err := os.ReadFile(promptPath)
 	if err != nil {
-		fmt.Fprintf(w, "data: {\"error\":\"未能读取 prompts/insight_v1.txt 提示词模板: %s\"}\n\n", err.Error())
-		flusher.Flush()
-		return
+		promptTpl = []byte(service.DefaultPrompt())
 	}
 
 	fullUserContent := fmt.Sprintf("%s\n\n%s", string(promptTpl), dataContext)

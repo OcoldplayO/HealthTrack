@@ -1268,6 +1268,7 @@
       // 双通道分离状态
       let thinkingText = '';
       let responseText = '';
+      let hasError = false;
 
       // 核心渲染函数：合并调度思考流与正文流
       function updateUI() {
@@ -1327,6 +1328,7 @@
               const parsed = JSON.parse(dataStr);
               if (parsed.error) {
                 responseText += `\n> ⚠️ **服务提示**: ${parsed.error}\n`;
+                hasError = true;
                 updateUI();
               } else if (parsed.choices && parsed.choices.length > 0) {
                 const delta = parsed.choices[0].delta || {};
@@ -1354,7 +1356,10 @@
         }
 
         // 流式正常传输结束判断
-        if (responseText || thinkingText) {
+        if (hasError) {
+          updateUI();
+          statusTag.innerText = '分析失败';
+        } else if (responseText || thinkingText) {
           updateUI();
           statusTag.innerText = '复盘完成';
         } else {

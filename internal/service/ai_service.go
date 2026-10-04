@@ -22,6 +22,11 @@ import (
 //go:embed default_prompt.txt
 var defaultPromptTemplate string
 
+// DefaultPrompt 返回内嵌的提示词模板，供磁盘模板缺失时兜底（例如 Android 端未打包 prompts 目录）。
+func DefaultPrompt() string {
+	return defaultPromptTemplate
+}
+
 type AIService struct {
 	configs *config.RuntimeStore
 	repo    *repository.RecordRepository
