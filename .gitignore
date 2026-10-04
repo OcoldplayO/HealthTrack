@@ -44,3 +44,6 @@ android/build/
 android/app/build/
 android/local.properties
 *.log
+
+# 本地打包/安装脚本（含本机签名口令与绝对路径，严禁提交）
+scripts/build-android.ps1
