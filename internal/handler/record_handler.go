@@ -118,7 +118,22 @@ func (h *RecordHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 // ExportCSV 导出 Excel / WPS 友好的 CSV 表格 (带 UTF-8 BOM，防止乱码)
 func (h *RecordHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 	userID := int64(1)
-	records, err := h.recordService.GetAllRecords(userID)
+
+	// 导出范围：range=7 / range=30 / 缺省(全部)
+	rangeParam := r.URL.Query().Get("range")
+	var records []*model.HealthRecord
+	var err error
+	rangeKey := "all"
+	switch rangeParam {
+	case "7":
+		records, err = h.recordService.GetRecentRecords(userID, 7)
+		rangeKey = "7d"
+	case "30":
+		records, err = h.recordService.GetRecentRecords(userID, 30)
+		rangeKey = "30d"
+	default:
+		records, err = h.recordService.GetAllRecords(userID)
+	}
 	if err != nil {
 		writeJSON(w, http.StatusOK, model.Error(model.CodeDBError, err.Error()))
 		return
@@ -168,7 +183,7 @@ func (h *RecordHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 	}
 	writer.Flush()
 
-	fileName := fmt.Sprintf("HealthTrack_健康数据导出_%s.csv", time.Now().Format("20060102"))
+	fileName := fmt.Sprintf("HealthTrack_export_%s_%s.csv", rangeKey, time.Now().Format("20060102"))
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
 	w.WriteHeader(http.StatusOK)

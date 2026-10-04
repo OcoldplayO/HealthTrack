@@ -1,21 +1,32 @@
 package com.healthtrack.app;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.DownloadManager;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.DownloadListener;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -26,6 +37,8 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -51,6 +64,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        requestLegacyStoragePermissionIfNeeded();
         enableFullscreen();
         setContentView(createContentView());
         startServerAndLoadWebView();
@@ -72,6 +86,15 @@ public final class MainActivity extends Activity {
                 return false;
             }
         });
+        // 拦截导出 CSV 下载（Content-Disposition: attachment），交由系统 DownloadManager 处理。
+        webView.setDownloadListener(new DownloadListener() {
+            @Override
+            public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimetype, long contentLength) {
+                handleExportDownload(url, contentDisposition);
+            }
+        });
+        // 暴露导出辅助桥：网页可调用 window.HealthTrack.openDownloads() 跳到系统下载目录。
+        webView.addJavascriptInterface(new ExportBridge(), "HealthTrack");
         root.addView(webView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
@@ -252,6 +275,82 @@ public final class MainActivity extends Activity {
 
     private void showStartupError(Exception error) {
         statusView.setText("HealthTrack 启动失败\n\n" + error.getMessage());
+    }
+
+    private void requestLegacyStoragePermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT <= 28
+                && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1001);
+        }
+    }
+
+    private void handleExportDownload(String url, String contentDisposition) {
+        String filename = extractFilename(contentDisposition);
+        if (filename == null || filename.isEmpty()) {
+            filename = "HealthTrack_export.csv";
+        }
+        try {
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+            request.setTitle(filename);
+            request.setMimeType("text/csv");
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            // Android 10+ 分区存储下无需 WRITE_EXTERNAL_STORAGE 即可写入公共下载目录。
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
+            DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            manager.enqueue(request);
+            postExportResult(true, filename, "下载目录 Download/");
+            Toast.makeText(this, "已开始导出：" + filename, Toast.LENGTH_SHORT).show();
+        } catch (Exception error) {
+            postExportResult(false, null, "导出启动失败：" + error.getMessage());
+            Toast.makeText(this, "导出失败：" + error.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void postExportResult(final boolean ok, final String filename, final String message) {
+        try {
+            JSONObject object = new JSONObject();
+            object.put("ok", ok);
+            if (filename != null) {
+                object.put("filename", filename);
+                object.put("location", "下载目录 Download/");
+            }
+            if (message != null) {
+                object.put("message", message);
+            }
+            final String script = "if (window.onExportResult) window.onExportResult(" + object.toString() + ");";
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    webView.evaluateJavascript(script, null);
+                }
+            });
+        } catch (Exception ignored) {
+            // JS 回调失败不影响下载本身。
+        }
+    }
+
+    private String extractFilename(String contentDisposition) {
+        if (contentDisposition == null) {
+            return null;
+        }
+        Matcher matcher = Pattern.compile("filename=\"?([^\";]+)\"?", Pattern.CASE_INSENSITIVE).matcher(contentDisposition);
+        if (matcher.find()) {
+            return matcher.group(1).trim();
+        }
+        return null;
+    }
+
+    private final class ExportBridge {
+        @android.webkit.JavascriptInterface
+        public void openDownloads() {
+            try {
+                Intent intent = new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+            } catch (Exception ignored) {
+                Toast.makeText(MainActivity.this, "未找到系统下载管理器", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
     @Override

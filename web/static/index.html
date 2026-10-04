@@ -167,7 +167,7 @@
         <button onclick="openSettings()" title="AI 设置" aria-label="AI 设置" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 transition-colors flex items-center justify-center text-base">
           ⚙️
         </button>
-        <button onclick="exportData()" title="导出 Excel/CSV 表格" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-lg transition-colors flex items-center space-x-1">
+        <button onclick="openExportModal()" title="导出 Excel/CSV 表格" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-lg transition-colors flex items-center space-x-1">
           <span>📥 导出 Excel</span>
         </button>
       </div>
@@ -223,6 +223,31 @@
             <button id="test-config-btn" type="button" onclick="testAIConfig()" class="py-2.5 rounded-xl border border-blue-200 text-blue-600 font-bold text-sm hover:bg-blue-50 transition-colors">测试连接</button>
             <button id="save-config-btn" type="button" onclick="saveAIConfig()" class="py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">保存配置</button>
           </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 导出数据弹窗 -->
+    <div id="export-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeExportOnBackdrop(event)">
+      <section class="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="export-title">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div>
+            <h2 id="export-title" class="font-bold text-slate-900">导出数据</h2>
+            <p class="text-xs text-slate-400 mt-0.5">导出为 CSV，可用 Excel / WPS 打开</p>
+          </div>
+          <button onclick="closeExport()" aria-label="关闭导出" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500">✕</button>
+        </div>
+        <div class="p-5 space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-2">导出范围</label>
+            <div class="grid grid-cols-3 gap-2" id="export-range-pills">
+              <button data-range="7" onclick="selectExportRange(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">最近7天</button>
+              <button data-range="30" onclick="selectExportRange(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">最近30天</button>
+              <button data-range="all" onclick="selectExportRange(this)" class="py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm transition-all">全部</button>
+            </div>
+          </div>
+          <div id="export-result" class="hidden text-xs rounded-xl px-3 py-2.5"></div>
+          <button id="export-start-btn" type="button" onclick="startExport()" class="w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">开始导出</button>
         </div>
       </section>
     </div>
@@ -1493,9 +1518,124 @@
       }
     }
 
-    function exportData() {
-      window.location.href = '/api/v1/export';
+    // ===== 导出数据 =====
+    let exportRange = 'all';
+
+    function openExportModal() {
+      document.getElementById('export-modal').classList.remove('hidden');
+      selectExportRange(document.querySelector('#export-range-pills button[data-range="all"]'));
     }
+
+    function closeExport() {
+      document.getElementById('export-modal').classList.add('hidden');
+    }
+
+    function closeExportOnBackdrop(event) {
+      if (event.target === event.currentTarget) closeExport();
+    }
+
+    function selectExportRange(btn) {
+      exportRange = btn.getAttribute('data-range');
+      document.querySelectorAll('#export-range-pills button').forEach(p => {
+        const active = p === btn;
+        p.className = active
+          ? 'py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm transition-all'
+          : 'py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+      });
+      resetExportResult();
+    }
+
+    function resetExportResult() {
+      const el = document.getElementById('export-result');
+      el.classList.add('hidden');
+      el.textContent = '';
+    }
+
+    function buildExportFilename(range) {
+      // 与后端 Content-Disposition 保持一致，采用 ASCII 文件名，避免跨平台/跨设备中文文件名乱码。
+      const key = range === '7' ? '7d' : range === '30' ? '30d' : 'all';
+      const d = new Date();
+      const ymd = '' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+      return `HealthTrack_export_${key}_${ymd}.csv`;
+    }
+
+    async function startExport() {
+      const url = '/api/v1/export' + (exportRange === 'all' ? '' : `?range=${exportRange}`);
+
+      // 手机 App：交给原生 DownloadListener → DownloadManager 下载，结果由原生回调 onExportResult
+      if (window.HealthTrack) {
+        setExportBusy(true);
+        window.location.href = url;
+        return;
+      }
+
+      // PC 浏览器：fetch → blob → 触发下载
+      setExportBusy(true);
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const blob = await res.blob();
+        const filename = buildExportFilename(exportRange);
+
+        const a = document.createElement('a');
+        const blobUrl = URL.createObjectURL(blob);
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+
+        showExportResult(true, { filename, size: blob.size, location: '浏览器默认下载目录' });
+        showToast('导出成功', true);
+      } catch (e) {
+        showExportResult(false, { message: '导出失败：' + (e.message || '网络错误') });
+        showToast('导出失败', false);
+      } finally {
+        setExportBusy(false);
+      }
+    }
+
+    function setExportBusy(busy) {
+      const btn = document.getElementById('export-start-btn');
+      btn.disabled = busy;
+      btn.classList.toggle('opacity-50', busy);
+      btn.textContent = busy ? '导出中…' : '开始导出';
+    }
+
+    function showExportResult(ok, info) {
+      const el = document.getElementById('export-result');
+      el.classList.remove('hidden');
+      if (ok) {
+        const sizeText = info.size != null ? `（${formatBytes(info.size)}）` : '';
+        const openAction = window.HealthTrack
+          ? '<button onclick="window.HealthTrack.openDownloads()" class="mt-1.5 text-emerald-700 underline underline-offset-2 font-bold">打开下载目录</button>'
+          : '<button onclick="startExport()" class="mt-1.5 text-emerald-700 underline underline-offset-2 font-bold">重新下载</button>';
+        el.className = 'text-xs rounded-xl px-3 py-2.5 bg-emerald-50 text-emerald-700';
+        el.innerHTML = `文件已保存：<span class="font-bold break-all">${info.filename}</span>${sizeText}<br>位置：${info.location}<div>${openAction}</div>`;
+      } else {
+        el.className = 'text-xs rounded-xl px-3 py-2.5 bg-red-50 text-red-600';
+        el.textContent = info.message;
+      }
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+    }
+
+    // 原生 Android 下载完成/失败回调（由 MainActivity.evaluateJavascript 调用）
+    window.onExportResult = function (result) {
+      setExportBusy(false);
+      if (result && result.ok) {
+        showExportResult(true, { filename: result.filename, location: result.location || '下载目录 Download/' });
+        showToast('导出成功', true);
+      } else {
+        showExportResult(false, { message: '导出失败：' + ((result && result.message) || '未知错误') });
+        showToast('导出失败', false);
+      }
+    };
   </script>
 </body>
 </html>
