@@ -78,7 +78,7 @@ func main() {
 
 	// 4. 依赖注入与分层装配
 	recordRepo := repository.NewRecordRepository(dbMgr.DB)
-	recordService := service.NewRecordService(recordRepo)
+	recordService := service.NewRecordService(recordRepo, runtimeConfigs)
 	insightService := service.NewInsightService(recordRepo)
 	aiService := service.NewAIService(runtimeConfigs, recordRepo)
 	aiHandler := handler.NewAIHandler(runtimeConfigs, insightService, recordService)
@@ -107,6 +107,7 @@ func main() {
 		}
 	})
 	mux.HandleFunc("/api/config/test", configHandler.Test)
+	mux.HandleFunc("/api/config/sleep", configHandler.UpdateSleep)
 
 	// 前端静态页面分发（开发模式读取磁盘，生产模式走内嵌内存）。
 	var staticHandler http.Handler

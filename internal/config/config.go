@@ -14,6 +14,7 @@ type Config struct {
 	Server      ServerConfig   `yaml:"server"`
 	Database    DatabaseConfig `yaml:"database"`
 	AI          AIConfig       `yaml:"ai"`
+	Sleep       SleepConfig    `yaml:"sleep"`
 }
 
 type ServerConfig struct {
@@ -32,6 +33,13 @@ type AIConfig struct {
 	Model   string `yaml:"model"`
 }
 
+// SleepConfig 熬夜三档分界阈值。就寝时间 < GreenBefore 为未熬夜(绿)；
+// [GreenBefore, YellowBefore) 为轻度熬夜(黄)；>= YellowBefore 为重度熬夜(红)。
+type SleepConfig struct {
+	GreenBefore  string `yaml:"green_before"`
+	YellowBefore string `yaml:"yellow_before"`
+}
+
 // DefaultConfig 返回完整默认配置。
 // APIKey 有意保持为空，不能在代码仓库中内置真实密钥。
 func DefaultConfig() *Config {
@@ -48,6 +56,10 @@ func DefaultConfig() *Config {
 			BaseURL: "https://api.deepseek.com/v1",
 			APIKey:  "",
 			Model:   "deepseek-chat",
+		},
+		Sleep: SleepConfig{
+			GreenBefore:  "23:00",
+			YellowBefore: "00:00",
 		},
 	}
 }
@@ -70,6 +82,13 @@ ai:
   base_url: "https://api.deepseek.com/v1"
   api_key: ""
   model: "deepseek-chat"
+
+sleep:
+  # 熬夜三档分界：就寝时间 < green_before 为未熬夜(绿)；
+  # [green_before, yellow_before) 为轻度熬夜(黄)；>= yellow_before 为重度熬夜(红)。
+  # 阈值采用 HH:mm，凌晨时间按跨日 +24h 归一化；"00:00" 表示次日 0 点。
+  green_before: "23:00"
+  yellow_before: "00:00"
 `
 
 // FindProjectRoot 是没有显式传入 -config 时的旧版兼容逻辑。

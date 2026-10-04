@@ -200,6 +200,24 @@
             <input id="setting-api-key" type="password" autocomplete="off" placeholder="留空则保留当前 API Key" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
             <p id="api-key-status" class="text-[11px] text-slate-400 mt-1.5">正在读取配置…</p>
           </div>
+          <div class="pt-1 border-t border-slate-100">
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-xs font-bold text-slate-600">熬夜判定阈值</label>
+              <span class="text-[10px] text-slate-400">午夜 0 点请填 00:00</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label for="setting-sleep-green" class="block text-[10px] font-semibold text-slate-500 mb-1">不熬夜截止线</label>
+                <input id="setting-sleep-green" type="time" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
+              </div>
+              <div>
+                <label for="setting-sleep-yellow" class="block text-[10px] font-semibold text-slate-500 mb-1">轻度熬夜截止线</label>
+                <input id="setting-sleep-yellow" type="time" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
+              </div>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1.5">晚于「不熬夜截止线」判定轻度熬夜，晚于「轻度熬夜截止线」判定重度熬夜。</p>
+            <button id="save-sleep-btn" type="button" onclick="saveSleepThresholds()" class="mt-2 w-full py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-colors">保存熬夜阈值</button>
+          </div>
           <p id="settings-feedback" class="hidden text-xs rounded-xl px-3 py-2.5"></p>
           <div class="grid grid-cols-2 gap-3 pt-1">
             <button id="test-config-btn" type="button" onclick="testAIConfig()" class="py-2.5 rounded-xl border border-blue-200 text-blue-600 font-bold text-sm hover:bg-blue-50 transition-colors">测试连接</button>
@@ -542,6 +560,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       setTodayDate();
+      loadSleepThresholds();
     });
 
     function showToast(msg, isSuccess = true) {
@@ -598,6 +617,8 @@
         const config = json.data;
         document.getElementById('setting-base-url').value = config.base_url || '';
         document.getElementById('setting-model').value = config.model || '';
+        document.getElementById('setting-sleep-green').value = config.sleep_green_before || '23:00';
+        document.getElementById('setting-sleep-yellow').value = config.sleep_yellow_before || '00:00';
         document.getElementById('api-key-status').textContent = config.api_key_configured
           ? `当前 Key：${config.api_key_masked}（留空可保留）`
           : '尚未配置 API Key';
@@ -662,6 +683,42 @@
       }
     }
 
+    async function saveSleepThresholds() {
+      const green = document.getElementById('setting-sleep-green').value;
+      const yellow = document.getElementById('setting-sleep-yellow').value;
+      if (!green || !yellow) {
+        setSettingsFeedback('请填写完整的熬夜阈值时间', false);
+        return;
+      }
+      const g = parseTimeMinutes(green);
+      const y = parseTimeMinutes(yellow);
+      if (isNaN(g) || isNaN(y) || g >= y) {
+        setSettingsFeedback('不熬夜截止线需早于轻度熬夜截止线', false);
+        return;
+      }
+
+      setSettingsBusy('save-sleep-btn', true, '保存中…');
+      try {
+        const response = await fetch('/api/config/sleep', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ green_before: green, yellow_before: yellow })
+        });
+        const json = await response.json();
+        if (!response.ok || json.code !== 200) throw new Error(json.message || '保存失败');
+
+        sleepThresholds.green = green;
+        sleepThresholds.yellow = yellow;
+        handleSleepCalculation();
+        setSettingsFeedback('✓ ' + json.message, true);
+        showToast('熬夜阈值已保存并立即生效');
+      } catch (error) {
+        setSettingsFeedback(error.message || '保存失败，请稍后重试', false);
+      } finally {
+        setSettingsBusy('save-sleep-btn', false);
+      }
+    }
+
     function switchTab(tab) {
       currentTab = tab;
       ['log', 'dash', 'insight'].forEach(t => {
@@ -690,6 +747,49 @@
       loadRecordForDate(str);
     }
 
+    // 熬夜阈值（默认 23:00/00:00，启动时从 /api/config 同步）
+    let sleepThresholds = { green: '23:00', yellow: '00:00' };
+
+    // 将 HH:mm 折算为分钟，凌晨(00:00-04:00)按跨日 +24h 归一化，与后端一致
+    function parseTimeMinutes(t) {
+      if (!t) return NaN;
+      const parts = t.split(':');
+      if (parts.length !== 2) return NaN;
+      const h = Number(parts[0]);
+      const m = Number(parts[1]);
+      if (isNaN(h) || isNaN(m)) return NaN;
+      let total = h * 60 + m;
+      if (h >= 0 && h <= 4) total += 1440;
+      return total;
+    }
+
+    // 按自定义阈值计算熬夜等级：< green 绿；[green, yellow) 黄；>= yellow 红
+    function calcSleepTag(bedTime, green, yellow) {
+      const total = parseTimeMinutes(bedTime);
+      if (isNaN(total)) return 'GREEN';
+      let g = parseTimeMinutes(green);
+      let y = parseTimeMinutes(yellow);
+      if (isNaN(g)) g = 23 * 60;
+      if (isNaN(y)) y = 24 * 60;
+      if (total < g) return 'GREEN';
+      if (total < y) return 'YELLOW';
+      return 'RED';
+    }
+
+    async function loadSleepThresholds() {
+      try {
+        const res = await fetch('/api/config');
+        const json = await res.json();
+        if (res.ok && json.code === 200 && json.data) {
+          const d = json.data;
+          if (d.sleep_green_before) sleepThresholds.green = d.sleep_green_before;
+          if (d.sleep_yellow_before) sleepThresholds.yellow = d.sleep_yellow_before;
+        }
+      } catch (e) {
+        // 读取失败则使用默认阈值
+      }
+    }
+
     // 睡眠跨日联动核算与三色熬夜标签自动计算
     function handleSleepCalculation() {
       const bedTime = document.getElementById('sleepBedTime').value;
@@ -709,17 +809,18 @@
       const hours = ((wakeMinutes - bedMinutes) / 60).toFixed(1);
       document.getElementById('sleepDuration').value = hours;
 
-      // 熬夜分级评定 (<=24:00 绿; <=01:00 黄; >01:00 红)
+      // 熬夜分级评定：按自定义阈值实时计算
       const badge = document.getElementById('sleepTagBadge');
-      if (bH >= 18 || bH === 0) {
-        badge.className = 'badge-green';
-        badge.innerText = '🟢 未熬夜';
-      } else if (bH === 1 && bM === 0) {
+      const tag = calcSleepTag(bedTime, sleepThresholds.green, sleepThresholds.yellow);
+      if (tag === 'YELLOW') {
         badge.className = 'badge-yellow';
         badge.innerText = '🟡 轻度熬夜';
-      } else {
+      } else if (tag === 'RED') {
         badge.className = 'badge-red';
         badge.innerText = '🔴 重度熬夜';
+      } else {
+        badge.className = 'badge-green';
+        badge.innerText = '🟢 未熬夜';
       }
     }
 

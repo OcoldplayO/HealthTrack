@@ -80,40 +80,55 @@ type SaveRecordDTO struct {
 	Concerta       *ConcertaDetail   `json:"concerta"`
 }
 
-// CalculateSleepTag 根据入睡时间计算熬夜等级 (GREEN <= 24:00, YELLOW <= 01:00, RED > 01:00)
-func CalculateSleepTag(startTimeStr string) string {
-	if startTimeStr == "" {
+// CalculateSleepTagWithThresholds 根据入睡时间与自定义阈值计算熬夜等级。
+// 就寝时间 < greenBefore 为 GREEN；[greenBefore, yellowBefore) 为 YELLOW；>= yellowBefore 为 RED。
+// 阈值与就寝时间均按 HH:mm 解析，凌晨(00:00-04:00)按跨日 +24h 归一化。
+func CalculateSleepTagWithThresholds(startTimeStr, greenBefore, yellowBefore string) string {
+	total, ok := parseSleepTimeMinutes(startTimeStr)
+	if !ok {
 		return "GREEN"
 	}
+	green, okG := parseSleepTimeMinutes(greenBefore)
+	yellow, okY := parseSleepTimeMinutes(yellowBefore)
+	if !okG {
+		green = 23 * 60
+	}
+	if !okY {
+		yellow = 24 * 60
+	}
 
-	parts := strings.Split(strings.TrimSpace(startTimeStr), ":")
-	if len(parts) == 0 {
+	if total < green {
 		return "GREEN"
 	}
-
-	hour, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return "GREEN"
-	}
-
-	var minute int
-	if len(parts) > 1 {
-		minute, _ = strconv.Atoi(parts[1])
-	}
-
-	// 时间折算为分钟: 凌晨时间 (00:00 - 04:00) 对应于跨日后的 24:00 - 28:00
-	totalMinutes := hour * 60 + minute
-	if hour >= 0 && hour <= 4 {
-		totalMinutes += 24 * 60
-	}
-
-	// 24:00 对应 1440 分钟, 01:00 对应 1500 分钟 (25*60)
-	if totalMinutes <= 24*60 {
-		return "GREEN"
-	} else if totalMinutes <= 25*60 {
+	if total < yellow {
 		return "YELLOW"
 	}
 	return "RED"
+}
+
+// parseSleepTimeMinutes 将 HH:mm 折算为分钟；凌晨(00:00-04:00)按跨日后 +24h。
+func parseSleepTimeMinutes(s string) (int, bool) {
+	s = strings.TrimSpace(s)
+	parts := strings.Split(s, ":")
+	if len(parts) != 2 {
+		return 0, false
+	}
+	hour, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, false
+	}
+	minute, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, false
+	}
+	if minute < 0 || minute > 59 {
+		return 0, false
+	}
+	total := hour*60 + minute
+	if hour >= 0 && hour <= 4 {
+		total += 24 * 60
+	}
+	return total, true
 }
 
 // Validate 参数边界校验

@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -65,6 +66,66 @@ func (s *RuntimeStore) UpdateAI(baseURL, model string, apiKey *string) error {
 
 	s.cfg = next
 	return nil
+}
+
+// UpdateSleep 校验、原子持久化并立即应用新的熬夜阈值配置。
+func (s *RuntimeStore) UpdateSleep(greenBefore, yellowBefore string) error {
+	greenBefore = strings.TrimSpace(greenBefore)
+	yellowBefore = strings.TrimSpace(yellowBefore)
+	if err := validateSleepTimes(greenBefore, yellowBefore); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	next := s.cfg
+	next.Sleep.GreenBefore = greenBefore
+	next.Sleep.YellowBefore = yellowBefore
+
+	if err := writeConfigAtomically(s.configPath, &next); err != nil {
+		return err
+	}
+
+	s.cfg = next
+	return nil
+}
+
+// validateSleepTimes 校验熬夜阈值为合法 HH:mm 且未熬夜截止早于轻度截止。
+func validateSleepTimes(greenBefore, yellowBefore string) error {
+	g, okG := parseHHMM(greenBefore)
+	y, okY := parseHHMM(yellowBefore)
+	if !okG || !okY {
+		return fmt.Errorf("熬夜阈值必须是 HH:mm 格式")
+	}
+	if g >= y {
+		return fmt.Errorf("轻度熬夜截止时间必须晚于未熬夜截止时间")
+	}
+	return nil
+}
+
+// parseHHMM 将 HH:mm 折算为分钟；凌晨(00:00-04:00)视为跨日后 +24h。
+func parseHHMM(s string) (int, bool) {
+	parts := strings.Split(s, ":")
+	if len(parts) != 2 {
+		return 0, false
+	}
+	hour, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, false
+	}
+	minute, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, false
+	}
+	if minute < 0 || minute > 59 {
+		return 0, false
+	}
+	total := hour*60 + minute
+	if hour >= 0 && hour <= 4 {
+		total += 24 * 60
+	}
+	return total, true
 }
 
 func writeConfigAtomically(configPath string, cfg *Config) error {

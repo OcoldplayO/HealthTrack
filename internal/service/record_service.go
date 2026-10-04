@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"healthtrack/internal/config"
 	"healthtrack/internal/model"
 	"healthtrack/internal/repository"
 	"regexp"
@@ -11,17 +12,23 @@ import (
 )
 
 type RecordService struct {
-	repo *repository.RecordRepository
+	repo    *repository.RecordRepository
+	configs *config.RuntimeStore
 }
 
-func NewRecordService(repo *repository.RecordRepository) *RecordService {
-	return &RecordService{repo: repo}
+func NewRecordService(repo *repository.RecordRepository, configs *config.RuntimeStore) *RecordService {
+	return &RecordService{repo: repo, configs: configs}
 }
 
 // GetTodayRecord 获取今日记录
 func (s *RecordService) GetTodayRecord(userID int64) (*model.HealthRecord, error) {
 	today := time.Now().Format("2006-01-02")
-	return s.repo.GetByDate(userID, today)
+	rec, err := s.repo.GetByDate(userID, today)
+	if err != nil || rec == nil {
+		return rec, err
+	}
+	s.applySleepTag(rec)
+	return rec, nil
 }
 
 // SaveRecord 保存或合并记录
@@ -30,10 +37,10 @@ func (s *RecordService) SaveRecord(userID int64, dto *model.SaveRecordDTO) (*mod
 		return nil, err
 	}
 
-	// 1. 计算熬夜颜色等级
+	// 1. 按当前阈值实时计算熬夜颜色等级（落库仅作向前兼容与导出用）
 	sleepTag := "GREEN"
 	if dto.SleepStartTime != nil && *dto.SleepStartTime != "" {
-		sleepTag = model.CalculateSleepTag(*dto.SleepStartTime)
+		sleepTag = s.calcSleepTag(*dto.SleepStartTime)
 	}
 
 	// 2. 自动从日记文本中提取运动胶囊标签
@@ -62,7 +69,12 @@ func (s *RecordService) GetHistoryRecords(userID int64, startDate, endDate strin
 		return nil, fmt.Errorf("开始日期不能晚于结束日期")
 	}
 
-	return s.repo.GetRange(userID, startDate, endDate)
+	records, err := s.repo.GetRange(userID, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	s.applySleepTags(records)
+	return records, nil
 }
 
 // GetRecentRecords 按天数获取近 N 天的历史记录 (升序排列)
@@ -72,12 +84,43 @@ func (s *RecordService) GetRecentRecords(userID int64, days int) ([]*model.Healt
 	}
 	endDate := time.Now().Format("2006-01-02")
 	startDate := time.Now().AddDate(0, 0, -(days - 1)).Format("2006-01-02")
-	return s.repo.GetRange(userID, startDate, endDate)
+	records, err := s.repo.GetRange(userID, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	s.applySleepTags(records)
+	return records, nil
 }
 
 // GetAllRecords 导出全量数据
 func (s *RecordService) GetAllRecords(userID int64) ([]*model.HealthRecord, error) {
-	return s.repo.GetAll(userID)
+	records, err := s.repo.GetAll(userID)
+	if err != nil {
+		return nil, err
+	}
+	s.applySleepTags(records)
+	return records, nil
+}
+
+// calcSleepTag 按当前配置的熬夜阈值实时计算等级。
+func (s *RecordService) calcSleepTag(startTime string) string {
+	cfg := s.configs.Snapshot()
+	return model.CalculateSleepTagWithThresholds(startTime, cfg.Sleep.GreenBefore, cfg.Sleep.YellowBefore)
+}
+
+// applySleepTag 对单条记录按当前阈值重算 SleepTag。
+func (s *RecordService) applySleepTag(r *model.HealthRecord) {
+	if r == nil || r.SleepStartTime == nil || *r.SleepStartTime == "" {
+		return
+	}
+	r.SleepTag = s.calcSleepTag(*r.SleepStartTime)
+}
+
+// applySleepTags 对多条记录按当前阈值重算 SleepTag。
+func (s *RecordService) applySleepTags(records []*model.HealthRecord) {
+	for _, r := range records {
+		s.applySleepTag(r)
+	}
 }
 
 // extractActivityTags 智能关键词运动标签提取
