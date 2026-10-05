@@ -17,10 +17,11 @@ type ExerciseDetail struct {
 
 // ColdShowerDetail 冷水澡记录
 type ColdShowerDetail struct {
-	Enabled  bool   `json:"enabled"`  // 是否打卡
-	Timing   string `json:"timing"`   // morning, post_workout, evening
-	Duration int    `json:"duration"` // 时长 (分钟)
-	Feeling  string `json:"feeling"`  // refreshed, neutral, shivering
+	Enabled   bool     `json:"enabled"`    // 是否打卡
+	Timing    string   `json:"timing"`     // morning, post_workout, evening
+	Duration  int      `json:"duration"`   // 时长 (分钟)
+	WaterTemp *float64 `json:"water_temp"` // 预估体感水温 (℃)，可空
+	Feeling   string   `json:"feeling"`    // refreshed, neutral, shivering
 }
 
 // ConcertaDetail 专注达服药与多维效能记录
@@ -154,6 +155,11 @@ func (dto *SaveRecordDTO) Validate() error {
 	}
 	if dto.JournalText != nil && len([]rune(*dto.JournalText)) > 2000 {
 		return fmt.Errorf("日记文本不能超过 2000 个字符")
+	}
+	if dto.ColdShower != nil && dto.ColdShower.WaterTemp != nil {
+		if *dto.ColdShower.WaterTemp < 0.0 || *dto.ColdShower.WaterTemp > 40.0 {
+			return fmt.Errorf("冷水澡水温需在 0.0 ~ 40.0 ℃ 之间")
+		}
 	}
 	return nil
 }

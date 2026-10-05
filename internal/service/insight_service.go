@@ -124,10 +124,14 @@ func (s *InsightService) BuildPromptContext(records []*model.HealthRecord) strin
 				strings.Join(r.Concerta.Compensations, ","))
 		}
 
-		// 格式化冷水澡明细
+		// 格式化冷水澡明细（含预估体感水温，便于模型分析水温变化对唤醒强度的影响）
 		csText := "无冷水澡"
 		if r.ColdShower != nil && r.ColdShower.Enabled {
-			csText = fmt.Sprintf("%s(%d分钟/%s)", r.ColdShower.Timing, r.ColdShower.Duration, r.ColdShower.Feeling)
+			tempText := ""
+			if r.ColdShower.WaterTemp != nil {
+				tempText = fmt.Sprintf("%.1f℃/", *r.ColdShower.WaterTemp)
+			}
+			csText = fmt.Sprintf("%s(%s%d分钟/%s)", r.ColdShower.Timing, tempText, r.ColdShower.Duration, r.ColdShower.Feeling)
 		}
 
 		sb.WriteString(fmt.Sprintf(

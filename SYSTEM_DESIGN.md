@@ -140,7 +140,7 @@
   * `feeling`：`refreshed` (神经清爽唤醒), `neutral` (无感), `shivering` (发抖/回温困难)
 * **关联分析**：
   晨起冷水澡促发去甲肾上腺素与多巴胺平缓释放，缩短专注达起效潜伏期；睡前冷水澡激活交感神经，关联分析其对入睡潜伏期及深睡时长的负面干扰。
-* **【补增需求 · 见第十章 Backlog 第 1 条】**：新增**预估体感水温**字段。10 月天气转凉、持续降雨，水温较夏季大幅下降，冷刺激强度显著提升（主观上接近短效专注达）。记录水温后，可让 AI 觉察"水温变化 → 唤醒强度 → 时长需求"的量化关系，据此调整冷水澡时长。
+* **预估体感水温 `water_temp`（已实现）**：单位 ℃，可空，录入范围 `0~40`。10 月天气转凉、持续降雨，水温较夏季大幅下降，冷刺激强度显著提升（主观上接近短效专注达）。记录水温后，AI 可建立"水温变化 → 唤醒强度 → 时长需求"的量化关联，据此给出冷水澡时长调整建议；`BuildPromptContext` 输出的冷水澡明细形如 `morning(16.0℃/2分钟/refreshed)`。
 
 ---
 
@@ -170,10 +170,11 @@ type ExerciseDetail struct {
 
 // ColdShowerDetail 冷水澡记录
 type ColdShowerDetail struct {
-	Enabled  bool   `json:"enabled"`  // 是否打卡
-	Timing   string `json:"timing"`   // morning, post_workout, evening
-	Duration int    `json:"duration"` // 时长 (分钟)
-	Feeling  string `json:"feeling"`  // refreshed, neutral, shivering
+	Enabled   bool     `json:"enabled"`    // 是否打卡
+	Timing    string   `json:"timing"`     // morning, post_workout, evening
+	Duration  int      `json:"duration"`   // 时长 (分钟)
+	WaterTemp *float64 `json:"water_temp"` // 预估体感水温 (℃)，可空，0~40
+	Feeling   string   `json:"feeling"`    // refreshed, neutral, shivering
 }
 
 // ConcertaDetail 专注达服药与多维效能记录
@@ -451,7 +452,7 @@ function handleSleepCalculation() {
           <button type="button" class="pill-sm-btn" data-val="neutral">🟡 无明显感觉</button>
           <button type="button" class="pill-sm-btn" data-val="shivering">🔴 寒冷后轻微困倦感</button>
         </div>
-        <!-- 【补增需求】预估体感水温（待实现，见第十章 Backlog 第 1 条） -->
+        <!-- 预估体感水温：number 输入 (id=coldShowerWaterTemp，单位 ℃，0~40，可空)，随 cold_shower.water_temp 提交 -->
       </div>
     </div>
   </div>
@@ -539,7 +540,7 @@ function handleSleepCalculation() {
 `InsightService.BuildPromptContext(records []*model.HealthRecord) string` 负责把记录数组压成两段式文本：
 
 1. **【系统预计算：宏观生理与行为特征大盘】**：统计区间、有效记录天数、期间净体重变化、平均夜间失水（对比 0.4~0.9kg 基准）、力竭抗阻训练天数、专注达服药天数。
-2. **【逐日微观多维流水】**：按日输出晨重（含日变化、睡前排水）、睡眠（时长 / 就寝 / 标签）、运动、药物、冷水澡、饮食日记。
+2. **【逐日微观多维流水】**：按日输出晨重（含日变化、睡前排水）、睡眠（时长 / 就寝 / 标签）、运动、药物、冷水澡（含预估体感水温）、饮食日记。
 
 ### 6.2 AI 流式实现：`internal/service/ai_service.go`
 
@@ -722,17 +723,15 @@ scripts/build-android.ps1
 
 ## 十、 待办需求清单 (Backlog)
 
-> 本章记录**已确认、尚未实现**的需求。实现顺序由用户指定；每完成一项即从"待办"移入对应正文章节并注明实现方式。
+> 本章记录**已确认**的需求：标注 ✅ 者已实现并同步进正文，其余为待办；实现顺序由用户指定。
 
-### 10.1 补增需求（本轮新增）
+### 10.1 补增需求
 
-**① 冷水澡记录增加「预估体感水温」字段**
+**✅ ① 冷水澡记录增加「预估体感水温」字段（已实现）**
 * **背景**：10 月初天气转凉、持续降雨，水温较夏季大幅下降，冷刺激显著增强（主观体验接近"短效专注达"）。
-* **方案**：在 `ColdShowerDetail` 增加水温字段（建议 `water_temp` / `estimated_temp`，单位 ℃，`float64`，可空，允许用户粗估，如 15~20℃ 区间）。
-* **落库**：随 `cold_shower_json` 一起序列化，无需新增数据库列。
-* **价值**：让 AI 建立"水温 ↓ → 唤醒强度 ↑ → 可适当缩短时长"的量化关联，据此给出时长调整建议；同步更新第七章提示词与 `BuildPromptContext` 的冷水澡明细输出。
+* **实现**：`ColdShowerDetail` 新增 `water_temp`（`*float64`，单位 ℃，可空，入参校验 `0~40`）；随 `cold_shower_json` 落库，无需新增数据库列。前端冷水澡子表单新增「水温(估)」输入，历史列表标签展示 `🚿 冷水澡 16℃`；`BuildPromptContext` 输出 `morning(16.0℃/2分钟/refreshed)`；提示词模板同步补充"水温 → 刺激强度 → 时长建议"分析指引。详见 §2.8 / §3.1 / §4.2。
 
-**② AI 洞察历史存档 + 重复生成提醒**
+**② AI 洞察历史存档 + 重复生成提醒（待实现）**
 * **背景**：当前每次点击 AI 洞察都重新调用大模型，既浪费 token，又看不到历史生成的洞察内容。
 * **需求拆解**：
   1. **历史存档**：持久化每次生成的洞察内容（建议记录：生成时间、分析区间 `start_date/end_date`、范围档位、完整 Markdown 文本），支持回看历史洞察。

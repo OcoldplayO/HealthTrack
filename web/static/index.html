@@ -437,6 +437,13 @@
                     <span>分钟</span>
                   </div>
                 </div>
+                <div class="flex items-center justify-between text-xs text-slate-500">
+                  <span>水温(估):</span>
+                  <div class="flex items-center space-x-1">
+                    <input type="number" id="coldShowerWaterTemp" step="0.5" min="0" max="40" placeholder="--" class="w-14 border border-slate-200 rounded-lg px-2 py-0.5 text-center font-bold text-blue-600 outline-none">
+                    <span>℃</span>
+                  </div>
+                </div>
                 <div class="space-y-1">
                   <span class="text-[10px] text-slate-400 font-semibold block">即刻体感:</span>
                   <div class="flex flex-wrap gap-1.5" id="csFeelingPills">
@@ -1027,9 +1034,12 @@
             setColdShowerTiming(rec.cold_shower.timing || 'morning');
             setColdShowerFeeling(rec.cold_shower.feeling || 'refreshed');
             document.getElementById('coldShowerDuration').value = rec.cold_shower.duration || 2;
+            const csTemp = rec.cold_shower.water_temp;
+            document.getElementById('coldShowerWaterTemp').value = (csTemp === null || csTemp === undefined) ? '' : csTemp;
           } else {
             document.getElementById('coldShowerEnabled').checked = false;
             toggleColdShower(false);
+            document.getElementById('coldShowerWaterTemp').value = '';
           }
 
         } else {
@@ -1047,6 +1057,7 @@
           document.querySelectorAll('#concertaSideEffects .chip, #concertaCompensations .chip').forEach(c => c.classList.remove('active'));
           document.getElementById('coldShowerEnabled').checked = false;
           toggleColdShower(false);
+          document.getElementById('coldShowerWaterTemp').value = '';
         }
       } catch (err) {
         console.error("加载单日记录失败", err);
@@ -1103,10 +1114,12 @@
 
       // 组装冷水澡详情
       const coldShowerEnabled = document.getElementById('coldShowerEnabled').checked;
+      const coldShowerTempRaw = document.getElementById('coldShowerWaterTemp').value;
       let coldShowerPayload = {
         enabled: coldShowerEnabled,
         timing: coldShowerState.timing,
         duration: parseInt(document.getElementById('coldShowerDuration').value) || 2,
+        water_temp: coldShowerTempRaw === '' ? null : parseFloat(coldShowerTempRaw),
         feeling: coldShowerState.feeling
       };
 
@@ -1275,7 +1288,8 @@
               tagsHtml += `<span class="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">💊 专注达${r.concerta.dose}mg</span>`;
             }
             if (r.cold_shower && r.cold_shower.enabled) {
-              tagsHtml += `<span class="bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">🚿 冷水澡</span>`;
+              const csTemp = (r.cold_shower.water_temp === null || r.cold_shower.water_temp === undefined) ? '' : ` ${r.cold_shower.water_temp}℃`;
+              tagsHtml += `<span class="bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">🚿 冷水澡${csTemp}</span>`;
             }
 
             listEl.innerHTML += `
