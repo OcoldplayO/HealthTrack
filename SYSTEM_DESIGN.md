@@ -281,6 +281,19 @@ func (m *DBManager) migrate() error {
 		UNIQUE(user_id, record_date)
 	);
 	CREATE INDEX IF NOT EXISTS idx_records_user_date ON health_records(user_id, record_date);
+
+	CREATE TABLE IF NOT EXISTS ai_insights (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL DEFAULT 1,
+		range_days INTEGER NOT NULL DEFAULT 30,
+		start_date TEXT,
+		end_date TEXT,
+		content TEXT,        -- 洞察正文 (Markdown)
+		thinking TEXT,       -- 大模型思维链 (reasoning_content) 原文
+		model TEXT,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_insights_user_id ON ai_insights(user_id, id DESC);
 	`
 
 	// 平滑增量扩展字段（忽略"列已存在"错误，保证向后兼容）
@@ -300,6 +313,7 @@ func (m *DBManager) migrate() error {
 * **多用户预留**：所有读写均带 `user_id` 条件，当前单机版固定 `userID = 1`；唯一键为 `UNIQUE(user_id, record_date)`。
 * **历史遗留列**：`sleep_start_time` / `sleep_end_time` 为主用字段；`sleep_bed_time` / `sleep_wake_time` 为兼容早期前端而保留的冗余列，写入时二者同步维护，读取时若主用字段为空则回退读取遗留列。
 * **结构化对象 JSON 列**：`exercise_json` / `cold_shower_json` / `concerta_json` 存 `TEXT`，空值约定为 `"{}"`，读取时忽略空对象。
+* **AI 洞察存档表 `ai_insights`**：独立于 `health_records`，持久化每次生成的洞察。`content` 存正文 Markdown、`thinking` 存思维链原文，`range_days` 记录档位（7/30/60），`start_date` / `end_date` 为该期数据实际起止日期；游标分页按 `id DESC`。
 * **自动冷备份**：每次启动若当日尚无备份，则复制一份到 `data/backups/health_backup_YYYYMMDD.db`。
 
 ### 3.3 数据访问层交互契约（`internal/repository/record_repo.go`）
@@ -494,7 +508,11 @@ function handleSleepCalculation() {
 | `GET`  | `/api/v1/records/today`   | 获取今日已有记录，用于表单初始回显     | 无                                                |
 | `POST` | `/api/v1/records`         | 新建或幂等合并单日数据                 | `SaveRecordDTO` 完整 JSON                         |
 | `GET`  | `/api/v1/records/history` | 按日期区间拉取数据，供给看板图表       | `?start_date=2026-09-01&end_date=2026-09-28`      |
-| `GET`  | `/api/v1/insights/stream` | **AI 深度洞察流式接口 (SSE)**          | `?start_date=...&end_date=...`（缺省为近 30 天）  |
+| `GET`  | `/api/v1/insights/stream` | **AI 深度洞察流式接口 (SSE)**          | `?days=7` / `?days=30`（缺省） / `?days=60`       |
+| `GET`  | `/api/v1/insights`        | AI 洞察历史列表（游标分页）             | `?limit=10&before_id=<id>&range_days=7\|30\|60&q=<关键词>` |
+| `GET`  | `/api/v1/insights/{id}`   | AI 洞察历史详情（含思维链原文）         | 路径参数 `id`                                     |
+| `DELETE` | `/api/v1/insights/{id}` | 删除单条洞察存档                        | 路径参数 `id`                                     |
+| `POST` | `/api/v1/insights/batch-delete` | 批量删除洞察存档（历史页管理模式）  | JSON Body `{"ids":[1,2,3]}`（服务端过滤非法值并去重） |
 | `GET`  | `/api/v1/export`          | **导出 CSV（UTF-8 BOM，Excel/WPS 友好）** | `?range=7` / `?range=30` / 缺省为全部             |
 | `GET`  | `/api/v1/export/json`     | 导出全量 JSON 备份                     | 无                                                |
 | `GET`  | `/healthz`                | 服务健康检查探针                       | 返回 `{"status":"ok","time":...}`                 |
@@ -567,6 +585,7 @@ function handleSleepCalculation() {
 
 * **权威文件**：`prompts/insight_v1.txt`（桌面/源码环境优先读取）。
 * **兜底文件**：`internal/service/default_prompt.txt`（通过 `go:embed` 编译进二进制，Android 等无 `prompts/` 目录环境使用）。
+* **消息角色**：线上生成入口 `GET /api/v1/insights/stream`（`AIHandler.StreamInsight`）以 **`system` + `user` 双消息**下发：`system` 固定承载硬性约束（思维链与正文必须全程简体中文，常量 `systemInstruction`），`user` 承载提示词模板 + 预计算数据上下文。**思维链语言由 `system` 角色主导**——同类约束若只写在 `user` 消息里遵循度不稳定，会出现同一模板时而中文、时而英文思考。
 * **占位符契约**（由 `AIService.buildPrompt` 替换，模板须包含以下 token）：
 
   | 占位符             | 含义                     |
@@ -602,7 +621,7 @@ type Config struct {
 	ProjectRoot string         `yaml:"-"`
 	Server      ServerConfig   `yaml:"server"`   // port, dev_mode
 	Database    DatabaseConfig `yaml:"database"` // path, backup_dir
-	AI          AIConfig       `yaml:"ai"`       // base_url, api_key, model
+	AI          AIConfig       `yaml:"ai"`       // base_url, api_key, model, max_tokens, thinking
 	Sleep       SleepConfig    `yaml:"sleep"`    // green_before, yellow_before
 }
 
@@ -616,6 +635,7 @@ func FindProjectRoot() string
 * **配置文件缺失时自动创建**安全模板（`DefaultConfigTemplate`，不含真实 Key，权限 `0600`），**绝不覆盖已有配置**。
 * **启动参数**：`-config <路径>`（未指定时沿用项目根 `config.yaml`）、`-data-dir <目录>`（指定后数据库与备份强制放入该目录，Android 传入 `filesDir`）、`-port <端口>`（覆盖 `server.port`）。
 * **环境变量覆盖**（容器/CI 场景）：`AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 优先级高于配置文件。
+* **思维链长度封顶（`ai.max_tokens` / `ai.thinking`）**：推理模型的思考过程不受提示词中"500 字以内"约束（该约束写在 user 消息里，对原生 reasoning 通道无效），故改由请求参数硬性封顶。`ai.max_tokens` 为单次响应最大 token 数（含思维链+正文），`>0` 时注入请求体 `max_tokens`，`<=0` 表示不限制（交由服务端默认值）；`ai.thinking` 取 `enabled` / `disabled`，仅在这两个非空值时注入 `thinking: {"type": ...}`，留空则不传、保持服务端默认（即思维链默认开启）。二者均只影响请求参数，前端思维链展示不受影响。
 * **路径解析**：未使用 `-data-dir` 时，`database.path` / `backup_dir` 的相对路径基于 `config.yaml` 所在目录；`FindProjectRoot` 依次尝试"当前目录 → 上一级 → 可执行文件所在目录（含 `bin/` 特判）"，杜绝"不同目录启动导致数据库路径裂脑"。
 * **Android DNS 修复**：`main` 启动首行调用 `netutil.ConfigureResolver()`，必须在任何网络请求之前执行。
 
@@ -731,12 +751,17 @@ scripts/build-android.ps1
 * **背景**：10 月初天气转凉、持续降雨，水温较夏季大幅下降，冷刺激显著增强（主观体验接近"短效专注达"）。
 * **实现**：`ColdShowerDetail` 新增 `water_temp`（`*float64`，单位 ℃，可空，入参校验 `0~40`）；随 `cold_shower_json` 落库，无需新增数据库列。前端冷水澡子表单新增「水温(估)」输入，历史列表标签展示 `🚿 冷水澡 16℃`；`BuildPromptContext` 输出 `morning(16.0℃/2分钟/refreshed)`；提示词模板同步补充"水温 → 刺激强度 → 时长建议"分析指引。详见 §2.8 / §3.1 / §4.2。
 
-**② AI 洞察历史存档 + 重复生成提醒（待实现）**
-* **背景**：当前每次点击 AI 洞察都重新调用大模型，既浪费 token，又看不到历史生成的洞察内容。
-* **需求拆解**：
-  1. **历史存档**：持久化每次生成的洞察内容（建议记录：生成时间、分析区间 `start_date/end_date`、范围档位、完整 Markdown 文本），支持回看历史洞察。
-  2. **重复生成提醒**：同一天内若已生成过同一档位（近 7 天 / 30 天 / 60 天）的洞察，再次点击时提示"当日已存在该区间洞察，是否继续生成？"，由用户决定是否覆盖/新增。
-* **待讨论**：历史洞察的**存放位置与交互展示方案**（例如：洞察面板内加"历史记录"抽屉 / 独立历史页 / 按日期折叠列表）尚未定稿，实现前需与用户确认。
+**✅ ② AI 洞察历史存档 + 重复生成提醒（已实现）**
+* **背景**：此前每次点击 AI 洞察都重新调用大模型，既浪费 token，又看不到历史生成的洞察内容。
+* **实现（混合形态：A 入口 + C 页面）**：
+  1. **历史存档**：新增 `ai_insights` 表（见 §3.2）。SSE 流正常结束且确有产出时，服务端自动落库，**同时保存正文 Markdown 与思维链（`reasoning_content`）原文**；客户端中途断开不落库，避免存入半截内容。
+  2. **同天重复生成**：采用**追加保留**（不覆盖），每次生成均为新增一条存档，列表按时间倒序、同天多条可区分。
+  3. **入口与页面**：洞察面板标题栏右侧「🕘 历史」按钮进入独立视图 `view-history`；页面含关键词搜索、档位筛选（全部/近7天/近30天/近60天）、历史列表与「加载更多」。
+  4. **分页**：**游标分页**（`id DESC` + `before_id`），每批 **10 条**，不做页码翻页。
+  5. **重复生成提醒（文字，按档位独立）**：进入洞察页或切换档位时，仅按**当前档位**判断今日是否已生成该档位洞察——若有则状态标签显示「今日已生成过（HH:mm）· 点击查看」、按钮文案改为「重新生成」；若该档位今日未生成过（即使其他档位已生成）则显示「点击上方按钮开始」与默认按钮文案。各档位（7/30/60）状态互不影响。生成完成后状态显示「复盘完成 · 已存档」。
+* **详情**：点击列表项内联展开全文（含可折叠的「💭 思维链推导」区块）。
+* **删除（管理模式）**：历史页头部「管理」按钮进入管理模式——条目左侧出现复选框，支持逐条勾选、全选/取消全选，底部浮出「删除所选 (n)」操作条并二次确认后调用 `POST /api/v1/insights/batch-delete`。移动端额外支持**长按条目**直接进入管理模式并选中该项；切换搜索/筛选会自动退出管理模式。展开区不再提供单条删除入口（避免可发现性差）。
+* **说明**：按用户要求**不内置演示数据**，首次进入历史页为空态。
 
 ### 10.2 历史遗留待办（此前已提出、尚未实现）
 

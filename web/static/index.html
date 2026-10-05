@@ -252,6 +252,23 @@
       </section>
     </div>
 
+    <!-- 通用确认弹窗（替代原生 confirm，兼容安卓 WebView 与内嵌浏览器） -->
+    <div id="app-confirm-modal" class="hidden fixed inset-0 z-[70] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center">
+      <section class="w-full max-w-xs bg-white rounded-3xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="app-confirm-title">
+        <div class="px-5 pt-5">
+          <h2 id="app-confirm-title" class="font-bold text-slate-900 text-base">请确认</h2>
+          <p id="app-confirm-msg" class="text-sm text-slate-500 mt-2 leading-relaxed"></p>
+        </div>
+        <div class="p-5 flex gap-2">
+          <button id="app-confirm-cancel" type="button" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors">取消</button>
+          <button id="app-confirm-ok" type="button" class="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors">确定删除</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 轻量错误提示条（替代原生 alert） -->
+    <div id="app-toast" class="hidden fixed left-1/2 -translate-x-1/2 bottom-24 z-[80] max-w-[90%] px-4 py-2.5 rounded-2xl bg-slate-900/95 text-white text-xs shadow-xl"></div>
+
     <!-- 核心内容切换区 -->
     <main class="flex-1 overflow-y-auto p-5 no-scrollbar bg-slate-50/50 relative" id="main-content">
       
@@ -526,6 +543,9 @@
             <span class="text-lg">✨</span>
             <h2 class="text-base font-bold text-slate-900">AI 智能健康复盘</h2>
           </div>
+          <button onclick="openInsightHistory()" class="flex items-center space-x-1 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors">
+            <span>🕘</span><span>历史</span>
+          </button>
         </div>
 
         <!-- 分析周期选择胶囊 -->
@@ -554,6 +574,46 @@
         </div>
       </section>
 
+      <!-- 4. AI 洞察历史页 (Insight History View) -->
+      <section id="view-history" class="fade-in space-y-4 hidden">
+        <div class="flex justify-between items-center">
+          <button onclick="switchTab('insight')" class="flex items-center space-x-0.5 text-slate-500 hover:text-slate-800 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            <span class="text-xs font-bold">返回</span>
+          </button>
+          <h2 class="text-base font-bold text-slate-900">🕘 洞察历史</h2>
+          <button onclick="toggleHistoryManage()" id="history-manage-btn" class="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl transition-colors">管理</button>
+        </div>
+
+        <!-- 关键词搜索 -->
+        <div class="relative">
+          <input id="history-search" oninput="onHistorySearchInput()" type="text" placeholder="搜索洞察内容关键词…"
+            class="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all">
+          <svg class="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path></svg>
+        </div>
+
+        <!-- 档位筛选 -->
+        <div class="flex space-x-2">
+          <button onclick="setHistoryFilter(0)" id="hfilter-0" class="flex-1 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white transition-all">全部</button>
+          <button onclick="setHistoryFilter(7)" id="hfilter-7" class="flex-1 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 7 天</button>
+          <button onclick="setHistoryFilter(30)" id="hfilter-30" class="flex-1 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 30 天</button>
+          <button onclick="setHistoryFilter(60)" id="hfilter-60" class="flex-1 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 60 天</button>
+        </div>
+
+        <!-- 历史列表 -->
+        <div id="history-list" class="space-y-2.5"></div>
+
+        <!-- 加载更多（游标分页，每批 10 条） -->
+        <button onclick="loadHistory(false)" id="history-loadmore" class="hidden w-full py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all">加载更多</button>
+
+        <!-- 管理模式底部操作条 -->
+        <div id="history-delete-bar" class="hidden sticky bottom-2 z-10 flex items-center justify-between bg-slate-900/95 backdrop-blur-md text-white rounded-2xl px-4 py-2.5 shadow-xl">
+          <button onclick="toggleHistorySelectAll()" id="history-selectall-btn" class="text-xs font-bold text-slate-200 hover:text-white transition-colors">全选</button>
+          <span id="history-selected-count" class="text-xs text-slate-300">已选 0 项</span>
+          <button onclick="deleteSelectedInsights()" id="history-delete-btn" class="text-xs font-bold bg-slate-600/60 text-slate-300 px-3.5 py-1.5 rounded-xl cursor-not-allowed transition-colors" disabled>删除所选</button>
+        </div>
+      </section>
+
     </main>
 
     <!-- 底部 Tab 导航 -->
@@ -579,6 +639,21 @@
     let insightDays = 30;
     let weightChart = null;
     let sleepChart = null;
+
+    // AI 洞察历史页状态（游标分页 + 搜索筛选）
+    let historyState = {
+      items: [],      // 已加载的列表项
+      beforeId: 0,    // 游标：当前已加载的最后一条 id
+      hasMore: false,
+      loading: false,
+      rangeDays: 0,   // 0=全部；7/30/60
+      q: '',
+      error: '',
+      expanded: {},   // id -> 是否展开
+      details: {},    // id -> 详情全文（含思维链）
+      manageMode: false, // 管理模式（批量选择删除）
+      selected: {}    // id -> 是否勾选
+    };
 
     // 生物黑客交互状态
     let exerciseState = {
@@ -756,15 +831,26 @@
 
     function switchTab(tab) {
       currentTab = tab;
-      ['log', 'dash', 'insight'].forEach(t => {
+      // 历史页没有对应的底部 Tab，导航高亮仍归属「洞察」
+      const navKey = tab === 'history' ? 'insight' : tab;
+
+      ['log', 'dash', 'insight', 'history'].forEach(t => {
         const view = document.getElementById(`view-${t}`);
-        const btn = document.getElementById(`tab-${t}`);
+        if (!view) return;
         if (t === tab) {
           view.classList.remove('hidden');
+        } else {
+          view.classList.add('hidden');
+        }
+      });
+
+      ['log', 'dash', 'insight'].forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        if (!btn) return;
+        if (t === navKey) {
           btn.classList.add('text-blue-600', 'font-bold');
           btn.classList.remove('text-slate-400');
         } else {
-          view.classList.add('hidden');
           btn.classList.remove('text-blue-600', 'font-bold');
           btn.classList.add('text-slate-400');
         }
@@ -772,6 +858,9 @@
 
       if (tab === 'dash') {
         loadDashboardData(dashRange);
+      }
+      if (tab === 'insight') {
+        checkTodayInsight();
       }
     }
 
@@ -1316,6 +1405,8 @@
           el.className = 'flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
         }
       });
+      // 各档位状态彼此独立：切换后按新档位重新判断"今日是否已生成"
+      checkTodayInsight();
     }
 
     // 轻量原生 Markdown 解析器 (支持标题、列表、粗体、分割线、行内强调与段落)
@@ -1504,7 +1595,7 @@
           statusTag.innerText = '分析失败';
         } else if (responseText || thinkingText) {
           updateUI();
-          statusTag.innerText = '复盘完成';
+          statusTag.innerText = '复盘完成 · 已存档';
         } else {
           contentEl.innerHTML = '<p class="text-slate-400">未能获取到分析内容，请检查后端大模型连接。</p>';
           statusTag.innerText = '暂无分析内容';
@@ -1528,7 +1619,411 @@
         contentEl.classList.remove('typing-cursor');
         btn.disabled = false;
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
-        btn.innerHTML = originalBtnText;
+        // 有产出即说明已自动存档，按钮语义转为「重新生成」（同天同档位为追加保留）
+        btn.innerHTML = (responseText || thinkingText) ? '<span>🔄 重新生成</span>' : originalBtnText;
+      }
+    }
+
+    // ===== AI 洞察历史（入口按钮 + 独立视图 + 游标分页） =====
+
+    // 进入历史页：重置筛选与搜索后加载首批
+    function openInsightHistory() {
+      historyState.rangeDays = 0;
+      historyState.q = '';
+      exitHistoryManage();
+      const searchEl = document.getElementById('history-search');
+      if (searchEl) searchEl.value = '';
+      setHistoryFilterPills(0);
+      switchTab('history');
+      loadHistory(true);
+    }
+
+    function setHistoryFilter(days) {
+      historyState.rangeDays = days;
+      exitHistoryManage();
+      setHistoryFilterPills(days);
+      if (currentTab === 'history') loadHistory(true);
+    }
+
+    function setHistoryFilterPills(days) {
+      [0, 7, 30, 60].forEach(d => {
+        const el = document.getElementById(`hfilter-${d}`);
+        if (!el) return;
+        if (d === days) {
+          el.className = 'flex-1 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white transition-all';
+        } else {
+          el.className = 'flex-1 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+        }
+      });
+    }
+
+    let historySearchTimer = null;
+    function onHistorySearchInput() {
+      clearTimeout(historySearchTimer);
+      historySearchTimer = setTimeout(() => {
+        exitHistoryManage();
+        historyState.q = (document.getElementById('history-search').value || '').trim();
+        loadHistory(true);
+      }, 300);
+    }
+
+    // 加载历史：reset=true 重置游标重新拉取；false 加载下一批（每批 10 条）
+    async function loadHistory(reset) {
+      if (historyState.loading) return;
+      historyState.loading = true;
+      if (reset) {
+        historyState.items = [];
+        historyState.beforeId = 0;
+        historyState.hasMore = false;
+        historyState.error = '';
+        historyState.expanded = {};
+        historyState.details = {};
+      }
+      renderHistoryList();
+
+      const params = new URLSearchParams();
+      params.set('limit', '10');
+      if (historyState.beforeId > 0) params.set('before_id', String(historyState.beforeId));
+      if (historyState.rangeDays > 0) params.set('range_days', String(historyState.rangeDays));
+      if (historyState.q) params.set('q', historyState.q);
+
+      try {
+        const resp = await fetch('/api/v1/insights?' + params.toString());
+        const json = await resp.json();
+        if (json.code !== 200) throw new Error(json.message || '查询失败');
+        const data = json.data || {};
+        const items = data.items || [];
+        historyState.items = historyState.items.concat(items);
+        historyState.hasMore = !!data.has_more;
+        if (items.length > 0) historyState.beforeId = items[items.length - 1].id;
+      } catch (e) {
+        historyState.error = e.message;
+      } finally {
+        historyState.loading = false;
+        renderHistoryList();
+      }
+    }
+
+    function renderHistoryList() {
+      const listEl = document.getElementById('history-list');
+      const moreBtn = document.getElementById('history-loadmore');
+      const manageBtn = document.getElementById('history-manage-btn');
+      if (!listEl) return;
+
+      if (!historyState.items.length) {
+        if (historyState.loading) {
+          listEl.innerHTML = '<p class="text-center text-xs text-slate-400 py-8">加载中…</p>';
+        } else if (historyState.error) {
+          listEl.innerHTML = `<p class="text-center text-xs text-red-500 py-8">加载失败：${escapeHtml(historyState.error)}</p>`;
+        } else {
+          listEl.innerHTML = '<div class="bg-white border border-dashed border-slate-200 rounded-2xl py-10 text-center text-xs text-slate-400">暂无洞察存档<br><span class="text-[11px]">在洞察页生成后会自动存档到这里</span></div>';
+        }
+        if (moreBtn) moreBtn.classList.add('hidden');
+        if (manageBtn) manageBtn.classList.toggle('hidden', !historyState.manageMode);
+        updateHistoryDeleteBar();
+        return;
+      }
+
+      listEl.innerHTML = historyState.items.map(it => {
+        const isOpen = !!historyState.expanded[it.id];
+        const selected = !!historyState.selected[it.id];
+        const d = new Date(it.created_at);
+        const timeStr = isNaN(d.getTime()) ? '' :
+          `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        const preview = (it.content || '').replace(/[#*`>|\-]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90) || '（无正文）';
+
+        const head = `
+          <div class="flex justify-between items-center mb-1.5">
+            <span class="text-xs font-bold text-slate-800">${escapeHtml(it.start_date)} ~ ${escapeHtml(it.end_date)}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-bold">近 ${it.range_days} 天</span>
+          </div>
+          <p class="text-xs text-slate-500 leading-relaxed ${(isOpen && !historyState.manageMode) ? '' : 'line-clamp-2'}">${escapeHtml(preview)}</p>
+          <div class="flex justify-between items-center mt-2">
+            <span class="text-[10px] text-slate-400">${timeStr}${it.model ? ' · ' + escapeHtml(it.model) : ''}</span>
+            ${historyState.manageMode ? '' : `<span class="text-[10px] text-blue-600 font-bold">${isOpen ? '收起 ▴' : '展开 ▾'}</span>`}
+          </div>`;
+
+        // 管理模式：整卡作为勾选热区，不展开详情
+        if (historyState.manageMode) {
+          return `
+            <div data-hp-id="${it.id}" onclick="onHistoryItemClick(${it.id})" class="cursor-pointer select-none flex items-start space-x-3 bg-white border rounded-2xl p-3.5 shadow-sm transition-colors ${selected ? 'border-blue-400 ring-1 ring-blue-300' : 'border-slate-100'}">
+              <div class="mt-0.5 w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-colors ${selected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}">
+                ${selected ? '<svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>' : ''}
+              </div>
+              <div class="flex-1 min-w-0">${head}</div>
+            </div>`;
+        }
+
+        let detail = '';
+        if (isOpen) {
+          const full = historyState.details[it.id];
+          if (!full) {
+            detail = '<p class="text-[11px] text-slate-400 mt-2">加载全文…</p>';
+          } else {
+            const think = (full.thinking || '').trim();
+            const thinkHtml = think ? `
+              <details class="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500">
+                <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">💭 思维链推导 (${think.length} 字)</summary>
+                <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${escapeHtml(think)}</div>
+              </details>` : '';
+            detail = `${thinkHtml}
+              <div class="mt-2 text-sm text-slate-700 leading-relaxed markdown-body">${renderMarkdown(full.content || '')}</div>`;
+          }
+        }
+
+        return `
+          <div data-hp-id="${it.id}" class="bg-white border border-slate-100 rounded-2xl p-3.5 shadow-sm">
+            <div class="cursor-pointer select-none" onclick="onHistoryItemClick(${it.id})">${head}</div>
+            ${detail}
+          </div>`;
+      }).join('');
+
+      if (moreBtn) moreBtn.classList.toggle('hidden', !historyState.hasMore);
+      if (manageBtn) manageBtn.classList.toggle('hidden', !historyState.items.length && !historyState.manageMode);
+      updateHistoryDeleteBar();
+      bindHistoryLongPress();
+    }
+
+    // 条目点击分发：长按触发后抑制本次点击；管理模式=勾选；普通模式=展开/收起
+    function onHistoryItemClick(id) {
+      if (historyLongPressFired) { historyLongPressFired = false; return; }
+      if (historyState.manageMode) { toggleHistorySelect(id); return; }
+      toggleHistoryItem(id);
+    }
+
+    // ===== 管理模式（批量删除） =====
+    let historyLongPressTimer = null;
+    let historyLongPressFired = false;
+
+    // 长按条目（移动端最佳实践）直接进入管理模式并选中该项
+    function bindHistoryLongPress() {
+      const listEl = document.getElementById('history-list');
+      if (!listEl) return;
+      listEl.querySelectorAll('[data-hp-id]').forEach(el => {
+        const id = parseInt(el.getAttribute('data-hp-id'), 10);
+        const start = () => {
+          if (historyState.manageMode) return;
+          historyLongPressFired = false;
+          clearTimeout(historyLongPressTimer);
+          historyLongPressTimer = setTimeout(() => {
+            historyLongPressFired = true;
+            historyState.manageMode = true;
+            historyState.selected = { [id]: true };
+            syncHistoryManageUI();
+            renderHistoryList();
+          }, 500);
+        };
+        const cancel = () => clearTimeout(historyLongPressTimer);
+        el.addEventListener('pointerdown', start);
+        el.addEventListener('pointerup', cancel);
+        el.addEventListener('pointerleave', cancel);
+        el.addEventListener('pointercancel', cancel);
+        el.addEventListener('contextmenu', e => e.preventDefault());
+      });
+    }
+
+    function toggleHistoryManage() {
+      historyState.manageMode = !historyState.manageMode;
+      if (!historyState.manageMode) historyState.selected = {};
+      syncHistoryManageUI();
+      renderHistoryList();
+    }
+
+    function exitHistoryManage() {
+      if (!historyState.manageMode) return;
+      historyState.manageMode = false;
+      historyState.selected = {};
+      syncHistoryManageUI();
+    }
+
+    function syncHistoryManageUI() {
+      const btn = document.getElementById('history-manage-btn');
+      if (btn) {
+        btn.innerText = historyState.manageMode ? '完成' : '管理';
+        btn.className = historyState.manageMode
+          ? 'text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl transition-colors'
+          : 'text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl transition-colors';
+      }
+      updateHistoryDeleteBar();
+    }
+
+    function toggleHistorySelect(id) {
+      if (historyState.selected[id]) delete historyState.selected[id];
+      else historyState.selected[id] = true;
+      renderHistoryList();
+    }
+
+    function toggleHistorySelectAll() {
+      const ids = historyState.items.map(i => i.id);
+      const selectedCount = ids.filter(id => historyState.selected[id]).length;
+      if (selectedCount === ids.length) {
+        historyState.selected = {};
+      } else {
+        const sel = {};
+        ids.forEach(id => { sel[id] = true; });
+        historyState.selected = sel;
+      }
+      renderHistoryList();
+    }
+
+    function updateHistoryDeleteBar() {
+      const bar = document.getElementById('history-delete-bar');
+      if (!bar) return;
+      const show = historyState.manageMode && historyState.items.length > 0;
+      bar.classList.toggle('hidden', !show);
+      if (!show) return;
+
+      const ids = historyState.items.map(i => i.id);
+      const count = ids.filter(id => historyState.selected[id]).length;
+
+      const countEl = document.getElementById('history-selected-count');
+      if (countEl) countEl.innerText = `已选 ${count} 项`;
+
+      const selAllBtn = document.getElementById('history-selectall-btn');
+      if (selAllBtn) selAllBtn.innerText = (ids.length > 0 && count === ids.length) ? '取消全选' : '全选';
+
+      const delBtn = document.getElementById('history-delete-btn');
+      if (delBtn) {
+        delBtn.disabled = count === 0;
+        delBtn.innerText = count > 0 ? `删除所选 (${count})` : '删除所选';
+        delBtn.className = count > 0
+          ? 'text-xs font-bold bg-red-500 hover:bg-red-600 px-3.5 py-1.5 rounded-xl transition-colors'
+          : 'text-xs font-bold bg-slate-600/60 text-slate-300 px-3.5 py-1.5 rounded-xl cursor-not-allowed transition-colors';
+      }
+    }
+
+    // 通用确认弹窗：返回 Promise<boolean>。用于替代原生 confirm()，
+    // 原生对话框在安卓 WebView（未实现 onJsConfirm）恒返回 false，且在 IDE 内嵌浏览器会打断宿主组件树。
+    function appConfirm(message, options) {
+      const opts = options || {};
+      return new Promise(resolve => {
+        const modal = document.getElementById('app-confirm-modal');
+        const titleEl = document.getElementById('app-confirm-title');
+        const msgEl = document.getElementById('app-confirm-msg');
+        const okBtn = document.getElementById('app-confirm-ok');
+        const cancelBtn = document.getElementById('app-confirm-cancel');
+        if (!modal) { resolve(false); return; }
+
+        titleEl.innerText = opts.title || '请确认';
+        msgEl.innerText = message || '';
+        okBtn.innerText = opts.confirmText || '确定';
+        if (opts.danger === false) {
+          okBtn.className = 'flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors';
+        } else {
+          okBtn.className = 'flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors';
+        }
+
+        const cleanup = () => {
+          modal.classList.add('hidden');
+          okBtn.onclick = null;
+          cancelBtn.onclick = null;
+          modal.onclick = null;
+        };
+        okBtn.onclick = () => { cleanup(); resolve(true); };
+        cancelBtn.onclick = () => { cleanup(); resolve(false); };
+        modal.onclick = (e) => { if (e.target === modal) { cleanup(); resolve(false); } };
+
+        modal.classList.remove('hidden');
+      });
+    }
+
+    // 轻量提示条：替代原生 alert()，避免安卓端静默无提示。
+    let appToastTimer = null;
+    function appToast(message) {
+      const el = document.getElementById('app-toast');
+      if (!el) return;
+      el.innerText = message || '';
+      el.classList.remove('hidden');
+      if (appToastTimer) clearTimeout(appToastTimer);
+      appToastTimer = setTimeout(() => el.classList.add('hidden'), 2600);
+    }
+
+    async function deleteSelectedInsights() {
+      const ids = historyState.items.map(i => i.id).filter(id => historyState.selected[id]);
+      if (!ids.length) return;
+      const ok = await appConfirm(`确定删除所选 ${ids.length} 条洞察存档？删除后不可恢复。`, { title: '删除洞察存档', confirmText: '确定删除' });
+      if (!ok) return;
+      try {
+        const resp = await fetch('/api/v1/insights/batch-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids })
+        });
+        const json = await resp.json();
+        if (json.code !== 200) throw new Error(json.message || '删除失败');
+        historyState.items = historyState.items.filter(x => !historyState.selected[x.id]);
+        Object.keys(historyState.selected).forEach(id => {
+          delete historyState.expanded[id];
+          delete historyState.details[id];
+        });
+        historyState.selected = {};
+        if (!historyState.items.length) historyState.manageMode = false;
+        syncHistoryManageUI();
+        renderHistoryList();
+        checkTodayInsight(); // 同步刷新洞察页"今日已生成"状态
+      } catch (e) {
+        appToast('删除失败：' + e.message);
+      }
+    }
+
+    async function toggleHistoryItem(id) {
+      if (historyState.expanded[id]) {
+        historyState.expanded[id] = false;
+        renderHistoryList();
+        return;
+      }
+      historyState.expanded[id] = true;
+      renderHistoryList();
+      if (!historyState.details[id]) {
+        try {
+          const resp = await fetch(`/api/v1/insights/${id}`);
+          const json = await resp.json();
+          historyState.details[id] = (json.code === 200 && json.data) ? json.data : { content: '加载失败', thinking: '' };
+        } catch (e) {
+          historyState.details[id] = { content: '加载失败：' + e.message, thinking: '' };
+        }
+        renderHistoryList();
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    // 洞察页状态提示：按"当前档位"判断今日是否已生成过该档位洞察。
+    // 各档位独立：仅当本档位今日已有存档时才提示并切换按钮为「重新生成」。
+    async function checkTodayInsight() {
+      const statusTag = document.getElementById('insight-status-tag');
+      const btn = document.getElementById('btn-generate-insight');
+      if (!statusTag || !btn) return;
+
+      const range = insightDays; // 记录本次查询档位，防止快速切换导致的过期响应
+      try {
+        const resp = await fetch(`/api/v1/insights?limit=1&range_days=${range}`);
+        if (range !== insightDays) return; // 已切换到其他档位，丢弃过期结果
+        const json = await resp.json();
+        if (range !== insightDays) return;
+        const items = (json.data && json.data.items) || [];
+        if (items.length > 0) {
+          const d = new Date(items[0].created_at);
+          const now = new Date();
+          const sameDay = !isNaN(d.getTime()) &&
+            d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+          if (sameDay) {
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            statusTag.innerHTML = `<span class="text-emerald-600">今日已生成过（${hh}:${mm}）</span> · <span onclick="openInsightHistory()" class="text-blue-600 cursor-pointer font-bold">点击查看</span>`;
+            btn.innerHTML = '<span>🔄 重新生成</span>';
+            return;
+          }
+        }
+        statusTag.innerText = '点击上方按钮开始';
+        btn.innerHTML = '<span>🚀 生成阶段深度洞察</span>';
+      } catch (e) {
+        // 静默失败，不打扰用户
       }
     }
 

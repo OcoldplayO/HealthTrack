@@ -47,3 +47,6 @@ android/local.properties
 
 # 本地打包/安装脚本（含本机签名口令与绝对路径，严禁提交）
 scripts/build-android.ps1
+
+# 设计原型预览（临时稿，不进入版本库）
+.preview/

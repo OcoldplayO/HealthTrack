@@ -78,6 +78,20 @@ func (m *DBManager) migrate() error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_records_user_date ON health_records(user_id, record_date);
+
+	CREATE TABLE IF NOT EXISTS ai_insights (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL DEFAULT 1,
+		range_days INTEGER NOT NULL DEFAULT 30,
+		start_date TEXT,
+		end_date TEXT,
+		content TEXT,
+		thinking TEXT,
+		model TEXT,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_insights_user_id ON ai_insights(user_id, id DESC);
 	`
 	if _, err := m.DB.Exec(schema); err != nil {
 		return err

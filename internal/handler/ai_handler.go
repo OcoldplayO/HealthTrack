@@ -14,18 +14,26 @@ import (
 	"strings"
 
 	"healthtrack/internal/config"
+	"healthtrack/internal/model"
+	"healthtrack/internal/repository"
 	"healthtrack/internal/service"
 )
 
 type AIHandler struct {
-	configs *config.RuntimeStore
-	insight *service.InsightService
-	repoSvc *service.RecordService
+	configs     *config.RuntimeStore
+	insight     *service.InsightService
+	repoSvc     *service.RecordService
+	insightRepo *repository.InsightRepository
 }
 
-func NewAIHandler(configs *config.RuntimeStore, insight *service.InsightService, repoSvc *service.RecordService) *AIHandler {
-	return &AIHandler{configs: configs, insight: insight, repoSvc: repoSvc}
+func NewAIHandler(configs *config.RuntimeStore, insight *service.InsightService, repoSvc *service.RecordService, insightRepo *repository.InsightRepository) *AIHandler {
+	return &AIHandler{configs: configs, insight: insight, repoSvc: repoSvc, insightRepo: insightRepo}
 }
+
+// systemInstruction 以 system 角色下发硬性约束。
+// 推理模型的思维链（reasoning_content）语言主要由 system 角色决定；同类约束若只写在
+// user 消息里（见提示词模板），遵循度不稳定，会出现同一模板时而中文、时而英文思考。
+const systemInstruction = "你是严谨的中文健康分析顾问。硬性要求：你的全部思考过程（reasoning_content）与最终回答必须始终使用简体中文，严禁使用英文进行推理、自问自答或中英夹杂。"
 
 func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 	cfg := h.configs.Snapshot()
@@ -59,8 +67,10 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. 构建预计算特征上下文
+	// 3. 构建预计算特征上下文（同时记录该期数据实际起止日期，用于存档）
 	dataContext := h.insight.BuildPromptContext(records)
+	startDate := records[0].RecordDate
+	endDate := records[len(records)-1].RecordDate
 
 	// 4. 读取提示词模板 prompts/insight_v1.txt。
 	// 磁盘读取失败（例如 Android 端 prompts 目录未打包进 APK）时，回退到内嵌的默认模板，避免报“模板文件不存在”。
@@ -86,8 +96,17 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 		"stream":      true,
 		"temperature": 0.4,
 		"messages": []map[string]string{
+			{"role": "system", "content": systemInstruction},
 			{"role": "user", "content": fullUserContent},
 		},
+	}
+	// 5.1 按配置给思维链封顶：max_tokens 对推理模型的思考+正文总输出生效
+	if cfg.AI.MaxTokens > 0 {
+		requestBody["max_tokens"] = cfg.AI.MaxTokens
+	}
+	// 5.2 思维链开关；留空则不传，保持服务端默认
+	if cfg.AI.Thinking == "enabled" || cfg.AI.Thinking == "disabled" {
+		requestBody["thinking"] = map[string]string{"type": cfg.AI.Thinking}
 	}
 	jsonPayload, err := json.Marshal(requestBody)
 	if err != nil {
@@ -127,8 +146,9 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 6. 逐行透明转发 SSE 流
+	// 6. 逐行透明转发 SSE 流，同时累积正文与思维链，供传输结束后落库存档
 	reader := bufio.NewReader(resp.Body)
+	var contentBuf, thinkingBuf strings.Builder
 	for {
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
@@ -139,5 +159,51 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Write(line)
 		flusher.Flush()
+
+		if payload := extractSSEData(line); payload != "" {
+			var chunk struct {
+				Choices []struct {
+					Delta struct {
+						Content          string `json:"content"`
+						ReasoningContent string `json:"reasoning_content"`
+					} `json:"delta"`
+				} `json:"choices"`
+			}
+			if json.Unmarshal([]byte(payload), &chunk) == nil && len(chunk.Choices) > 0 {
+				contentBuf.WriteString(chunk.Choices[0].Delta.Content)
+				thinkingBuf.WriteString(chunk.Choices[0].Delta.ReasoningContent)
+			}
+		}
 	}
+
+	// 7. 仅在流完整结束且确有内容时落库；客户端中途断开会在上面的 return 处提前退出，不会存半截内容
+	if strings.TrimSpace(contentBuf.String()) != "" || strings.TrimSpace(thinkingBuf.String()) != "" {
+		saved := &model.AIInsight{
+			UserID:    userID,
+			RangeDays: days,
+			StartDate: startDate,
+			EndDate:   endDate,
+			Content:   contentBuf.String(),
+			Thinking:  thinkingBuf.String(),
+			Model:     cfg.AI.Model,
+		}
+		if _, err := h.insightRepo.Insert(saved); err != nil {
+			slog.Error("保存 AI 洞察存档失败", "err", err)
+		} else {
+			slog.Info("AI 洞察已存档", "range_days", days, "start", startDate, "end", endDate)
+		}
+	}
+}
+
+// extractSSEData 从单行 SSE 文本中提取 data 载荷；非 data 行或 [DONE] 返回空串。
+func extractSSEData(line []byte) string {
+	s := strings.TrimSpace(string(line))
+	if !strings.HasPrefix(s, "data:") {
+		return ""
+	}
+	payload := strings.TrimSpace(s[len("data:"):])
+	if payload == "" || payload == "[DONE]" {
+		return ""
+	}
+	return payload
 }

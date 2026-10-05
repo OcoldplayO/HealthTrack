@@ -31,6 +31,10 @@ type AIConfig struct {
 	BaseURL string `yaml:"base_url"`
 	APIKey  string `yaml:"api_key"`
 	Model   string `yaml:"model"`
+	// MaxTokens 单次响应最大 token 数（含思维链），<=0 时不向服务端传递该参数，由服务端默认值决定。
+	MaxTokens int `yaml:"max_tokens"`
+	// Thinking 控制推理模型思维链开关："enabled" 开启、"disabled" 关闭，空字符串表示不传递该参数。
+	Thinking string `yaml:"thinking"`
 }
 
 // SleepConfig 熬夜三档分界阈值。就寝时间 < GreenBefore 为未熬夜(绿)；
@@ -53,9 +57,11 @@ func DefaultConfig() *Config {
 			BackupDir: "data/backups",
 		},
 		AI: AIConfig{
-			BaseURL: "https://api.deepseek.com/v1",
-			APIKey:  "",
-			Model:   "deepseek-chat",
+			BaseURL:   "https://api.deepseek.com/v1",
+			APIKey:    "",
+			Model:     "deepseek-chat",
+			MaxTokens: 10000,
+			Thinking:  "",
 		},
 		Sleep: SleepConfig{
 			GreenBefore:  "23:00",
@@ -82,6 +88,10 @@ ai:
   base_url: "https://api.deepseek.com/v1"
   api_key: ""
   model: "deepseek-chat"
+  # 单次响应最大 token 数（含思维链），用于给推理模型的思考长度封顶；<=0 表示不限制（交由服务端默认值）。
+  max_tokens: 10000
+  # 思维链开关：enabled 开启、disabled 关闭；留空表示不传递该参数（保持服务端默认）。
+  thinking: ""
 
 sleep:
   # 熬夜三档分界：就寝时间 < green_before 为未熬夜(绿)；

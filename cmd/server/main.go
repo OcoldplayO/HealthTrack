@@ -78,10 +78,12 @@ func main() {
 
 	// 4. 依赖注入与分层装配
 	recordRepo := repository.NewRecordRepository(dbMgr.DB)
+	insightRepo := repository.NewInsightRepository(dbMgr.DB)
 	recordService := service.NewRecordService(recordRepo, runtimeConfigs)
 	insightService := service.NewInsightService(recordRepo)
 	aiService := service.NewAIService(runtimeConfigs, recordRepo)
-	aiHandler := handler.NewAIHandler(runtimeConfigs, insightService, recordService)
+	aiHandler := handler.NewAIHandler(runtimeConfigs, insightService, recordService, insightRepo)
+	insightHandler := handler.NewInsightHandler(insightRepo)
 	configHandler := handler.NewConfigHandler(runtimeConfigs)
 	recordHandler := handler.NewRecordHandler(recordService, aiService)
 
@@ -92,7 +94,11 @@ func main() {
 	mux.HandleFunc("/api/v1/records/today", recordHandler.GetToday)
 	mux.HandleFunc("/api/v1/records", recordHandler.SaveRecord)
 	mux.HandleFunc("/api/v1/records/history", recordHandler.GetHistory)
-	mux.HandleFunc("/api/v1/insights/stream", aiHandler.StreamInsight)
+	mux.HandleFunc("GET /api/v1/insights/stream", aiHandler.StreamInsight)
+	mux.HandleFunc("GET /api/v1/insights", insightHandler.List)
+	mux.HandleFunc("GET /api/v1/insights/{id}", insightHandler.Detail)
+	mux.HandleFunc("DELETE /api/v1/insights/{id}", insightHandler.Delete)
+	mux.HandleFunc("POST /api/v1/insights/batch-delete", insightHandler.BatchDelete)
 	mux.HandleFunc("/api/v1/export", recordHandler.ExportCSV)
 	mux.HandleFunc("/api/v1/export/json", recordHandler.ExportJSON)
 	mux.HandleFunc("/healthz", recordHandler.Healthz)
