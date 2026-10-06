@@ -507,6 +507,9 @@
           <div class="h-44 w-full">
             <canvas id="chart-weight"></canvas>
           </div>
+          <p id="dash-weight-detail" class="text-[11px] text-slate-500 flex items-start space-x-1">
+            <span>👆</span><span>点击折线查看当日晨重 / 睡前重</span>
+          </p>
         </div>
 
         <!-- 睡眠时长与熬夜分级柱状图 -->
@@ -1297,7 +1300,9 @@
         document.getElementById('dash-sleep-stat').innerText = '--';
       }
 
-      // 1. 体重趋势图
+      // 1. 体重趋势图（点击某天查看晨起 / 睡前体重与夜间排水差值）
+      const weightDetailEl = document.getElementById('dash-weight-detail');
+      weightDetailEl.innerHTML = '<span>👆</span><span>点击折线查看当日晨重 / 睡前重</span>';
       const ctxWeight = document.getElementById('chart-weight').getContext('2d');
       if (weightChart) weightChart.destroy();
       weightChart = new Chart(ctxWeight, {
@@ -1311,7 +1316,8 @@
               borderColor: '#2563eb',
               backgroundColor: '#2563eb',
               tension: 0.3,
-              spanGaps: true
+              spanGaps: true,
+              pointHitRadius: 12
             },
             {
               label: '睡前体重',
@@ -1319,14 +1325,35 @@
               borderColor: '#f59e0b',
               backgroundColor: '#f59e0b',
               tension: 0.3,
-              spanGaps: true
+              spanGaps: true,
+              pointHitRadius: 12
             }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          // 移动端：手指落在该日期对应的 x 轴列任意高度即可命中最近一天，无需精确戳中数据点
+          interaction: { mode: 'index', intersect: false },
           plugins: { legend: { display: false } },
+          onClick: (evt, elements) => {
+            if (!elements || !elements.length) return;
+            const r = records[elements[0].index];
+            if (!r) return;
+            const fmtW = (v) => (v === null || v === undefined) ? '--' : `${v} kg`;
+            const am = r.weight_am, pm = r.weight_pm;
+            let diffHtml = '';
+            if (am !== null && am !== undefined && pm !== null && pm !== undefined) {
+              const d = Math.round((pm - am) * 10) / 10;
+              let note;
+              if (d < 0.3) note = '偏低，可能高钠储水';
+              else if (d < 0.4) note = '偏低';
+              else if (d <= 0.9) note = '正常';
+              else note = '偏高';
+              diffHtml = ` · 夜间排水 <b class="text-slate-700">${d.toFixed(1)} kg</b>（${note}）`;
+            }
+            weightDetailEl.innerHTML = `<span>⚖️</span><span><b class="text-slate-700">${r.record_date}</b>　晨起 ${fmtW(am)} · 睡前 ${fmtW(pm)}${diffHtml}</span>`;
+          },
           scales: {
             y: { beginAtZero: false, ticks: { font: { size: 10 } } },
             x: { ticks: { font: { size: 10 } } }
