@@ -94,7 +94,9 @@ jobs:
 
       - name: Rename APK with version and commit hash
         run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
+          # 用检出后的实际提交（即 tag 指向的提交），而非 GITHUB_SHA ——
+          # 手动触发时 GITHUB_SHA 是 main 的 HEAD，会与真正编译的代码对不上
+          SHORT_SHA="$(git rev-parse --short=7 HEAD)"
           APK=$(ls android/app/build/outputs/apk/debug/*.apk | head -n1)
           APK_NAME="HealthTrack-v${VERSION_NAME}-${SHORT_SHA}.apk"
           cp "$APK" "$APK_NAME"
@@ -110,8 +112,8 @@ jobs:
           files: ${{ env.APK_NAME }}
           generate_release_notes: true
           draft: false
-          # beta / alpha / rc 自动标记为预发布版本
-          prerelease: ${{ contains(env.VERSION_NAME, 'beta') || contains(env.VERSION_NAME, 'alpha') || contains(env.VERSION_NAME, 'rc') }}
+          # 一律发布为正式版；如需把 beta / alpha / rc 标为预发布，可改为按 VERSION_NAME 判断
+          prerelease: false
           body: |
             HealthTrack ${{ env.VERSION_NAME }} 构建完成。
 
