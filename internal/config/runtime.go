@@ -91,6 +91,70 @@ func (s *RuntimeStore) UpdateSleep(greenBefore, yellowBefore string) error {
 	return nil
 }
 
+// UpdateScoreBands 校验、原子持久化并立即应用新的评分分档文案。
+func (s *RuntimeStore) UpdateScoreBands(bands []ScoreBandConfig) error {
+	if err := validateScoreBands(bands); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	next := s.cfg
+	next.Summary.ScoreBands = bands
+
+	if err := writeConfigAtomically(s.configPath, &next); err != nil {
+		return err
+	}
+
+	s.cfg = next
+	return nil
+}
+
+// validateScoreBands 校验分档：必须完整覆盖 1~10、区间不重叠且递增，文案非空、配色合法。
+func validateScoreBands(bands []ScoreBandConfig) error {
+	if len(bands) == 0 {
+		return fmt.Errorf("评分分档不能为空")
+	}
+
+	expected := 1
+	for i, b := range bands {
+		if len(b.Range) != 2 {
+			return fmt.Errorf("第 %d 档的 range 必须为 [起始, 结束]", i+1)
+		}
+		low, high := b.Range[0], b.Range[1]
+		if low < 1 || high > 10 || low > high {
+			return fmt.Errorf("第 %d 档的分数区间非法，需在 1~10 内且起始不大于结束", i+1)
+		}
+		if low != expected {
+			return fmt.Errorf("评分分档需从 1 到 10 连续且不重叠（第 %d 档应从 %d 开始）", i+1, expected)
+		}
+		expected = high + 1
+		if strings.TrimSpace(b.Label) == "" {
+			return fmt.Errorf("第 %d 档的文案不能为空", i+1)
+		}
+		if len([]rune(b.Label)) > 20 {
+			return fmt.Errorf("第 %d 档的文案不能超过 20 个字符", i+1)
+		}
+		if !isValidTone(b.Tone) {
+			return fmt.Errorf("第 %d 档的配色非法，可选：rose/amber/emerald/indigo/violet", i+1)
+		}
+	}
+	if expected != 11 {
+		return fmt.Errorf("评分分档必须完整覆盖 1~10 分")
+	}
+	return nil
+}
+
+func isValidTone(tone string) bool {
+	for _, t := range ValidScoreTones {
+		if t == tone {
+			return true
+		}
+	}
+	return false
+}
+
 // validateSleepTimes 校验熬夜阈值为合法 HH:mm 且未熬夜截止早于轻度截止。
 func validateSleepTimes(greenBefore, yellowBefore string) error {
 	g, okG := parseHHMM(greenBefore)

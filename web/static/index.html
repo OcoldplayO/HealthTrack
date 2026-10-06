@@ -139,6 +139,155 @@
       border-top: 1px solid #e2e8f0;
       margin: 0.75rem 0;
     }
+
+    /* ============================================================
+       睡前小结（第 4 个 Tab）专属样式：靛蓝 → 紫罗兰强调色
+       ============================================================ */
+    :root {
+      --evo-accent:      #6366f1;
+      --evo-accent-deep: #8b5cf6;
+    }
+    @keyframes evRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    @keyframes evPop  { 0% { transform: scale(1); } 45% { transform: scale(1.16); } 100% { transform: scale(1); } }
+    @keyframes evSlideUp { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    @keyframes evShimmer { 0% { background-position: -420px 0; } 100% { background-position: 420px 0; } }
+    @keyframes evSwipeOut { to { opacity: 0; transform: translateX(-26px) scale(.97); } }
+    .ev-rise { animation: evRise .42s cubic-bezier(.22,1,.36,1) both; }
+    .ev-pop  { animation: evPop .32s cubic-bezier(.34,1.56,.64,1); }
+
+    .evo-accent-grad      { background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%); }
+    .evo-accent-grad-soft { background-image: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%); }
+    .evo-grad-text {
+      background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+
+    .evo-card {
+      background: #fff; border: 1px solid #eef2f7; border-radius: 1.25rem;
+      box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 10px 28px -18px rgba(15,23,42,.18);
+      transition: box-shadow .28s ease, transform .18s ease;
+    }
+    .evo-card-hero {
+      border-radius: 1.5rem; border: 1px solid #e6e9ff;
+      box-shadow: 0 1px 2px rgba(99,102,241,.05), 0 18px 40px -24px rgba(99,102,241,.45);
+    }
+    .evo-card-lite { box-shadow: none; border-color: #f1f5f9; }
+
+    .evo-eyebrow {
+      font-size: .625rem; font-weight: 800; letter-spacing: .1em;
+      text-transform: uppercase; color: #94a3b8;
+    }
+
+    .evo-fchip {
+      padding: .3rem .7rem; border-radius: 9999px; font-size: .7rem; font-weight: 700;
+      background: #f8fafc; color: #64748b; border: 1px solid #e8edf5;
+      transition: all .18s cubic-bezier(.22,1,.36,1); white-space: nowrap;
+    }
+    .evo-fchip:active { transform: scale(.94); }
+    .evo-fchip.active {
+      background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
+      color: #fff; border-color: transparent;
+      box-shadow: 0 6px 16px -6px rgba(99,102,241,.75);
+    }
+
+    /* 深色 AI 卡内的范围选择胶囊 */
+    .evo-fchip-dark {
+      padding: .18rem .55rem; border-radius: 9999px; font-size: .62rem; font-weight: 800;
+      background: rgba(255,255,255,.07); color: #94a3b8; border: 1px solid rgba(148,163,184,.28);
+      transition: all .18s cubic-bezier(.22,1,.36,1); white-space: nowrap;
+    }
+    .evo-fchip-dark:active { transform: scale(.94); }
+    .evo-fchip-dark.active {
+      background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
+      color: #fff; border-color: transparent;
+      box-shadow: 0 6px 16px -6px rgba(99,102,241,.75);
+    }
+
+    .evo-done-row { transition: background-color .2s ease, border-color .2s ease; }
+    .evo-done-row:focus-within { background: #f5f6ff; border-color: #c7d2fe; }
+    .evo-seq-dot {
+      width: 1.375rem; height: 1.375rem; border-radius: 9999px; flex: none;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .65rem; font-weight: 800; background: #f1f5f9; color: #94a3b8;
+      transition: all .22s cubic-bezier(.34,1.56,.64,1);
+    }
+    .evo-seq-dot.filled {
+      background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
+      color: #fff; box-shadow: 0 4px 10px -3px rgba(99,102,241,.7);
+    }
+
+    input[type="range"].evo-score-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 26px; background: transparent; cursor: pointer;
+    }
+    input[type="range"].evo-score-slider::-webkit-slider-runnable-track {
+      height: 8px; border-radius: 9999px;
+      background: linear-gradient(to right, #6366f1 0%, #8b5cf6 var(--pct, 66%), #e9edf5 var(--pct, 66%), #e9edf5 100%);
+    }
+    input[type="range"].evo-score-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 26px; height: 26px; margin-top: -9px; border-radius: 9999px;
+      background: #fff; border: 3px solid var(--evo-accent);
+      box-shadow: 0 4px 14px -2px rgba(99,102,241,.65);
+      transition: transform .16s ease;
+    }
+    input[type="range"].evo-score-slider:active::-webkit-slider-thumb { transform: scale(1.14); }
+    input[type="range"].evo-score-slider::-moz-range-track {
+      height: 8px; border-radius: 9999px; background: #e9edf5;
+    }
+    input[type="range"].evo-score-slider::-moz-range-progress {
+      height: 8px; border-radius: 9999px; background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    }
+    input[type="range"].evo-score-slider::-moz-range-thumb {
+      width: 22px; height: 22px; border-radius: 9999px;
+      background: #fff; border: 3px solid var(--evo-accent);
+      box-shadow: 0 4px 14px -2px rgba(99,102,241,.65);
+    }
+
+    .evo-collapsible { max-height: 0; overflow: hidden; transition: max-height .34s cubic-bezier(.4,0,.2,1); }
+    .evo-collapsible.open { max-height: 1200px; }
+
+    .evo-tl-item { position: relative; padding-left: 1.75rem; }
+    .evo-tl-node {
+      position: absolute; left: 0; top: 1.1rem;
+      width: 10px; height: 10px; border-radius: 9999px;
+      background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
+      box-shadow: 0 0 0 4px #eef2ff;
+    }
+    .evo-tl-line { position: absolute; left: 4px; top: 1.85rem; bottom: 0; width: 1px; background: #e8edf5; }
+    .evo-tl-item:last-child .evo-tl-line { display: none; }
+
+    .evo-ai-card { background: #0f172a; border-radius: 1.5rem; box-shadow: 0 20px 44px -26px rgba(15,23,42,.9); }
+    .evo-md-dark h3 { color: #e2e8f0; font-weight: 700; font-size: .85rem; margin: .7rem 0 .35rem; padding-bottom: .25rem; border-bottom: 1px solid rgba(148,163,184,.18); }
+    .evo-md-dark h3:first-child { margin-top: 0; }
+    .evo-md-dark h1, .evo-md-dark h2 { color: #f1f5f9; font-weight: 700; font-size: .9rem; margin: .7rem 0 .35rem; }
+    .evo-md-dark p  { color: #cbd5e1; font-size: .78rem; line-height: 1.7; margin-bottom: .55rem; }
+    .evo-md-dark ul { list-style: disc; padding-left: 1.15rem; margin-bottom: .5rem; }
+    .evo-md-dark li { color: #cbd5e1; font-size: .78rem; line-height: 1.65; margin-bottom: .35rem; }
+    .evo-md-dark strong { color: #fff; font-weight: 700; }
+    .evo-md-dark code { background: rgba(148,163,184,.16); padding: 0 .25rem; border-radius: .25rem; }
+    .evo-md-dark hr { border: 0; border-top: 1px solid rgba(148,163,184,.18); margin: .75rem 0; }
+
+    .evo-swipe { position: relative; border-radius: 1.25rem; margin-bottom: .75rem; }
+    .evo-swipe-action {
+      position: absolute; inset: 0; border-radius: 1.25rem; overflow: hidden;
+      background-image: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
+      display: flex; justify-content: flex-end; align-items: stretch;
+    }
+    .evo-swipe-del {
+      width: 84px; flex: none; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 3px;
+      color: #fff; font-size: .68rem; font-weight: 800; letter-spacing: .02em;
+      transition: background-color .16s ease;
+    }
+    .evo-swipe-del:active { background: rgba(255,255,255,.16); }
+    .evo-swipe-panel {
+      position: relative; touch-action: pan-y; transform: translateX(0);
+      transition: transform .3s cubic-bezier(.22,1,.36,1); will-change: transform;
+    }
+    .evo-swipe.open .evo-swipe-panel { transform: translateX(-84px); }
+    .evo-swipe.dragging .evo-swipe-panel { transition: none; }
+    .evo-swipe.removing { animation: evSwipeOut .26s cubic-bezier(.4,0,.2,1) forwards; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between select-none">
@@ -639,10 +788,232 @@
         </div>
       </section>
 
+      <!-- 4. 睡前小结 (Evening Summary View) -->
+      <section id="view-evening" class="fade-in hidden -m-5">
+
+        <!-- 头部：夜色渐变，建立页面情绪 -->
+        <div class="relative overflow-hidden px-5 pt-5 pb-6 rounded-b-[2rem] evo-accent-grad-soft border-b border-indigo-100/60">
+          <span class="absolute -right-8 -top-10 w-32 h-32 rounded-full bg-indigo-200/40 blur-3xl"></span>
+          <span class="absolute -left-6 top-6 w-24 h-24 rounded-full bg-violet-200/40 blur-3xl"></span>
+
+          <div class="relative flex items-start justify-between">
+            <div>
+              <p class="evo-eyebrow">EVENING REVIEW</p>
+              <h1 class="text-xl font-black text-slate-900 tracking-tight mt-0.5">睡前小结</h1>
+            </div>
+            <span class="text-2xl leading-none select-none">🌙</span>
+          </div>
+
+          <div class="relative flex items-center justify-between mt-4">
+            <label class="flex items-center space-x-1.5 bg-white/80 backdrop-blur px-3 py-1.5 rounded-xl border border-indigo-100 shadow-sm">
+              <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+              <input type="date" id="summary-date" class="bg-transparent text-xs font-bold text-slate-700 outline-none w-[6.6rem]" onchange="evOnDateChange(this.value)">
+            </label>
+            <button onclick="evSetToday()" class="text-[11px] font-bold text-indigo-600 bg-white/80 backdrop-blur hover:bg-white px-3 py-1.5 rounded-full border border-indigo-100 transition-colors active:scale-[.96]">回到今日</button>
+          </div>
+        </div>
+
+        <div class="px-4 pt-4 pb-6 space-y-3.5">
+
+          <!-- ── 主卡：图片 + 感想 ── -->
+          <div class="evo-card evo-card-hero overflow-hidden ev-rise" style="animation-delay:.04s">
+            <div class="px-4 pt-4 pb-3 flex items-center justify-between">
+              <span class="text-[11px] font-bold text-slate-500">今日最难忘的一张图</span>
+              <span class="text-[10px] font-semibold text-indigo-400">一天一张</span>
+            </div>
+
+            <!-- 空态 -->
+            <label id="photo-empty" for="photo-input" class="block cursor-pointer px-4">
+              <div class="border-2 border-dashed border-indigo-200/80 bg-indigo-50/30 hover:bg-indigo-50/70 hover:border-indigo-300 rounded-2xl py-8 flex flex-col items-center justify-center transition-all active:scale-[.99]">
+                <span class="w-11 h-11 rounded-2xl evo-accent-grad flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                </span>
+                <span class="text-xs font-bold text-slate-600 mt-2.5">选择今天的这一张</span>
+                <span class="text-[10px] text-slate-400 mt-0.5">自动压缩后仅存本机</span>
+              </div>
+            </label>
+
+            <!-- 已选 -->
+            <div id="photo-filled" class="hidden">
+              <div class="relative mx-4 rounded-2xl overflow-hidden bg-slate-100 shadow-sm">
+                <img id="photo-preview" src="" alt="今日图片" class="w-full h-52 object-cover">
+                <div class="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-slate-900/55 to-transparent"></div>
+                <span class="absolute top-2.5 left-2.5 text-[10px] font-bold text-white bg-slate-900/45 backdrop-blur px-2 py-0.5 rounded-full">今日一张</span>
+                <div class="absolute bottom-2.5 right-2.5 flex space-x-1.5">
+                  <label for="photo-input" class="text-[10px] font-bold text-slate-700 bg-white/95 px-2.5 py-1 rounded-full cursor-pointer active:scale-[.95] transition-transform">替换</label>
+                  <button onclick="evRemovePhoto()" class="text-[10px] font-bold text-red-600 bg-white/95 px-2.5 py-1 rounded-full active:scale-[.95] transition-transform">删除</button>
+                </div>
+              </div>
+              <p id="photo-meta" class="px-4 pt-2 text-[10px] text-slate-400"></p>
+            </div>
+            <input type="file" id="photo-input" accept="image/*" class="hidden" onchange="evOnPhotoPick(event)">
+
+            <!-- 感想 -->
+            <div class="px-4 pt-3 pb-4 mt-3 border-t border-dashed" style="border-color:#eef2f7">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-[11px] font-bold text-slate-500">那一刻的感想</span>
+                <span class="text-[10px] text-slate-400"><span id="note-len">0</span> 字</span>
+              </div>
+              <textarea id="note-text" rows="3" oninput="document.getElementById('note-len').innerText=this.value.length" class="w-full bg-slate-50 text-slate-700 border border-transparent rounded-xl p-3 text-[13px] outline-none focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all resize-none leading-relaxed placeholder:text-slate-400" placeholder="为什么这张图值得被记住…"></textarea>
+            </div>
+          </div>
+
+          <!-- ── 今日完成的三件事 ── -->
+          <div class="evo-card p-4 ev-rise" style="animation-delay:.08s">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-[11px] font-bold text-slate-500">今日完成的三件事</span>
+              <span id="done-count" class="text-[10px] font-black text-slate-300 tabular-nums transition-colors">0 / 3</span>
+            </div>
+            <div class="space-y-2">
+              <div class="evo-done-row flex items-center space-x-2.5 bg-slate-50/80 border border-transparent rounded-xl px-2.5 py-2">
+                <span class="evo-seq-dot" id="seq-1">1</span>
+                <input type="text" id="done-1" maxlength="200" oninput="evUpdateDoneCount()" placeholder="最有成就感的那件事" class="flex-1 bg-transparent text-[13px] text-slate-700 outline-none placeholder:text-slate-400">
+              </div>
+              <div class="evo-done-row flex items-center space-x-2.5 bg-slate-50/80 border border-transparent rounded-xl px-2.5 py-2">
+                <span class="evo-seq-dot" id="seq-2">2</span>
+                <input type="text" id="done-2" maxlength="200" oninput="evUpdateDoneCount()" placeholder="其次推进的一件事" class="flex-1 bg-transparent text-[13px] text-slate-700 outline-none placeholder:text-slate-400">
+              </div>
+              <div class="evo-done-row flex items-center space-x-2.5 bg-slate-50/80 border border-transparent rounded-xl px-2.5 py-2">
+                <span class="evo-seq-dot" id="seq-3">3</span>
+                <input type="text" id="done-3" maxlength="200" oninput="evUpdateDoneCount()" placeholder="哪怕很小，也算（可留空）" class="flex-1 bg-transparent text-[13px] text-slate-700 outline-none placeholder:text-slate-400">
+              </div>
+            </div>
+          </div>
+
+          <!-- ── 今日对自己的打分 ── -->
+          <div class="evo-card p-4 ev-rise" style="animation-delay:.12s">
+            <div class="flex items-end justify-between mb-1">
+              <div class="mb-1 flex items-center space-x-1.5">
+                <span class="text-[11px] font-bold text-slate-500">今日对自己的打分</span>
+                <button onclick="evToggleBandEditor()" class="text-[10px] font-bold text-indigo-500 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-full active:scale-[.95] transition-all">⚙ 文案</button>
+              </div>
+              <div class="flex items-baseline space-x-1">
+                <span id="score-value" class="text-[2.6rem] leading-none font-black evo-grad-text tabular-nums">7</span>
+                <span class="text-[11px] font-bold text-slate-300">/ 10</span>
+              </div>
+            </div>
+            <input type="range" id="score-range" min="1" max="10" step="1" value="7" oninput="evUpdateScore(this.value)" class="evo-score-slider mt-1">
+            <div class="flex justify-between text-[10px] font-bold text-slate-300 px-1 -mt-0.5 tabular-nums">
+              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+            </div>
+            <div id="score-text" class="mt-3 text-center text-[11px] font-bold rounded-xl py-2 bg-indigo-50 text-indigo-600 transition-colors">还不错，稳住了节奏</div>
+
+            <!-- 分档文案配置：读写 config.yaml 的 summary.score_bands -->
+            <div id="band-editor" class="evo-collapsible">
+              <div class="mt-3 pt-3 border-t border-dashed border-slate-200">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="evo-eyebrow">评分文案设置</span>
+                  <button onclick="evResetBands()" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 active:scale-[.95] transition-transform">恢复默认</button>
+                </div>
+                <div id="band-rows" class="space-y-1.5"></div>
+                <div class="flex items-center justify-between mt-3">
+                  <p class="text-[10px] text-slate-400 leading-relaxed">改动保存后立即生效，历史小结评分文案同步更新。</p>
+                  <button onclick="evSaveBands()" id="band-save-btn" class="shrink-0 ml-2 text-[11px] font-bold text-white evo-accent-grad px-3 py-1.5 rounded-xl shadow-md shadow-indigo-500/25 active:scale-[.96] transition-all">保存文案</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── 保存 ── -->
+          <button onclick="evSave()" id="ev-save-btn" class="w-full py-3.5 rounded-2xl evo-accent-grad text-white font-bold text-sm shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-[.985] transition-all ev-rise" style="animation-delay:.16s">保存今日小结</button>
+
+          <!-- ── 小结洞察（深色卡，独立身份） ── -->
+          <div class="evo-ai-card p-4 ev-rise" style="animation-delay:.2s">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-[11px] font-bold text-white flex items-center space-x-1.5"><span>🔗</span><span>小结洞察</span></span>
+              <span class="text-[9px] font-bold text-indigo-200 bg-white/10 px-2 py-0.5 rounded-full">独立于「洞察」页</span>
+            </div>
+
+            <!-- 关联生理数据的窗口长度：7 / 30 天 -->
+            <div class="flex items-center space-x-2 mb-3">
+              <span class="text-[9px] font-bold text-slate-500 shrink-0">关联生理数据</span>
+              <div class="flex space-x-1" id="ev-insight-range">
+                <button class="evo-fchip-dark active" data-val="7" onclick="evSetInsightRange(this)">近 7 天</button>
+                <button class="evo-fchip-dark" data-val="30" onclick="evSetInsightRange(this)">近 30 天</button>
+              </div>
+            </div>
+
+            <div id="insight-empty">
+              <p class="text-[11px] text-slate-400 leading-relaxed">从小结的<b class="text-slate-200">自评与文字</b>出发，结合所选区间内的体重 / 睡眠 / 运动趋势，重点解读你的心理状态与成就感。</p>
+              <button onclick="evGenerateInsight()" id="ev-insight-btn" class="mt-3 w-full py-2.5 rounded-xl evo-accent-grad text-white font-bold text-xs shadow-lg shadow-indigo-500/25 active:scale-[.98] transition-transform">✨ 生成小结洞察</button>
+            </div>
+
+            <div id="insight-panel" class="hidden space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span id="insight-meta" class="text-[10px] font-bold text-slate-500"></span>
+                <button onclick="evResetInsight()" class="text-[10px] font-bold text-slate-500 hover:text-slate-300 px-1">清除</button>
+              </div>
+              <!-- 与「洞察」页一致：思维链在上，正文在下 -->
+              <div class="pb-2.5 border-b border-white/10">
+                <button onclick="evToggleThinking()" class="text-[10px] font-bold text-slate-400 hover:text-slate-200 flex items-center space-x-1.5 active:scale-[.97] transition-transform">
+                  <span id="think-arrow" class="transform transition-transform text-[8px]">▶</span><span>💭 思维链推导</span>
+                </button>
+                <div id="think-body" class="evo-collapsible">
+                  <p id="think-text" class="mt-2 text-[10px] text-slate-400 bg-white/5 rounded-xl p-3 leading-relaxed whitespace-pre-line"></p>
+                </div>
+              </div>
+              <div id="insight-body" class="evo-md-dark"></div>
+            </div>
+          </div>
+
+          <!-- ── 往期回顾 ── -->
+          <div class="pt-1.5 ev-rise" style="animation-delay:.24s">
+            <div class="flex items-center justify-between px-1 mb-3">
+              <div class="flex items-center space-x-2">
+                <span class="text-[11px] font-bold text-slate-500">往期回顾</span>
+                <span id="ev-history-total" class="text-[10px] font-black text-slate-300 tabular-nums">0 篇</span>
+              </div>
+              <span class="text-[10px] text-slate-300 font-semibold">左滑卡片可删除</span>
+            </div>
+
+            <!-- 筛选 -->
+            <div class="evo-card evo-card-lite p-3 space-y-2.5">
+              <div class="flex items-center space-x-2">
+                <span class="evo-eyebrow w-8 shrink-0">日期</span>
+                <div class="flex flex-wrap gap-1.5" id="ev-filter-date">
+                  <button class="evo-fchip active" data-val="all" onclick="evSetDateFilter(this)">全部</button>
+                  <button class="evo-fchip" data-val="7" onclick="evSetDateFilter(this)">近 7 天</button>
+                  <button class="evo-fchip" data-val="30" onclick="evSetDateFilter(this)">近 30 天</button>
+                </div>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span class="evo-eyebrow w-8 shrink-0">评分</span>
+                <div class="flex flex-wrap gap-1.5" id="ev-filter-score">
+                  <button class="evo-fchip active" data-val="all" onclick="evSetScoreFilter(this)">全部</button>
+                  <button class="evo-fchip" data-val="high" onclick="evSetScoreFilter(this)">9-10</button>
+                  <button class="evo-fchip" data-val="good" onclick="evSetScoreFilter(this)">7-8</button>
+                  <button class="evo-fchip" data-val="mid" onclick="evSetScoreFilter(this)">5-6</button>
+                  <button class="evo-fchip" data-val="low" onclick="evSetScoreFilter(this)">1-4</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between px-1 pt-3 pb-2">
+              <span class="text-[10px] text-slate-400">筛选结果 <b id="ev-filter-count" class="text-slate-600 tabular-nums">0</b> 篇</span>
+              <button id="ev-filter-reset" onclick="evResetFilters()" class="hidden text-[10px] font-bold text-indigo-500 active:scale-[.95] transition-transform">清除筛选</button>
+            </div>
+
+            <div id="ev-history-list" class="space-y-0"></div>
+
+            <div id="ev-history-empty" class="hidden evo-card p-8 text-center">
+              <p class="text-2xl">🫧</p>
+              <p class="text-xs font-bold text-slate-600 mt-2">没有符合条件的小结</p>
+              <p class="text-[10px] text-slate-400 mt-1">试着放宽日期或评分范围</p>
+            </div>
+
+            <button id="ev-load-more" onclick="evLoadMore()" class="hidden w-full mt-3 py-3 rounded-2xl bg-white border border-slate-200 text-[11px] font-bold text-slate-500 hover:bg-slate-50 hover:border-indigo-200 active:scale-[.99] transition-all">
+              加载更多（剩余 <b id="ev-remain-count">0</b> 篇）
+            </button>
+            <p id="ev-load-done" class="hidden text-center text-[10px] text-slate-300 py-3">· 已全部加载 ·</p>
+          </div>
+
+        </div>
+      </section>
+
     </main>
 
     <!-- 底部 Tab 导航 -->
-    <nav class="shrink-0 flex border-t border-slate-100 bg-white/95 backdrop-blur-md pb-6 pt-2 px-6 justify-between z-10">
+    <nav class="shrink-0 flex border-t border-slate-100 bg-white/95 backdrop-blur-md pb-6 pt-2 px-3 justify-between z-10">
       <button onclick="switchTab('log')" id="tab-log" class="flex flex-col items-center flex-1 text-blue-600 font-bold transition-colors">
         <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
         <span class="text-[10px]">记一笔</span>
@@ -654,6 +1025,10 @@
       <button onclick="switchTab('insight')" id="tab-insight" class="flex flex-col items-center flex-1 text-slate-400 hover:text-slate-700 transition-colors relative">
         <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
         <span class="text-[10px]">洞察</span>
+      </button>
+      <button onclick="switchTab('evening')" id="tab-evening" class="flex flex-col items-center flex-1 text-slate-400 hover:text-slate-700 transition-colors">
+        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+        <span class="text-[10px]">睡前小结</span>
       </button>
     </nav>
   </div>
@@ -860,7 +1235,7 @@
       // 历史页没有对应的底部 Tab，导航高亮仍归属「洞察」
       const navKey = tab === 'history' ? 'insight' : tab;
 
-      ['log', 'dash', 'insight', 'history'].forEach(t => {
+      ['log', 'dash', 'insight', 'history', 'evening'].forEach(t => {
         const view = document.getElementById(`view-${t}`);
         if (!view) return;
         if (t === tab) {
@@ -870,7 +1245,7 @@
         }
       });
 
-      ['log', 'dash', 'insight'].forEach(t => {
+      ['log', 'dash', 'insight', 'evening'].forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
         if (!btn) return;
         if (t === navKey) {
@@ -887,6 +1262,9 @@
       }
       if (tab === 'insight') {
         checkTodayInsight();
+      }
+      if (tab === 'evening') {
+        loadEveningTab();
       }
     }
 
@@ -2254,6 +2632,801 @@
         showToast('导出失败', false);
       }
     };
+
+    /* ============================================================
+       睡前小结（第 4 个 Tab）：今日填写 + 往期回顾 + 小结洞察
+       ============================================================ */
+    const EVO_DEFAULT_BANDS = [
+      { range: [1, 2],  label: '很低落',             tone: 'rose'    },
+      { range: [3, 4],  label: '有点钝',             tone: 'amber'   },
+      { range: [5, 6],  label: '平平',               tone: 'emerald' },
+      { range: [7, 8],  label: '还不错，稳住了节奏', tone: 'indigo'  },
+      { range: [9, 10], label: '满分的一天',         tone: 'violet'  }
+    ];
+    const EVO_TONE = {
+      rose:    { dot: '#f43f5e', chip: 'text-rose-600 bg-rose-50 border-rose-100',          band: 'bg-rose-50 text-rose-600' },
+      amber:   { dot: '#f59e0b', chip: 'text-amber-600 bg-amber-50 border-amber-100',       band: 'bg-amber-50 text-amber-700' },
+      emerald: { dot: '#10b981', chip: 'text-emerald-600 bg-emerald-50 border-emerald-100', band: 'bg-emerald-50 text-emerald-700' },
+      indigo:  { dot: '#6366f1', chip: 'text-indigo-600 bg-indigo-50 border-indigo-100',    band: 'bg-indigo-50 text-indigo-600' },
+      violet:  { dot: '#8b5cf6', chip: 'text-violet-600 bg-violet-50 border-violet-100',    band: 'bg-violet-50 text-violet-600' }
+    };
+    const EVO_TONE_CYCLE = ['rose', 'amber', 'emerald', 'indigo', 'violet'];
+    const EVO_PAGE_SIZE = 6;
+
+    let evoBands = null; // null = 尚未从 /api/config 载入
+    let evoState = {
+      date: '',
+      photoId: null,     // 当前日期已保存的图片 ID
+      pendingBlob: null, // 本地新选、尚未上传的压缩图
+      summaries: [],     // 全部小结（后端按 record_date 倒序）
+      dateFilter: 'all',
+      scoreFilter: 'all',
+      visible: EVO_PAGE_SIZE,
+      insightBusy: false,
+      insightRange: 7,   // 小结洞察关联的生理数据窗口（7 / 30 天）
+    };
+    let evoSwipe = { W: 84, drag: null, suppressClick: 0 };
+
+    function evoBandOf(score) {
+      const bands = evoBands || EVO_DEFAULT_BANDS;
+      return bands.find(b => score >= b.range[0] && score <= b.range[1]) || bands[bands.length - 1];
+    }
+    function evoTone(tone) { return EVO_TONE[tone] || EVO_TONE.indigo; }
+    function evoToday() {
+      const d = new Date(), p = n => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    }
+    function evoWeekday(dateStr) {
+      const names = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+      const d = new Date(dateStr + 'T00:00:00');
+      return isNaN(d.getTime()) ? '' : names[d.getDay()];
+    }
+    function evoDaysAgo(dateStr) {
+      const today = new Date(evoToday() + 'T00:00:00');
+      const target = new Date(dateStr + 'T00:00:00');
+      return Math.round((today - target) / 86400000);
+    }
+    function evoMmdd(d) { return d ? d.slice(5) : ''; }
+    function evoMonthKey(d) { return d ? d.slice(0, 7) : ''; }
+    function evoMonthLabel(k) { const parts = k.split('-'); return parts[0] + ' 年 ' + Number(parts[1]) + ' 月'; }
+    function evoAttr(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // ---------- 载入 ----------
+    async function loadEveningTab() {
+      if (!evoState.date) evoState.date = evoToday();
+      document.getElementById('summary-date').value = evoState.date;
+      await Promise.all([evoEnsureBands(), evoLoadCurrentSummary()]);
+      await evoLoadList();
+    }
+
+    async function evoEnsureBands() {
+      if (evoBands) { evoRenderBandRows(); return; }
+      try {
+        const resp = await fetch('/api/config');
+        const json = await resp.json();
+        const bands = json && json.data && json.data.summary_score_bands;
+        if (Array.isArray(bands) && bands.length) {
+          evoBands = bands.map(b => ({ range: [b.range[0], b.range[1]], label: b.label, tone: b.tone }));
+        }
+      } catch (e) { /* 回退默认 */ }
+      if (!evoBands) evoBands = EVO_DEFAULT_BANDS.map(b => ({ range: [b.range[0], b.range[1]], label: b.label, tone: b.tone }));
+      evoRenderBandRows();
+      evoPaintScoreBand(Number(document.getElementById('score-range').value) || 7);
+    }
+
+    async function evoLoadCurrentSummary() {
+      const date = evoState.date;
+      evoResetPhotoUI();
+      try {
+        const resp = await fetch(`/api/v1/evening/summary?date=${encodeURIComponent(date)}`);
+        const json = await resp.json();
+        const data = (json && json.code === 200) ? json.data : null;
+        if (data) {
+          document.getElementById('done-1').value = (data.done_items && data.done_items[0]) || '';
+          document.getElementById('done-2').value = (data.done_items && data.done_items[1]) || '';
+          document.getElementById('done-3').value = (data.done_items && data.done_items[2]) || '';
+          document.getElementById('note-text').value = data.note_text || '';
+          document.getElementById('note-len').innerText = (data.note_text || '').length;
+          evUpdateScore(data.score || 7);
+          if (data.photo_id) {
+            evoState.photoId = data.photo_id;
+            evoShowPhoto(`/api/v1/evening/photo/${data.photo_id}`, '');
+          }
+        } else {
+          document.getElementById('done-1').value = '';
+          document.getElementById('done-2').value = '';
+          document.getElementById('done-3').value = '';
+          document.getElementById('note-text').value = '';
+          document.getElementById('note-len').innerText = '0';
+          evUpdateScore(7);
+        }
+        evUpdateDoneCount();
+      } catch (e) {
+        appToast('读取该日小结失败：' + e.message);
+      }
+      evoLoadInsight(date);
+    }
+
+    // ---------- 日期 ----------
+    function evSetToday() {
+      evoState.date = evoToday();
+      document.getElementById('summary-date').value = evoState.date;
+      evoLoadCurrentSummary();
+      appToast('已回到今日');
+    }
+    function evOnDateChange(v) {
+      if (!v) return;
+      evoState.date = v;
+      evoLoadCurrentSummary();
+    }
+
+    // ---------- 三件事 ----------
+    function evUpdateDoneCount() {
+      let n = 0;
+      [1, 2, 3].forEach(i => {
+        const filled = !!document.getElementById('done-' + i).value.trim();
+        const dot = document.getElementById('seq-' + i);
+        if (filled) {
+          if (!dot.classList.contains('filled')) {
+            dot.classList.add('filled', 'ev-pop');
+            setTimeout(() => dot.classList.remove('ev-pop'), 340);
+          }
+          n++;
+        } else {
+          dot.classList.remove('filled');
+        }
+      });
+      const badge = document.getElementById('done-count');
+      badge.innerText = n + ' / 3';
+      badge.className = 'text-[10px] font-black tabular-nums transition-colors ' + (n === 0 ? 'text-slate-300' : 'text-indigo-500');
+    }
+
+    // ---------- 图片 ----------
+    function evoShowPhoto(src, meta) {
+      document.getElementById('photo-preview').src = src || '';
+      document.getElementById('photo-empty').classList.add('hidden');
+      const filled = document.getElementById('photo-filled');
+      filled.classList.remove('hidden');
+      document.getElementById('photo-meta').innerText = meta || '';
+    }
+    function evoResetPhotoUI() {
+      evoState.photoId = null;
+      evoState.pendingBlob = null;
+      const input = document.getElementById('photo-input');
+      if (input) input.value = '';
+      document.getElementById('photo-preview').src = '';
+      document.getElementById('photo-filled').classList.add('hidden');
+      document.getElementById('photo-empty').classList.remove('hidden');
+      document.getElementById('photo-meta').innerText = '';
+    }
+    async function evOnPhotoPick(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) { appToast('请选择图片文件'); return; }
+      try {
+        const blob = await evoCompressImage(file);
+        const prevUrl = evoState.pendingBlob && document.getElementById('photo-preview').src;
+        if (prevUrl && prevUrl.startsWith('blob:')) URL.revokeObjectURL(prevUrl);
+        evoState.pendingBlob = blob;
+        evoShowPhoto(URL.createObjectURL(blob), `原图 ${Math.round(file.size / 1024)} KB · 压缩后约 ${Math.round(blob.size / 1024)} KB（长边 ≤1600px, JPEG q0.8）`);
+        appToast('图片已就绪，保存小结时上传');
+      } catch (e) {
+        appToast('图片处理失败：' + e.message);
+      }
+    }
+    // canvas 压缩：长边 ≤1600px，输出 JPEG q0.8
+    function evoCompressImage(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('读取文件失败'));
+        reader.onload = e => {
+          const img = new Image();
+          img.onerror = () => reject(new Error('图片解码失败'));
+          img.onload = () => {
+            const MAX = 1600;
+            let w = img.width, h = img.height;
+            if (w > MAX || h > MAX) {
+              if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
+              else { w = Math.round(w * MAX / h); h = MAX; }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            canvas.toBlob(b => b ? resolve(b) : reject(new Error('压缩失败')), 'image/jpeg', 0.8);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    async function evRemovePhoto() {
+      const ok = await appConfirm('删除今天这张图片？删除后不可恢复。', { title: '删除图片', confirmText: '删除' });
+      if (!ok) return;
+      if (evoState.photoId) {
+        try {
+          const resp = await fetch(`/api/v1/evening/photo/${evoState.photoId}`, { method: 'DELETE' });
+          const json = await resp.json();
+          if (json.code !== 200) throw new Error(json.message || '删除失败');
+        } catch (e) {
+          appToast('删除图片失败：' + e.message);
+          return;
+        }
+      }
+      evoResetPhotoUI();
+      appToast('已删除今日图片');
+    }
+
+    // ---------- 评分 ----------
+    function evUpdateScore(v) {
+      const n = Number(v);
+      const num = document.getElementById('score-value');
+      num.innerText = n;
+      num.classList.remove('ev-pop'); void num.offsetWidth; num.classList.add('ev-pop');
+      document.getElementById('score-range').style.setProperty('--pct', ((n - 1) / 9 * 100).toFixed(1) + '%');
+      evoPaintScoreBand(n);
+    }
+    function evoPaintScoreBand(n) {
+      const b = evoBandOf(n);
+      const el = document.getElementById('score-text');
+      el.innerText = b.label;
+      el.className = 'mt-3 text-center text-[11px] font-bold rounded-xl py-2 transition-colors ' + evoTone(b.tone).band;
+    }
+
+    function evToggleBandEditor() {
+      const panel = document.getElementById('band-editor');
+      panel.classList.toggle('open');
+      if (panel.classList.contains('open')) evoRenderBandRows();
+    }
+    function evoRenderBandRows() {
+      const bands = evoBands || EVO_DEFAULT_BANDS;
+      document.getElementById('band-rows').innerHTML = bands.map((b, i) => `
+        <div class="flex items-center space-x-2 bg-slate-50/80 border border-slate-100 rounded-xl px-2.5 py-2">
+          <span class="text-[10px] font-black text-slate-400 tabular-nums w-9 shrink-0">${b.range[0]}-${b.range[1]}</span>
+          <button onclick="evCycleTone(${i})" title="点击切换配色"
+                  class="w-4 h-4 rounded-full shrink-0 border-2 border-white shadow ring-1 ring-slate-200 active:scale-90 transition-transform"
+                  style="background:${evoTone(b.tone).dot}"></button>
+          <input type="text" value="${evoAttr(b.label)}" maxlength="20" oninput="evSetBandLabel(${i}, this.value)"
+                 class="flex-1 min-w-0 bg-transparent text-[12px] text-slate-700 outline-none">
+        </div>`).join('');
+    }
+    function evSetBandLabel(i, v) {
+      (evoBands || EVO_DEFAULT_BANDS)[i].label = v;
+      evoRefreshScoreChips();
+      evoPaintScoreBand(Number(document.getElementById('score-range').value));
+    }
+    function evCycleTone(i) {
+      const bands = evoBands || EVO_DEFAULT_BANDS;
+      const cur = EVO_TONE_CYCLE.indexOf(bands[i].tone);
+      bands[i].tone = EVO_TONE_CYCLE[(cur + 1) % EVO_TONE_CYCLE.length];
+      evoRenderBandRows();
+      evoRefreshScoreChips();
+      evoPaintScoreBand(Number(document.getElementById('score-range').value));
+    }
+    function evResetBands() {
+      evoBands = EVO_DEFAULT_BANDS.map(b => ({ range: [b.range[0], b.range[1]], label: b.label, tone: b.tone }));
+      evoRenderBandRows();
+      evoRefreshScoreChips();
+      evoPaintScoreBand(Number(document.getElementById('score-range').value));
+      appToast('已恢复默认文案，点击「保存文案」生效');
+    }
+    function evoRefreshScoreChips() {
+      document.querySelectorAll('#ev-history-list .evo-score-chip').forEach(el => {
+        const b = evoBandOf(Number(el.dataset.score));
+        el.className = 'evo-score-chip text-[10px] font-black px-1.5 py-0.5 rounded-full border ' + evoTone(b.tone).chip;
+      });
+    }
+    async function evSaveBands() {
+      const bands = evoBands || EVO_DEFAULT_BANDS;
+      const btn = document.getElementById('band-save-btn');
+      btn.disabled = true; btn.classList.add('opacity-60');
+      try {
+        const resp = await fetch('/api/config/summary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ score_bands: bands.map(b => ({ range: [b.range[0], b.range[1]], label: b.label, tone: b.tone })) })
+        });
+        const json = await resp.json();
+        if (json.code !== 200) throw new Error(json.message || '保存失败');
+        appToast('评分文案已保存并生效');
+        evoRefreshScoreChips();
+        evoPaintScoreBand(Number(document.getElementById('score-range').value));
+      } catch (e) {
+        appToast('保存失败：' + e.message);
+      } finally {
+        btn.disabled = false; btn.classList.remove('opacity-60');
+      }
+    }
+
+    // ---------- 保存小结 ----------
+    async function evSave() {
+      const btn = document.getElementById('ev-save-btn');
+      const date = evoState.date || evoToday();
+      const done = [1, 2, 3].map(i => document.getElementById('done-' + i).value.trim()).filter(Boolean);
+      const note = document.getElementById('note-text').value.trim();
+      const score = Number(document.getElementById('score-range').value);
+      const hasPhoto = !!evoState.pendingBlob || !!evoState.photoId;
+      if (!done.length && !note && !hasPhoto) {
+        appToast('至少填写三件事、图片或感想中的一项');
+        return;
+      }
+      btn.disabled = true; btn.classList.add('opacity-60');
+      try {
+        let photoId = evoState.photoId;
+        if (evoState.pendingBlob) {
+          const up = await fetch(`/api/v1/evening/photo?date=${encodeURIComponent(date)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'image/jpeg' },
+            body: evoState.pendingBlob
+          });
+          const upJson = await up.json();
+          if (upJson.code !== 200) throw new Error(upJson.message || '图片上传失败');
+          photoId = (upJson.data && upJson.data.photo_id) ? upJson.data.photo_id : null;
+        }
+        const resp = await fetch('/api/v1/evening/summary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ record_date: date, done_items: done, note_text: note, score: score, photo_id: photoId || null })
+        });
+        const json = await resp.json();
+        if (json.code !== 200) throw new Error(json.message || '保存失败');
+
+        evoState.photoId = photoId;
+        if (evoState.pendingBlob && photoId) {
+          const prevUrl = document.getElementById('photo-preview').src;
+          if (prevUrl && prevUrl.startsWith('blob:')) URL.revokeObjectURL(prevUrl);
+          evoShowPhoto(`/api/v1/evening/photo/${photoId}`, '已保存 · 长边 ≤1600px, JPEG q0.8');
+        }
+        evoState.pendingBlob = null;
+        appToast('今日小结已保存');
+        await evoLoadList();
+      } catch (e) {
+        appToast('保存失败：' + e.message);
+      } finally {
+        btn.disabled = false; btn.classList.remove('opacity-60');
+      }
+    }
+
+    // ---------- 小结洞察 ----------
+    let evoInsightAbort = null;
+    function evoRangeLabel(n) { return (n === 30) ? '近 30 天' : '近 7 天'; }
+    // 切换关联生理数据窗口；已生成的洞察不自动重跑，由用户点「清除」后重新生成
+    function evSetInsightRange(btn) {
+      document.querySelectorAll('#ev-insight-range .evo-fchip-dark').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      evoState.insightRange = Number(btn.dataset.val) || 7;
+    }
+    function evoSyncRangeChips(n) {
+      if (n !== 7 && n !== 30) return;
+      evoState.insightRange = n;
+      document.querySelectorAll('#ev-insight-range .evo-fchip-dark').forEach(b => {
+        b.classList.toggle('active', Number(b.dataset.val) === n);
+      });
+    }
+    async function evoLoadInsight(date) {
+      evoStopInsight();
+      const emptyEl = document.getElementById('insight-empty');
+      const panel = document.getElementById('insight-panel');
+      document.getElementById('think-body').classList.remove('open');
+      document.getElementById('think-arrow').classList.remove('rotate-90');
+      document.getElementById('think-text').innerText = '';
+      document.getElementById('insight-body').innerHTML = '';
+      panel.classList.add('hidden');
+      emptyEl.classList.remove('hidden');
+      try {
+        const resp = await fetch(`/api/v1/evening/insight?date=${encodeURIComponent(date)}`);
+        const json = await resp.json();
+        const data = (json && json.code === 200) ? json.data : null;
+        if (data && data.content) evoRenderInsight(data);
+      } catch (e) { /* 静默失败，不打扰用户 */ }
+    }
+    function evoFmtTime(ts) {
+      if (!ts) return '';
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return '';
+      const p = n => String(n).padStart(2, '0');
+      return p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+    function evoRenderInsight(data) {
+      document.getElementById('insight-empty').classList.add('hidden');
+      const panel = document.getElementById('insight-panel');
+      panel.classList.remove('hidden');
+      evoSyncRangeChips(Number(data.range_days));
+      const rangeText = (data.range_days === 7 || data.range_days === 30) ? evoRangeLabel(data.range_days) + ' · ' : '';
+      document.getElementById('insight-meta').innerText = `${evoMmdd(data.start_date || evoState.date)} 小结洞察 · ${rangeText}生成于 ${evoFmtTime(data.created_at)}`;
+      document.getElementById('insight-body').innerHTML = renderMarkdown(data.content || '');
+      document.getElementById('think-text').innerText = data.thinking || '';
+    }
+    function evoStopInsight() {
+      if (evoInsightAbort) { try { evoInsightAbort.abort(); } catch (_) {} evoInsightAbort = null; }
+      const b = document.getElementById('insight-body');
+      if (b) b.classList.remove('typing-cursor');
+    }
+    async function evGenerateInsight() {
+      if (evoState.insightBusy) return;
+      const date = evoState.date || evoToday();
+      const btn = document.getElementById('ev-insight-btn');
+      const emptyEl = document.getElementById('insight-empty');
+      const panel = document.getElementById('insight-panel');
+      const body = document.getElementById('insight-body');
+
+      evoStopInsight();
+      evoState.insightBusy = true;
+      if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); btn.innerText = '⏳ 正在生成…'; }
+
+      emptyEl.classList.add('hidden');
+      panel.classList.remove('hidden');
+      panel.classList.add('ev-rise');
+      body.innerHTML = '<p class="text-slate-500 text-[11px]">（正在推导…）</p>';
+      body.classList.add('typing-cursor');
+      document.getElementById('insight-meta').innerText = `${evoMmdd(date)} 小结洞察 · ${evoRangeLabel(evoState.insightRange)} · 生成中…`;
+      document.getElementById('think-text').innerText = '';
+      document.getElementById('think-body').classList.remove('open');
+      document.getElementById('think-arrow').classList.remove('rotate-90');
+
+      let thinkingText = '', responseText = '', hasError = false;
+      function updateUI() {
+        body.innerHTML = responseText
+          ? renderMarkdown(responseText)
+          : '<p class="text-slate-500 text-[11px]">（正在推导…）</p>';
+        if (thinkingText) {
+          document.getElementById('think-text').innerText = thinkingText;
+          // 与「洞察」页一致：正文尚未输出时展开思维链，正文一开始输出就自动收起
+          const open = !responseText;
+          document.getElementById('think-body').classList.toggle('open', open);
+          document.getElementById('think-arrow').classList.toggle('rotate-90', open);
+        }
+      }
+
+      const controller = new AbortController();
+      evoInsightAbort = controller;
+      try {
+        const response = await fetch(`/api/v1/evening/insight/stream?date=${encodeURIComponent(date)}&days=${evoState.insightRange}`, { signal: controller.signal });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+          for (let line of lines) {
+            line = line.trim();
+            if (!line || !line.startsWith('data:')) continue;
+            const dataStr = line.slice(5).trim();
+            if (dataStr === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(dataStr);
+              if (parsed.error) {
+                responseText += '\n> ⚠️ **服务提示**: ' + parsed.error + '\n';
+                hasError = true;
+              } else if (parsed.choices && parsed.choices.length) {
+                const delta = parsed.choices[0].delta || {};
+                if (delta.reasoning_content) thinkingText += delta.reasoning_content;
+                if (delta.content) responseText += delta.content;
+              }
+              updateUI();
+            } catch (e) { /* 忽略心跳等非 JSON 帧 */ }
+          }
+        }
+        if (hasError) {
+          document.getElementById('insight-meta').innerText = `${evoMmdd(date)} 小结洞察 · ${evoRangeLabel(evoState.insightRange)} · 生成失败`;
+        } else if (responseText || thinkingText) {
+          document.getElementById('insight-meta').innerText = `${evoMmdd(date)} 小结洞察 · ${evoRangeLabel(evoState.insightRange)} · 生成于 ${evoFmtTime(new Date())}`;
+        } else {
+          body.innerHTML = '<p class="text-slate-500 text-[11px]">未能获取到分析内容，请检查大模型配置。</p>';
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') {
+          // 主动中止（切换日期/Tab），不提示
+        } else if (responseText || thinkingText) {
+          responseText += '\n\n> ⚠️ *[网络连接中断]*';
+          updateUI();
+        } else if (err instanceof TypeError) {
+          body.innerHTML = '<p class="text-rose-400 text-[11px]">无法连接本地服务，请确认 HealthTrack 正在运行。</p>';
+        } else {
+          body.innerHTML = '<p class="text-rose-400 text-[11px]">生成失败：' + escapeHtml(err.message) + '</p>';
+        }
+      } finally {
+        if (evoInsightAbort === controller) evoInsightAbort = null;
+        body.classList.remove('typing-cursor');
+        evoState.insightBusy = false;
+        if (btn) { btn.disabled = false; btn.classList.remove('opacity-60'); btn.innerText = '✨ 生成小结洞察'; }
+      }
+    }
+    async function evResetInsight() {
+      const ok = await appConfirm('清除这一天的小结洞察？清除后可重新生成。', { title: '清除洞察', confirmText: '清除' });
+      if (!ok) return;
+      const date = evoState.date || evoToday();
+      try {
+        const resp = await fetch(`/api/v1/evening/insight?date=${encodeURIComponent(date)}`, { method: 'DELETE' });
+        const json = await resp.json();
+        if (json.code !== 200) throw new Error(json.message || '清除失败');
+        evoStopInsight();
+        document.getElementById('insight-panel').classList.add('hidden');
+        document.getElementById('insight-empty').classList.remove('hidden');
+        document.getElementById('insight-body').innerHTML = '';
+        document.getElementById('think-text').innerText = '';
+        document.getElementById('think-body').classList.remove('open');
+        document.getElementById('think-arrow').classList.remove('rotate-90');
+        appToast('已清除该日小结洞察');
+      } catch (e) {
+        appToast('清除失败：' + e.message);
+      }
+    }
+    function evToggleThinking() {
+      const wrap = document.getElementById('think-body');
+      const arrow = document.getElementById('think-arrow');
+      const open = !wrap.classList.contains('open');
+      wrap.classList.toggle('open', open);
+      arrow.classList.toggle('rotate-90', open);
+    }
+
+    // ---------- 往期回顾 ----------
+    async function evoLoadList() {
+      try {
+        const resp = await fetch('/api/v1/evening/summaries');
+        const json = await resp.json();
+        if (json.code !== 200) throw new Error(json.message || '加载失败');
+        evoState.summaries = (json.data && json.data.items) || [];
+      } catch (e) {
+        appToast('加载往期小结失败：' + e.message);
+        evoState.summaries = [];
+      }
+      evoState.visible = Math.max(evoState.visible, EVO_PAGE_SIZE);
+      evoRenderHistory();
+    }
+
+    function evoFiltered() {
+      return evoState.summaries.filter(r => {
+        // 与后端「近 N 天」口径对齐：窗口为 今天-(N-1) 起
+        if (evoState.dateFilter !== 'all' && evoDaysAgo(r.record_date) > Number(evoState.dateFilter) - 1) return false;
+        const s = r.score || 0;
+        if (evoState.scoreFilter === 'high' && s < 9) return false;
+        if (evoState.scoreFilter === 'good' && (s < 7 || s > 8)) return false;
+        if (evoState.scoreFilter === 'mid'  && (s < 5 || s > 6)) return false;
+        if (evoState.scoreFilter === 'low'  && s > 4) return false;
+        return true;
+      });
+    }
+
+    function evoEntryHTML(r, idx) {
+      const tone = evoTone(evoBandOf(r.score || 0).tone);
+      const thumb = r.photo_id
+        ? `<img src="/api/v1/evening/photo/${r.photo_id}" alt="${evoMmdd(r.record_date)}" class="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-100 bg-slate-50">`
+        : `<span class="w-14 h-14 rounded-xl shrink-0 border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-[10px] text-slate-300 font-bold">无图</span>`;
+      const items = (r.done_items || []).filter(d => d && d.trim());
+      const preview = items.length ? items[0] : '（未填完成事项）';
+      const doneHtml = [0, 1, 2].map(i => {
+        const v = (r.done_items && r.done_items[i]) || '';
+        return (v && v.trim())
+          ? `<li class="flex items-start space-x-1.5 text-[11px] text-slate-600 leading-relaxed"><span class="text-indigo-400 font-black">·</span><span>${escapeHtml(v)}</span></li>`
+          : `<li class="flex items-start space-x-1.5 text-[11px] text-slate-300 leading-relaxed"><span class="font-black">·</span><span>未记录</span></li>`;
+      }).join('');
+      return `
+      <div class="evo-tl-item ev-rise" style="animation-delay:${Math.min(idx, 7) * 40}ms">
+        <span class="evo-tl-node"></span><span class="evo-tl-line"></span>
+        <div class="evo-swipe" data-date="${r.record_date}">
+          <div class="evo-swipe-action">
+            <button class="evo-swipe-del" onclick="evAskDelete('${r.record_date}')">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+              <span>删除</span>
+            </button>
+          </div>
+          <div class="evo-swipe-panel">
+            <div class="evo-card overflow-hidden">
+              <div class="evo-entry-head p-3 flex items-center space-x-3 cursor-pointer active:bg-slate-50/80 transition-colors">
+                ${thumb}
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center space-x-2">
+                    <span class="text-xs font-black text-slate-800 tabular-nums">${evoMmdd(r.record_date)}</span>
+                    <span class="text-[10px] text-slate-400">${evoWeekday(r.record_date)}</span>
+                    <span class="evo-score-chip text-[10px] font-black px-1.5 py-0.5 rounded-full border ${tone.chip}" data-score="${r.score}">${r.score} 分</span>
+                  </div>
+                  <p class="text-[11px] text-slate-400 truncate mt-1">${escapeHtml(preview)}</p>
+                </div>
+                <span class="evo-entry-arrow text-[9px] text-slate-300 transform transition-transform duration-300">▼</span>
+              </div>
+              <div class="evo-collapsible">
+                <div class="px-3 pb-3 pt-2.5 border-t border-slate-100 space-y-2.5">
+                  <div>
+                    <p class="evo-eyebrow mb-1.5">完成事项</p>
+                    <ol class="space-y-1">${doneHtml}</ol>
+                  </div>
+                  <div class="bg-slate-50 rounded-xl p-2.5">
+                    <p class="evo-eyebrow mb-1">当时的感想</p>
+                    <p class="text-[11px] text-slate-500 leading-relaxed">${r.note_text ? escapeHtml(r.note_text) : '（未填写）'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function evoRenderHistory() {
+      const list = evoFiltered();
+      const shown = list.slice(0, evoState.visible);
+      const wrap = document.getElementById('ev-history-list');
+      const empty = document.getElementById('ev-history-empty');
+      const moreBtn = document.getElementById('ev-load-more');
+      const doneTip = document.getElementById('ev-load-done');
+      const resetBtn = document.getElementById('ev-filter-reset');
+
+      document.getElementById('ev-filter-count').innerText = list.length;
+      document.getElementById('ev-history-total').innerText = evoState.summaries.length + ' 篇';
+      resetBtn.classList.toggle('hidden', evoState.dateFilter === 'all' && evoState.scoreFilter === 'all');
+
+      if (!list.length) {
+        wrap.innerHTML = '';
+        empty.classList.remove('hidden');
+        moreBtn.classList.add('hidden');
+        doneTip.classList.add('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      let html = '', lastMonth = '';
+      shown.forEach((r, i) => {
+        const mk = evoMonthKey(r.record_date);
+        if (mk !== lastMonth) {
+          const cnt = list.filter(x => evoMonthKey(x.record_date) === mk).length;
+          html += `<div class="flex items-center space-x-2 pt-2 pb-3 pl-7">
+                     <span class="text-[10px] font-black tracking-wider text-slate-400">${evoMonthLabel(mk)}</span>
+                     <span class="flex-1 h-px bg-slate-200"></span>
+                     <span class="text-[10px] text-slate-400 tabular-nums">${cnt} 篇</span>
+                   </div>`;
+          lastMonth = mk;
+        }
+        html += evoEntryHTML(r, i);
+      });
+      wrap.innerHTML = html;
+      evoBindSwipes();
+
+      const remain = list.length - shown.length;
+      if (remain > 0) {
+        moreBtn.classList.remove('hidden');
+        doneTip.classList.add('hidden');
+        document.getElementById('ev-remain-count').innerText = remain;
+      } else {
+        moreBtn.classList.add('hidden');
+        doneTip.classList.remove('hidden');
+      }
+    }
+
+    function evLoadMore() { evoState.visible += EVO_PAGE_SIZE; evoRenderHistory(); }
+    function evSetDateFilter(btn) {
+      document.querySelectorAll('#ev-filter-date .evo-fchip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      evoState.dateFilter = btn.dataset.val;
+      evoState.visible = EVO_PAGE_SIZE;
+      evoRenderHistory();
+    }
+    function evSetScoreFilter(btn) {
+      document.querySelectorAll('#ev-filter-score .evo-fchip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      evoState.scoreFilter = btn.dataset.val;
+      evoState.visible = EVO_PAGE_SIZE;
+      evoRenderHistory();
+    }
+    function evResetFilters() {
+      document.querySelectorAll('#ev-filter-date .evo-fchip, #ev-filter-score .evo-fchip').forEach(b => {
+        b.classList.toggle('active', b.dataset.val === 'all');
+      });
+      evoState.dateFilter = 'all';
+      evoState.scoreFilter = 'all';
+      evoState.visible = EVO_PAGE_SIZE;
+      evoRenderHistory();
+    }
+
+    // ---------- 左滑删除（Pointer Events：触摸与鼠标同一套逻辑） ----------
+    function evoBindSwipes() {
+      document.querySelectorAll('#ev-history-list .evo-swipe-panel').forEach(panel => {
+        panel.addEventListener('pointerdown', evoOnSwipeDown);
+        panel.addEventListener('pointermove', evoOnSwipeMove);
+        panel.addEventListener('pointerup', evoOnSwipeUp);
+        panel.addEventListener('pointercancel', evoOnSwipeUp);
+      });
+    }
+    function evoOnSwipeDown(e) {
+      const panel = e.currentTarget;
+      const swipe = panel.closest('.evo-swipe');
+      if (!swipe || swipe.classList.contains('removing')) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      evoCloseAllSwipe(swipe);
+      evoSwipe.drag = {
+        panel: panel, swipe: swipe, id: e.pointerId,
+        x0: e.clientX, y0: e.clientY, axis: null,
+        base: swipe.classList.contains('open') ? -evoSwipe.W : 0, off: 0
+      };
+    }
+    function evoOnSwipeMove(e) {
+      const drag = evoSwipe.drag;
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+      if (!drag.axis) {
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+        drag.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+        if (drag.axis === 'x') {
+          drag.panel.classList.add('dragging');
+          try { drag.panel.setPointerCapture(e.pointerId); } catch (_) {}
+        }
+      }
+      if (drag.axis !== 'x') return;
+      let off = drag.base + dx;
+      if (off > 0) off *= 0.28;
+      else if (off < -evoSwipe.W) off = -evoSwipe.W - (Math.abs(off) - evoSwipe.W) * 0.25;
+      drag.off = off;
+      drag.panel.style.transform = 'translateX(' + off + 'px)';
+      if (e.cancelable) e.preventDefault();
+    }
+    function evoOnSwipeUp(e) {
+      const drag = evoSwipe.drag;
+      if (!drag || e.pointerId !== drag.id) return;
+      const panel = drag.panel, swipe = drag.swipe;
+      panel.classList.remove('dragging');
+      panel.style.transform = '';
+      if (drag.axis === 'x') {
+        swipe.classList.toggle('open', drag.off < -42);
+        evoSwipe.suppressClick = Date.now();
+      }
+      evoSwipe.drag = null;
+    }
+    function evoCloseAllSwipe(except) {
+      document.querySelectorAll('#ev-history-list .evo-swipe.open').forEach(s => { if (s !== except) s.classList.remove('open'); });
+    }
+    // 事件委托：点卡片头展开/收起；已滑开的卡片点一下先收起
+    document.getElementById('ev-history-list').addEventListener('click', e => {
+      const head = e.target.closest('.evo-entry-head');
+      if (!head || Date.now() - evoSwipe.suppressClick < 320) return;
+      const swipe = head.closest('.evo-swipe');
+      if (swipe && swipe.classList.contains('open')) { swipe.classList.remove('open'); return; }
+      evoCloseAllSwipe();
+      const card = head.parentElement;
+      const bodyEl = card.querySelector('.evo-collapsible');
+      const arrow = head.querySelector('.evo-entry-arrow');
+      const open = !bodyEl.classList.contains('open');
+      bodyEl.classList.toggle('open', open);
+      if (arrow) arrow.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+    });
+
+    async function evAskDelete(date) {
+      const r = evoState.summaries.find(x => x.record_date === date);
+      const ok = await appConfirm(`${evoMmdd(date)}${r ? ' · ' + r.score + ' 分' : ''}，删除后不可恢复。`, { title: '删除这篇小结？', confirmText: '删除' });
+      const swipe = document.querySelector(`.evo-swipe[data-date="${date}"]`);
+      if (!ok) { if (swipe) swipe.classList.remove('open'); return; }
+      try {
+        const resp = await fetch(`/api/v1/evening/summary/${encodeURIComponent(date)}`, { method: 'DELETE' });
+        const json = await resp.json();
+        if (json.code !== 200) throw new Error(json.message || '删除失败');
+      } catch (e) {
+        appToast('删除失败：' + e.message);
+        if (swipe) swipe.classList.remove('open');
+        return;
+      }
+      const afterRemove = () => {
+        evoState.summaries = evoState.summaries.filter(x => x.record_date !== date);
+        evoRenderHistory();
+        if (evoState.date === date) {
+          evoState.date = evoToday();
+          document.getElementById('summary-date').value = evoState.date;
+          evoLoadCurrentSummary();
+        }
+      };
+      if (swipe) {
+        swipe.classList.add('removing');
+        setTimeout(() => { afterRemove(); appToast('已删除 ' + evoMmdd(date) + ' 的小结'); }, 260);
+      } else {
+        afterRemove();
+        appToast('已删除 ' + evoMmdd(date) + ' 的小结');
+      }
+    }
   </script>
 </body>
 </html>

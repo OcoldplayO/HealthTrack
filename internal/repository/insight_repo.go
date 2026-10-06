@@ -19,10 +19,14 @@ func NewInsightRepository(db *sql.DB) *InsightRepository {
 
 // Insert 新增一条洞察存档，返回自增主键
 func (r *InsightRepository) Insert(in *model.AIInsight) (int64, error) {
+	scope := in.Scope
+	if scope == "" {
+		scope = "health"
+	}
 	res, err := r.db.Exec(`
-		INSERT INTO ai_insights (user_id, range_days, start_date, end_date, content, thinking, model)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		in.UserID, in.RangeDays, in.StartDate, in.EndDate, in.Content, in.Thinking, in.Model,
+		INSERT INTO ai_insights (user_id, scope, range_days, start_date, end_date, content, thinking, model)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		in.UserID, scope, in.RangeDays, in.StartDate, in.EndDate, in.Content, in.Thinking, in.Model,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("写入洞察存档失败: %w", err)
@@ -31,16 +35,20 @@ func (r *InsightRepository) Insert(in *model.AIInsight) (int64, error) {
 }
 
 // List 游标分页查询（按 id 倒序）。为避免列表载荷过大，正文只返回预览片段，思维链不下发。
+// scope 为空时默认 "health"，避免睡前小结洞察混入「洞察」页历史列表。
 // 返回 (列表, 是否还有更多, 错误)。
-func (r *InsightRepository) List(userID int64, limit int, beforeID int64, rangeDays int, keyword string) ([]*model.AIInsight, bool, error) {
+func (r *InsightRepository) List(userID int64, scope string, limit int, beforeID int64, rangeDays int, keyword string) ([]*model.AIInsight, bool, error) {
 	if limit <= 0 || limit > 50 {
 		limit = 10
+	}
+	if scope == "" {
+		scope = "health"
 	}
 
 	var sb strings.Builder
 	sb.WriteString(`SELECT id, user_id, range_days, start_date, end_date, content, model, created_at
-		FROM ai_insights WHERE user_id = ?`)
-	args := []any{userID}
+		FROM ai_insights WHERE user_id = ? AND scope = ?`)
+	args := []any{userID, scope}
 
 	if beforeID > 0 {
 		sb.WriteString(" AND id < ?")
@@ -144,6 +152,47 @@ func (r *InsightRepository) DeleteMany(userID int64, ids []int64) (int64, error)
 	res, err := r.db.Exec(query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("批量删除洞察失败: %w", err)
+	}
+	return res.RowsAffected()
+}
+
+// GetByDateScope 查询某归属下、指定日期的最近一条洞察全文（用于睡前小结洞察回显）。
+func (r *InsightRepository) GetByDateScope(userID int64, scope, date string) (*model.AIInsight, error) {
+	row := r.db.QueryRow(`
+		SELECT id, user_id, scope, range_days, start_date, end_date, content, thinking, model, created_at
+		FROM ai_insights
+		WHERE user_id = ? AND scope = ? AND start_date = ? AND end_date = ?
+		ORDER BY id DESC LIMIT 1`, userID, scope, date, date)
+
+	it := &model.AIInsight{}
+	var scopeVal, startDate, endDate, content, thinking, modelName sql.NullString
+	var createdAt sql.NullTime
+	if err := row.Scan(&it.ID, &it.UserID, &scopeVal, &it.RangeDays, &startDate, &endDate, &content, &thinking, &modelName, &createdAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("查询小结洞察失败: %w", err)
+	}
+	it.Scope = scopeVal.String
+	it.StartDate = startDate.String
+	it.EndDate = endDate.String
+	it.Content = content.String
+	it.Thinking = thinking.String
+	it.Model = modelName.String
+	if createdAt.Valid {
+		it.CreatedAt = createdAt.Time
+	}
+	return it, nil
+}
+
+// DeleteByDateScope 删除某归属下、指定日期的全部洞察，返回受影响行数。
+func (r *InsightRepository) DeleteByDateScope(userID int64, scope, date string) (int64, error) {
+	res, err := r.db.Exec(
+		`DELETE FROM ai_insights WHERE user_id = ? AND scope = ? AND start_date = ? AND end_date = ?`,
+		userID, scope, date, date,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("删除小结洞察失败: %w", err)
 	}
 	return res.RowsAffected()
 }

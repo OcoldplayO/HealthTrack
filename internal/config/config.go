@@ -15,6 +15,34 @@ type Config struct {
 	Database    DatabaseConfig `yaml:"database"`
 	AI          AIConfig       `yaml:"ai"`
 	Sleep       SleepConfig    `yaml:"sleep"`
+	Summary     SummaryConfig  `yaml:"summary"`
+}
+
+// SummaryConfig 睡前小结相关配置。
+type SummaryConfig struct {
+	// ScoreBands 自评打分（1-10）分档文案与配色，前端据此渲染提示语。
+	ScoreBands []ScoreBandConfig `yaml:"score_bands"`
+}
+
+// ScoreBandConfig 单个评分分档。Tone 取值范围：rose / amber / emerald / indigo / violet。
+type ScoreBandConfig struct {
+	Range []int  `yaml:"range" json:"range"`
+	Label string `yaml:"label" json:"label"`
+	Tone  string `yaml:"tone" json:"tone"`
+}
+
+// ValidScoreTones 允许的分档配色标识。
+var ValidScoreTones = []string{"rose", "amber", "emerald", "indigo", "violet"}
+
+// DefaultScoreBands 返回默认的 5 档评分文案。
+func DefaultScoreBands() []ScoreBandConfig {
+	return []ScoreBandConfig{
+		{Range: []int{1, 2}, Label: "很低落", Tone: "rose"},
+		{Range: []int{3, 4}, Label: "有点钝", Tone: "amber"},
+		{Range: []int{5, 6}, Label: "平平", Tone: "emerald"},
+		{Range: []int{7, 8}, Label: "还不错，稳住了节奏", Tone: "indigo"},
+		{Range: []int{9, 10}, Label: "满分的一天", Tone: "violet"},
+	}
 }
 
 type ServerConfig struct {
@@ -67,6 +95,9 @@ func DefaultConfig() *Config {
 			GreenBefore:  "23:00",
 			YellowBefore: "00:00",
 		},
+		Summary: SummaryConfig{
+			ScoreBands: DefaultScoreBands(),
+		},
 	}
 }
 
@@ -99,6 +130,25 @@ sleep:
   # 阈值采用 HH:mm，凌晨时间按跨日 +24h 归一化；"00:00" 表示次日 0 点。
   green_before: "23:00"
   yellow_before: "00:00"
+
+summary:
+  # 睡前小结「今日自评 1-10」分档文案；tone 可选：rose/amber/emerald/indigo/violet。
+  score_bands:
+    - range: [1, 2]
+      label: "很低落"
+      tone: "rose"
+    - range: [3, 4]
+      label: "有点钝"
+      tone: "amber"
+    - range: [5, 6]
+      label: "平平"
+      tone: "emerald"
+    - range: [7, 8]
+      label: "还不错，稳住了节奏"
+      tone: "indigo"
+    - range: [9, 10]
+      label: "满分的一天"
+      tone: "violet"
 `
 
 // FindProjectRoot 是没有显式传入 -config 时的旧版兼容逻辑。
@@ -178,6 +228,12 @@ func LoadConfig(configPath, dataDir string) (*Config, error) {
 
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("解析配置文件失败 (%s): %w", resolvedConfigPath, err)
+	}
+
+	// 旧版配置文件不含 summary 段落，Unmarshal 可能将其置空，此处回填默认分档，
+	// 保证老用户升级后「睡前小结」评分文案仍可用。
+	if len(cfg.Summary.ScoreBands) == 0 {
+		cfg.Summary.ScoreBands = DefaultScoreBands()
 	}
 
 	cfg.ProjectRoot = configDir

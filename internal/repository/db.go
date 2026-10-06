@@ -92,6 +92,34 @@ func (m *DBManager) migrate() error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_insights_user_id ON ai_insights(user_id, id DESC);
+
+	CREATE TABLE IF NOT EXISTS evening_summaries (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL DEFAULT 1,
+		record_date TEXT NOT NULL,
+		done_1 TEXT DEFAULT '',
+		done_2 TEXT DEFAULT '',
+		done_3 TEXT DEFAULT '',
+		note_text TEXT DEFAULT '',
+		score INTEGER NOT NULL DEFAULT 0,
+		photo_id INTEGER,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(user_id, record_date)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_evening_summaries_user_date ON evening_summaries(user_id, record_date DESC);
+
+	CREATE TABLE IF NOT EXISTS evening_photos (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL DEFAULT 1,
+		record_date TEXT NOT NULL,
+		mime TEXT DEFAULT '',
+		data BLOB,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_evening_photos_user_date ON evening_photos(user_id, record_date);
 	`
 	if _, err := m.DB.Exec(schema); err != nil {
 		return err
@@ -104,6 +132,8 @@ func (m *DBManager) migrate() error {
 		`ALTER TABLE health_records ADD COLUMN exercise_json TEXT DEFAULT '{}';`,
 		`ALTER TABLE health_records ADD COLUMN cold_shower_json TEXT DEFAULT '{}';`,
 		`ALTER TABLE health_records ADD COLUMN concerta_json TEXT DEFAULT '{}';`,
+		// scope 区分洞察归属：health（生理周期洞察）/ evening（睡前小结洞察）
+		`ALTER TABLE ai_insights ADD COLUMN scope TEXT NOT NULL DEFAULT 'health';`,
 	}
 
 	for _, stmt := range alterStatements {

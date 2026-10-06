@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -79,13 +80,16 @@ func main() {
 	// 4. 依赖注入与分层装配
 	recordRepo := repository.NewRecordRepository(dbMgr.DB)
 	insightRepo := repository.NewInsightRepository(dbMgr.DB)
+	eveningRepo := repository.NewEveningRepository(dbMgr.DB)
 	recordService := service.NewRecordService(recordRepo, runtimeConfigs)
 	insightService := service.NewInsightService(recordRepo)
+	eveningService := service.NewEveningService(eveningRepo, runtimeConfigs)
 	aiService := service.NewAIService(runtimeConfigs, recordRepo)
-	aiHandler := handler.NewAIHandler(runtimeConfigs, insightService, recordService, insightRepo)
+	aiHandler := handler.NewAIHandler(runtimeConfigs, insightService, recordService, insightRepo, eveningRepo)
 	insightHandler := handler.NewInsightHandler(insightRepo)
 	configHandler := handler.NewConfigHandler(runtimeConfigs)
 	recordHandler := handler.NewRecordHandler(recordService, aiService)
+	eveningHandler := handler.NewEveningHandler(eveningService)
 
 	// 5. 路由注册
 	mux := http.NewServeMux()
@@ -99,6 +103,19 @@ func main() {
 	mux.HandleFunc("GET /api/v1/insights/{id}", insightHandler.Detail)
 	mux.HandleFunc("DELETE /api/v1/insights/{id}", insightHandler.Delete)
 	mux.HandleFunc("POST /api/v1/insights/batch-delete", insightHandler.BatchDelete)
+
+	// 睡前小结
+	mux.HandleFunc("GET /api/v1/evening/summary", eveningHandler.GetSummary)
+	mux.HandleFunc("POST /api/v1/evening/summary", eveningHandler.SaveSummary)
+	mux.HandleFunc("GET /api/v1/evening/summaries", eveningHandler.List)
+	mux.HandleFunc("DELETE /api/v1/evening/summary/{date}", eveningHandler.Delete)
+	mux.HandleFunc("POST /api/v1/evening/photo", eveningHandler.UploadPhoto)
+	mux.HandleFunc("GET /api/v1/evening/photo/{id}", eveningHandler.GetPhoto)
+	mux.HandleFunc("DELETE /api/v1/evening/photo/{id}", eveningHandler.DeletePhoto)
+	mux.HandleFunc("GET /api/v1/evening/insight/stream", aiHandler.StreamEveningInsight)
+	mux.HandleFunc("GET /api/v1/evening/insight", insightHandler.EveningDetail)
+	mux.HandleFunc("DELETE /api/v1/evening/insight", insightHandler.EveningDelete)
+
 	mux.HandleFunc("/api/v1/export", recordHandler.ExportCSV)
 	mux.HandleFunc("/api/v1/export/json", recordHandler.ExportJSON)
 	mux.HandleFunc("/healthz", recordHandler.Healthz)
@@ -114,6 +131,7 @@ func main() {
 	})
 	mux.HandleFunc("/api/config/test", configHandler.Test)
 	mux.HandleFunc("/api/config/sleep", configHandler.UpdateSleep)
+	mux.HandleFunc("/api/config/summary", configHandler.UpdateSummary)
 
 	// 前端静态页面分发（开发模式读取磁盘，生产模式走内嵌内存）。
 	var staticHandler http.Handler
@@ -137,6 +155,9 @@ func main() {
 		staticHandler = http.FileServer(http.FS(staticSub))
 	}
 
+	// 内嵌前端随二进制更新，HTML 必须禁用客户端缓存。否则浏览器 / Android WebView
+	// 可能复用旧 index.html，导致 App 覆盖安装后仍渲染上一版页面（新功能「看不见」）。
+	staticHandler = noCacheHTML(staticHandler)
 	mux.Handle("/", staticHandler)
 
 	// 6. HTTP 服务启动
@@ -185,6 +206,18 @@ func main() {
 	}
 
 	slog.Info("HealthTrack 服务已安全停止")
+}
+
+// noCacheHTML 给 HTML 文档响应加上禁止缓存的响应头。
+// 前端内嵌在二进制里，每次重新编译都会变化；若客户端缓存了旧页面，
+// 用户在浏览器或 Android WebView 中会看到上一版界面，误以为新功能没做出来。
+func noCacheHTML(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if p := r.URL.Path; p == "/" || strings.HasSuffix(p, ".html") {
+			w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // reportStartupFailure 把启动失败原因写入可执行文件同目录的日志文件。

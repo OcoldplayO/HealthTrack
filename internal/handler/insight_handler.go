@@ -32,7 +32,7 @@ func (h *InsightHandler) List(w http.ResponseWriter, r *http.Request) {
 	beforeID := int64(atoiDefault(q.Get("before_id"), 0))
 	rangeDays := atoiDefault(q.Get("range_days"), 0)
 
-	items, hasMore, err := h.repo.List(1, limit, beforeID, rangeDays, q.Get("q"))
+	items, hasMore, err := h.repo.List(1, "health", limit, beforeID, rangeDays, q.Get("q"))
 	if err != nil {
 		slog.Error("查询洞察历史失败", "err", err)
 		writeJSON(w, http.StatusOK, model.Error(model.CodeDBError, err.Error()))
@@ -130,6 +130,50 @@ func (h *InsightHandler) BatchDelete(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("已删除 %d 条", affected),
 		map[string]int64{"deleted": affected},
 	))
+}
+
+// EveningDetail 查询某日睡前小结洞察：GET /api/v1/evening/insight?date=YYYY-MM-DD
+// 不存在时返回 data=null，供前端展示空态而非报错。
+func (h *InsightHandler) EveningDetail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, model.Error(http.StatusMethodNotAllowed, "Method Not Allowed"))
+		return
+	}
+
+	date := r.URL.Query().Get("date")
+	if date == "" {
+		writeJSON(w, http.StatusOK, model.Error(model.CodeParamError, "缺少 date 参数"))
+		return
+	}
+
+	item, err := h.repo.GetByDateScope(1, "evening", date)
+	if err != nil {
+		slog.Error("查询小结洞察失败", "err", err)
+		writeJSON(w, http.StatusOK, model.Error(model.CodeDBError, err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusOK, model.Success(item))
+}
+
+// EveningDelete 删除某日睡前小结洞察：DELETE /api/v1/evening/insight?date=YYYY-MM-DD
+func (h *InsightHandler) EveningDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeJSON(w, http.StatusMethodNotAllowed, model.Error(http.StatusMethodNotAllowed, "Method Not Allowed"))
+		return
+	}
+
+	date := r.URL.Query().Get("date")
+	if date == "" {
+		writeJSON(w, http.StatusOK, model.Error(model.CodeParamError, "缺少 date 参数"))
+		return
+	}
+
+	if _, err := h.repo.DeleteByDateScope(1, "evening", date); err != nil {
+		slog.Error("删除小结洞察失败", "err", err)
+		writeJSON(w, http.StatusOK, model.Error(model.CodeDBError, err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusOK, model.SuccessWithMsg("已清除小结洞察", nil))
 }
 
 // atoiDefault 解析整数，失败时返回默认值

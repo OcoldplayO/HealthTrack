@@ -6,7 +6,8 @@ import "time"
 type AIInsight struct {
 	ID        int64     `json:"id"`
 	UserID    int64     `json:"user_id"`
-	RangeDays int       `json:"range_days"` // 生成时选择的档位：7/30/60
+	Scope     string    `json:"scope"`      // 归属：health（生理周期洞察）/ evening（睡前小结洞察）
+	RangeDays int       `json:"range_days"` // 生成时选择的档位：7/30/60（evening 为 0）
 	StartDate string    `json:"start_date"` // 该期数据起始日期 (YYYY-MM-DD)
 	EndDate   string    `json:"end_date"`   // 该期数据结束日期 (YYYY-MM-DD)
 	Content   string    `json:"content"`    // 复盘正文 (Markdown)
