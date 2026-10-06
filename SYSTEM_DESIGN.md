@@ -4,8 +4,10 @@
 
 | 文档版本               | 状态                             | 适用角色                                    | 效力说明                                                  |
 | :--------------------- | :------------------------------- | :------------------------------------------ | :-------------------------------------------------------- |
-| **v3.0.0 (Reconciled)** | **Approved & Frozen (最高权威)** | AI Agent / 全栈工程师                       | **项目全局唯一事实源 (SSOT)**，所有代码实现与重构以此为准 |
+| **v3.1.0 (Reconciled)** | **Approved & Frozen (最高权威)** | AI Agent / 全栈工程师                       | **项目全局唯一事实源 (SSOT)**，所有代码实现与重构以此为准 |
 
+> **v3.1.0 修订说明**：新增【睡前小结】模块（第 4 个底部导航）与侧重心理解读的小结洞察（独立提示词模板、思维链展示、图片存取、评分文案可配置、左滑删除），补齐正文 §3.4 / §4.3 / §5.2 / §5.3 / §6.3 / §7.2 / §8.1 / §8.2；并回填【第十章】Backlog 状态（原 10.2 的第 1~4、6 项已实现，移入 10.1 归档）。
+>
 > **v3.0.0 修订说明**：本节版对齐了工程实际实现（表名、字段、驱动、接口、构建方式），修正了 v2.0.0 中已失效的内容，并新增【第十章 待办需求清单 (Backlog)】。凡本文档与代码冲突之处，以本文档为准；如发现新的偏差，须更新本文档而非放任代码偏离。
 
 ---
@@ -118,7 +120,7 @@
   * 备注 `items`：自由文本，如 "骑行 3km" 或 "腿部深蹲"
 * **水肿归因锚点**：
   抗阻力量训练（尤其包含力竭大肌群训练如腿部）会引发肌纤维微损伤与急性充血修复，导致**皮质醇脉冲与炎症性水分潴留 (Water Retention)**。若次日 $\Delta W_{day}$ 暴增 $0.5 \sim 1.5\text{kg}$，系统与 AI 必须优先解释为肌肉修复储水，严禁误判为脂肪增长。
-* **待办**：目前 `type` 为单值，无法同时记录"有氧 + 无氧"，见第十章 Backlog 第 5 条。
+* **待办**：目前 `type` 为单值，无法同时记录"有氧 + 无氧"，见第十章 Backlog 第 1 条。
 
 ### 2.7 专注达 (Concerta) 多维药效与晚间断崖代偿
 
@@ -294,6 +296,32 @@ func (m *DBManager) migrate() error {
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_insights_user_id ON ai_insights(user_id, id DESC);
+
+	CREATE TABLE IF NOT EXISTS evening_summaries (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL DEFAULT 1,
+		record_date TEXT NOT NULL,
+		done_1 TEXT DEFAULT '',
+		done_2 TEXT DEFAULT '',
+		done_3 TEXT DEFAULT '',
+		note_text TEXT DEFAULT '',
+		score INTEGER NOT NULL DEFAULT 0,
+		photo_id INTEGER,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(user_id, record_date)
+	);
+	CREATE INDEX IF NOT EXISTS idx_evening_summaries_user_date ON evening_summaries(user_id, record_date DESC);
+
+	CREATE TABLE IF NOT EXISTS evening_photos (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL DEFAULT 1,
+		record_date TEXT NOT NULL,
+		mime TEXT DEFAULT '',
+		data BLOB,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_evening_photos_user_date ON evening_photos(user_id, record_date);
 	`
 
 	// 平滑增量扩展字段（忽略"列已存在"错误，保证向后兼容）
@@ -303,6 +331,8 @@ func (m *DBManager) migrate() error {
 		`ALTER TABLE health_records ADD COLUMN exercise_json TEXT DEFAULT '{}';`,
 		`ALTER TABLE health_records ADD COLUMN cold_shower_json TEXT DEFAULT '{}';`,
 		`ALTER TABLE health_records ADD COLUMN concerta_json TEXT DEFAULT '{}';`,
+		// scope 区分洞察归属：health（生理周期洞察）/ evening（睡前小结洞察）
+		`ALTER TABLE ai_insights ADD COLUMN scope TEXT NOT NULL DEFAULT 'health';`,
 	}
 	// ...
 }
@@ -314,6 +344,8 @@ func (m *DBManager) migrate() error {
 * **历史遗留列**：`sleep_start_time` / `sleep_end_time` 为主用字段；`sleep_bed_time` / `sleep_wake_time` 为兼容早期前端而保留的冗余列，写入时二者同步维护，读取时若主用字段为空则回退读取遗留列。
 * **结构化对象 JSON 列**：`exercise_json` / `cold_shower_json` / `concerta_json` 存 `TEXT`，空值约定为 `"{}"`，读取时忽略空对象。
 * **AI 洞察存档表 `ai_insights`**：独立于 `health_records`，持久化每次生成的洞察。`content` 存正文 Markdown、`thinking` 存思维链原文，`range_days` 记录档位（7/30/60），`start_date` / `end_date` 为该期数据实际起止日期；游标分页按 `id DESC`。
+  * **`scope` 列区分归属**：`health`（生理周期洞察，默认值）与 `evening`（睡前小结洞察）。列表查询默认只取 `health`，两类洞察互不串页；`evening` 洞察按 `record_date` 唯一，重新生成时先删除同日旧条。
+* **睡前小结两表**：`evening_summaries` 存小结主体（`done_1` / `done_2` / `done_3` 三列在模型层聚合为 `done_items` 数组，`score` 为 1~10 自评，`photo_id` 可空）；`evening_photos` 以 `BLOB` 直接存图并记录 `mime`（不经文件系统，规避 Android 路径与权限问题）。
 * **自动冷备份**：每次启动若当日尚无备份，则复制一份到 `data/backups/health_backup_YYYYMMDD.db`。
 
 ### 3.3 数据访问层交互契约（`internal/repository/record_repo.go`）
@@ -328,6 +360,12 @@ func (m *DBManager) migrate() error {
 * **`GetAll(userID int64)`**：等价于 `GetRange(userID, "1970-01-01", "2099-12-31")`，用于全量导出。
 
 上层 `internal/service/record_service.go` 负责在返回前用当前配置阈值**实时重算** `sleep_tag`。
+
+### 3.4 睡前小结数据层（`internal/model/evening.go`、`internal/repository/evening_repo.go`）
+
+* **实体**：`EveningSummary`（`record_date` 唯一、`done_items` 最多 3 条、`note_text`、`score` 1~10、`photo_id` 可空）与 `SaveEveningDTO`（入参校验：日期格式、评分区间、三件事条数上限）。
+* **图片 MIME 校验**：服务端对上传字节做**魔数嗅探**，仅接受 jpeg / png / webp / gif；上传体积上限 9 MB（`http.MaxBytesReader`），响应经 `GET /api/v1/evening/photo/{id}` 回吐并携带正确 `Content-Type`。
+* **引用一致性（严禁悬空引用）**：`DeleteByDate` 同步删除该日图片；`SavePhoto` 在事务内先删旧图、再插新图并回填 `photo_id`；`DeletePhoto` 删除图片记录并将引用它的 `photo_id` 置 `NULL`。
 
 ---
 
@@ -475,6 +513,16 @@ function handleSleepCalculation() {
 
 ---
 
+### 4.3 睡前小结 Tab（第 4 个底部导航）
+
+* **今日填写**：自评分滑块（1~10，实时联动分档文案徽章）、今日完成的三件事（最多 3 条，带序号圆点）、那一刻的感想、当日照片（`<input type="file">` 选取 → canvas 压缩 → 以图片原始二进制 POST，`Content-Type` 为图片类型；安卓端由 `MainActivity.onShowFileChooser` 走 SAF 选文件，Android 10+ 免存储权限）。
+* **往期回顾**：`GET /api/v1/evening/summaries` 一次拉全量，**前端本地**做「日期（全部 / 近 7 天 / 近 30 天）× 评分（全部 / 9-10 / 7-8 / 5-6 / 1-4）」组合筛选与分批渲染（每批 10 条 + 「加载更多」）；卡片支持**左滑删除**（Pointer Events 统一触摸与鼠标，`touch-action: pan-y` 保证竖向滚动不受影响，`-42px` 吸附阈值，右侧露出红色删除按钮）。
+* **小结洞察卡片**：深色独立卡片，手动生成 / 清除；「关联生理数据」窗口可在「近 7 天 / 近 30 天」间切换（默认近 7 天）；布局**思维链在上、正文在下**，正文未输出时思维链自动展开、正文一开始输出即自动收起（与「洞察」页行为一致）。
+* **评分文案可配置**：5 个分档（1-2 / 3-4 / 5-6 / 7-8 / 9-10），每档含 `label` + `tone`；落 `config.yaml` 的 `summary.score_bands`（见 §8.1）。打分卡「⚙ 文案」按钮展开编辑器，改动即时联动打分徽章与往期列表的评分 chip。
+* **破坏性操作红线**：删除一律走应用内确认弹窗 `#app-confirm-modal`（Promise 化 `appConfirm()`）与轻量提示条 `#app-toast`，**严禁使用原生 `confirm()` / `alert()`**——会打断 IDE 内嵌浏览器的宿主组件树，且安卓 WebView 下 `confirm()` 恒返回 `false`。
+
+---
+
 ## 五、 API 契约、统一响应与 SSE 流式协议
 
 ### 5.1 统一 JSON 响应信封（`internal/model/response.go`）
@@ -513,6 +561,16 @@ function handleSleepCalculation() {
 | `GET`  | `/api/v1/insights/{id}`   | AI 洞察历史详情（含思维链原文）         | 路径参数 `id`                                     |
 | `DELETE` | `/api/v1/insights/{id}` | 删除单条洞察存档                        | 路径参数 `id`                                     |
 | `POST` | `/api/v1/insights/batch-delete` | 批量删除洞察存档（历史页管理模式）  | JSON Body `{"ids":[1,2,3]}`（服务端过滤非法值并去重） |
+| `GET`  | `/api/v1/evening/summary` | 读取指定日期的睡前小结                 | `?date=YYYY-MM-DD`（缺省为今天）                  |
+| `POST` | `/api/v1/evening/summary` | 新建或覆盖当日睡前小结                 | `{record_date, done_items[], note_text, score}`   |
+| `GET`  | `/api/v1/evening/summaries` | 睡前小结全量列表（日期倒序）         | 无参数；返回 `{items, total}`，筛选与分页在前端完成 |
+| `DELETE` | `/api/v1/evening/summary/{date}` | 删除某日睡前小结（连同其照片） | 路径参数 `date`                                   |
+| `POST` | `/api/v1/evening/photo`   | 上传 / 替换小结照片（原始二进制）      | `?date=YYYY-MM-DD`；Body 为图片字节，`Content-Type` 为图片类型（≤9MB，魔数嗅探） |
+| `GET`  | `/api/v1/evening/photo/{id}` | 读取小结照片（BLOB 回吐）           | 路径参数 `id`；响应带真实 `Content-Type`          |
+| `DELETE` | `/api/v1/evening/photo/{id}` | 删除小结照片                       | 路径参数 `id`                                     |
+| `GET`  | `/api/v1/evening/insight/stream` | **睡前小结洞察流式生成 (SSE)**  | `?date=YYYY-MM-DD&days=7\|30`（白名单，缺省 7）    |
+| `GET`  | `/api/v1/evening/insight` | 读取某日已存档的小结洞察               | `?date=YYYY-MM-DD`                                |
+| `DELETE` | `/api/v1/evening/insight` | 清除某日的小结洞察                    | `?date=YYYY-MM-DD`                                |
 | `GET`  | `/api/v1/export`          | **导出 CSV（UTF-8 BOM，Excel/WPS 友好）** | `?range=7` / `?range=30` / 缺省为全部             |
 | `GET`  | `/api/v1/export/json`     | 导出全量 JSON 备份                     | 无                                                |
 | `GET`  | `/healthz`                | 服务健康检查探针                       | 返回 `{"status":"ok","time":...}`                 |
@@ -536,7 +594,7 @@ function handleSleepCalculation() {
   Access-Control-Allow-Origin: *
   ```
 
-* **流式帧协议格式**（实际为自定义 `{delta, status}` 帧，非直通 OpenAI 原始帧）：
+* **流式帧协议格式**（下列为早期 `AIService` 路径使用的自定义 `{delta, status}` 帧；当前线上洞察入口 `AIHandler` 系列为**透明转发上游原始 OpenAI 帧**，前端据 `choices[0].delta.content` 与 `delta.reasoning_content` 双通道分别渲染正文与思维链）：
 
   ```text
   data: {"delta":"根据您近30天的数据...","status":"streaming"}\n\n
@@ -573,15 +631,28 @@ function handleSleepCalculation() {
 4. **未配置 API Key 时**：走 `streamDemoInsight` 本地演示分析（逐字流式输出，明确标注"本地演示分析"），而非报错。
 5. **已配置时**：`callOpenAIStream` 请求 `{base_url}/chat/completions`，`temperature=0.7`、`stream=true`、超时 45s；逐行解析上游 `data:` 帧，抽取 `choices[0].delta.content` 后以本项目 `{delta,status}` 帧转发。
 
-> `cmd/server/main.go` 中 `handler.NewAIHandler` 承担 `/api/v1/insights/stream` 路由，内部委托 `aiService.StreamInsight`。
+> `cmd/server/main.go` 中 `/api/v1/insights/stream` 与 `/api/v1/evening/insight/stream` 均由 `AIHandler` 直接实现（装载模板 → `proxyChat` 转发上游），**不经过 `AIService.StreamInsight`**；后者为早期实现（含无 Key 时的本地演示分析），保留 `buildPrompt` 与内嵌模板兜底能力。
 
-### 6.3 运行时配置热更新（`internal/config/runtime.go`）
+### 6.3 睡前小结洞察流式实现（`internal/handler/ai_handler.go`）
+
+`AIHandler.StreamEveningInsight(w, r)` 的关键流程：
+
+1. **参数解析**：`date`（缺省为今天）与 `days`——**白名单 `{7, 30}`**，缺省 7。
+2. **取小结**：`eveningRepo.GetByDate`；该日无小结则直接回一句提示并以 `done` 结束，不调用大模型、不落库。
+3. **关联生理数据**：以**小结日期为终点向前回溯 `days - 1` 天**（起点 = `date - (days-1)`），`RecordService.GetHistoryRecords` 取区间记录后交 `InsightService.BuildPromptContext` 压成宏观特征 + 逐日流水文本。注意此处区间为"以小结日为终点的近 N 天"，与「洞察」页"以今天为终点的近 N 天"口径不同。
+4. **双消息下发**：`system` = `eveningSystemInstruction`（在通用中文硬约束 `systemInstruction` 之上追加"侧重心理状态与成就感、生理数据仅作辅助佐证"的角色定位）；`user` = 模板固定指令段 + 动态数据块（小结日期 / 关联范围 / 自评 / 三件事 / 感想 / 生理上下文）。
+5. **流结束落库**：以 `scope='evening'` + `record_date` **唯一**，落库前先 `DeleteByDateScope` 清理同日旧条，保证同一天只保留最新一条小结洞察（与「洞察」页"追加保留"策略不同）。
+6. `proxyChat` 统一承担请求组装（`temperature=0.4`、`ai.max_tokens` 封顶、`ai.thinking` 开关）、SSE 透明转发与正文 / 思维链双缓冲累积。
+
+### 6.4 运行时配置热更新（`internal/config/runtime.go`）
 
 `config.RuntimeStore` 持有当前 `Config` 快照与 `-config` 解析后的绝对路径，提供 `Snapshot()` / `UpdateAI(...)` / `UpdateSleep(...)`：先原子写回配置文件，再更新内存快照，实现"保存即生效"，无需重启进程。AI 洞察每次请求开始时调用 `Snapshot()` 取最新配置。
 
 ---
 
 ## 七、 提示词模板契约
+
+### 7.1 生理洞察模板（`prompts/insight_v1.txt`）
 
 * **权威文件**：`prompts/insight_v1.txt`（桌面/源码环境优先读取）。
 * **兜底文件**：`internal/service/default_prompt.txt`（通过 `go:embed` 编译进二进制，Android 等无 `prompts/` 目录环境使用）。
@@ -610,6 +681,18 @@ function handleSleepCalculation() {
   4. 区分相关性与因果性 —— 客观评估冷水澡对晨间唤醒与睡前交感激活的双面影响。
 * **输出结构**：固定 4 段 Markdown（① 生理体重与代谢水滞留归因；② 饮食加工程度与 8:2 弹性评估；③ 神经调控、专注达效能与睡眠节律；④ 极低阻力行动指南，严格限制 3 条）。
 
+### 7.2 睡前小结洞察模板（`prompts/evening_insight_v1.txt`）
+
+* **权威文件**：`prompts/evening_insight_v1.txt`；**兜底文件**：`internal/service/default_evening_prompt.txt`（`//go:embed`，经 `service.DefaultEveningPrompt()` 暴露，供 Android 等无 `prompts/` 目录环境使用）。
+* **装载时机**：`loadEveningPromptTemplate()` 在**每次请求**时读磁盘（读不到或内容为空则回退内嵌），因此桌面端调整措辞只需改 txt、**无需重新编译**；Android 端固定使用内嵌版，改文案必须重新打包。
+* **组装方式**：`模板固定指令段 + "\n\n" + 动态数据块`（无占位符替换，这与 §7.1 的 `{{.Xxx}}` 契约不同）。
+* **模板结构**（基础版，可后续迭代）：
+  1. **【思考与推演硬性约束】**：思考过程必须全程简体中文（严禁英文自问自答或罗列英文小标题）、思考预算上限 300 字。**该段与 `system` 消息的中文约束必须同时存在**——只靠 `system` 不足以稳定约束思维链语言。
+  2. **【角色与任务设定】**：温和务实的个人成长教练，输出侧重**心理状态与成就感**的洞察。
+  3. **【分析原则】**：先理解后归因；成就感为主线且必须落到细节；生理数据仅作辅助佐证、不作医学诊断；只使用给定数据、信息不足须明说"数据不足"；总篇幅 ≤400 字。
+  4. **【输出格式规范】**：固定 4 小节 —— 🌙 今日状态概览 / 🌟 成就感与心理归因 / ⚠️ 值得留意的信号 / 🌤️ 明日一件小事（仅 1 条低成本建议）。
+* **与生理洞察的差异**：生理洞察以代谢归因与 NOVA 饮食评估为主；小结洞察以心理与成就感解读为主，生理数据退为佐证。两份模板**不共用**，各自独立迭代。
+
 ---
 
 ## 八、 工程构建、配置与交付规范
@@ -623,6 +706,7 @@ type Config struct {
 	Database    DatabaseConfig `yaml:"database"` // path, backup_dir
 	AI          AIConfig       `yaml:"ai"`       // base_url, api_key, model, max_tokens, thinking
 	Sleep       SleepConfig    `yaml:"sleep"`    // green_before, yellow_before
+	Summary     SummaryConfig  `yaml:"summary"`  // score_bands：睡前小结评分文案分档
 }
 
 func LoadConfig(configPath, dataDir string) (*Config, error)
@@ -637,6 +721,7 @@ func FindProjectRoot() string
 * **环境变量覆盖**（容器/CI 场景）：`AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 优先级高于配置文件。
 * **思维链长度封顶（`ai.max_tokens` / `ai.thinking`）**：推理模型的思考过程不受提示词中"500 字以内"约束（该约束写在 user 消息里，对原生 reasoning 通道无效），故改由请求参数硬性封顶。`ai.max_tokens` 为单次响应最大 token 数（含思维链+正文），`>0` 时注入请求体 `max_tokens`，`<=0` 表示不限制（交由服务端默认值）；`ai.thinking` 取 `enabled` / `disabled`，仅在这两个非空值时注入 `thinking: {"type": ...}`，留空则不传、保持服务端默认（即思维链默认开启）。二者均只影响请求参数，前端思维链展示不受影响。
 * **路径解析**：未使用 `-data-dir` 时，`database.path` / `backup_dir` 的相对路径基于 `config.yaml` 所在目录；`FindProjectRoot` 依次尝试"当前目录 → 上一级 → 可执行文件所在目录（含 `bin/` 特判）"，杜绝"不同目录启动导致数据库路径裂脑"。
+* **睡前小结评分文案（`summary.score_bands`）**：为 5 个分档模型，每档含 `range`（如 `"1-2"`）、`label`（文案）、`tone`（色点，取值受 `ValidScoreTones` 白名单约束）。配置缺失时回退 `DefaultScoreBands()`（很低落 / 有点钝 / 平平 / 还不错，稳住了节奏 / 满分的一天）。保存时校验各档区间首尾相接且覆盖 `1~10`，非法则返回 `400`。该配置经 `GET /api/config` 下发，前端打分徽章与往期列表评分 chip 即时联动（详见 §4.3）。
 * **Android DNS 修复**：`main` 启动首行调用 `netutil.ConfigureResolver()`，必须在任何网络请求之前执行。
 
 ### 8.2 构建与发布（三种通道）
@@ -656,6 +741,7 @@ func FindProjectRoot() string
 * `packaging { jniLibs { useLegacyPackaging = true } }`（应对 Android 10+ `filesDir` noexec，需解压 JNI 库）。
 * 本地与 CI **必须使用同一把签名密钥**（项目根 `healthtrack-release.jks`，alias `healthtrack`），否则无法覆盖安装、会清空手机数据。
 * WebView 需注册 `DownloadListener` 与 JS 桥（`window.HealthTrack.openDownloads()`）才能处理导出文件下载，否则手机端点击导出无反应。
+* 内嵌前端的 HTML 响应（`/` 与 `*.html`）统一加 `Cache-Control: no-cache, must-revalidate`（`noCacheHTML` 中间件）：否则浏览器 / Android WebView 会启发式缓存旧 `index.html`，导致覆盖安装后仍渲染上一版页面、新功能"看不见"。
 
 **版本号基线差异说明（CI 与本地，已知问题，暂不修改）**：
 
@@ -663,7 +749,7 @@ func FindProjectRoot() string
 * **签名不受影响**：CI 与本地共用同一把固定密钥（项目根 `healthtrack-release.jks`，alias `healthtrack`），证书指纹一致，不会触发 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`。
 * **覆盖安装后果**：目标设备**从未装过** HealthTrack，或已装包的 `versionCode` **更低**时，CI 包可正常覆盖安装；若已装包 `versionCode` **更高**（例如你自己的开发机上装的本地包），则会报 `INSTALL_FAILED_VERSION_DOWNGRADE`。临时绕过用 `adb install -r -d`（允许降级）；**卸载会清空本地数据库，严禁使用**。
 * **结论**：CI 包仍适用于**全新设备/他人设备安装**与**按提交归档**（文件名带日期与短哈希、随邮件与 artifact 分发），但不保证能覆盖你自己开发机上的更新包。
-* **拟修复方案（方案 A，尚未实施）**：两端统一以仓库提交数 `git rev-list --count HEAD` 作为 `versionCode` 基线，本地脚本取 `max(已装 + 1, 提交数)`。同一提交在 CI 与本地算出的 `versionCode` 相同（相等允许覆盖安装），新提交自动 +1，跨端永远一致。前提：`main` 分支不重写历史（`reset`/`rebase` 会使提交数回退）。详见 §10.2 第 8 条。
+* **拟修复方案（方案 A，尚未实施）**：两端统一以仓库提交数 `git rev-list --count HEAD` 作为 `versionCode` 基线，本地脚本取 `max(已装 + 1, 提交数)`。同一提交在 CI 与本地算出的 `versionCode` 相同（相等允许覆盖安装），新提交自动 +1，跨端永远一致。前提：`main` 分支不重写历史（`reset`/`rebase` 会使提交数回退）。详见 §10.2 第 3 条。
 
 ### 8.3 统一 Git 忽略规则（`.gitignore`）
 
@@ -771,18 +857,26 @@ scripts/build-android.ps1
 * **删除（管理模式）**：历史页头部「管理」按钮进入管理模式——条目左侧出现复选框，支持逐条勾选、全选/取消全选，底部浮出「删除所选 (n)」操作条并二次确认后调用 `POST /api/v1/insights/batch-delete`。移动端额外支持**长按条目**直接进入管理模式并选中该项；切换搜索/筛选会自动退出管理模式。展开区不再提供单条删除入口（避免可发现性差）。
 * **说明**：按用户要求**不内置演示数据**，首次进入历史页为空态。
 
-### 10.2 历史遗留待办（此前已提出、尚未实现）
+**✅ ③ 睡前小总结（已实现）**
+* **背景**：在生理数据之外，补一层"心理与成就感"的自我复盘，帮助用户看见每天的进展。
+* **实现**：新增底部第 4 个 Tab「睡前小结」（段落详见 §4.3），含今日填写（自评分滑块 / 完成的三件事 / 感想 / 照片）、往期回顾（日期 + 评分组合筛选、分页加载、左滑删除）与小结洞察卡片。数据层新增 `evening_summaries` / `evening_photos` 两表、`ai_insights` 增加 `scope` 列（见 §3.2 / §3.4），后端 `EveningHandler` 提供 summary / summaries / photo / insight 系列接口（见 §5.2）。小结洞察复用了「磁盘模板 → 内嵌兜底」的双轨提示词机制，但模板**侧重心理状态与成就感**、生理数据仅作辅助佐证（见 §7.2）；`system` 硬约束与模板顶部【思考与推演硬性约束】双重保证思维链为简体中文；前端思维链在上、正文在下，正文未输出时思维链自动展开、正文开始输出即自动收起。评分文案落 `config.yaml` 的 `summary.score_bands`，可自定义（见 §8.1）。提交：`ab7e1f1`。
+* **待办**：手写签名尚未实现（见 10.2 第 4 条）。
+
+**✅ ④ 看板交互与录入顺序（已实现）**
+* **睡眠看板点击查看**：点击某天显示当日就寝 / 起床时间（数据后端已具备 `sleep_start_time` / `sleep_end_time`）。提交 `3e7e386`。
+* **体重看板点击查看**：点击单日查看晨起体重 + 睡前体重，并展示夜间排水差值；顺带优化了移动端折线图节点触点命中不灵敏的问题。提交 `3e40383`。
+* **腰围趋势**：未采用原计划的"体重 + 腰围双 Y 轴双折线"（对不同数据跨度用户不友好），改为**新增独立卡片「腰围变化趋势 (cm)」**，与体重卡片结构一致（紫色折线、点击查看当日腰围、缺值显示 `--`）。提交 `3e397a5`。
+* **录入顺序**：记一笔顶部输入框顺序调整为「睡前体重 → 晨起空腹 → 腰围」（仅调整 DOM 顺序，相关 `id` 与取值逻辑未变）。提交 `3e7e386`。
+* **通用基建**：为 `/` 与 `*.html` 增加 `Cache-Control: no-cache, must-revalidate`，避免覆盖安装后 WebView 复用旧页面（见 §8.2）。
+
+### 10.2 历史遗留待办（尚未实现）
 
 | # | 需求                                         | 涉及范围                       | 备注                                                     |
 | :- | :------------------------------------------- | :----------------------------- | :------------------------------------------------------- |
-| 1 | 睡眠看板：点击某天显示入睡 / 起床时间         | 前端 `index.html` 看板         | 数据后端已具备（`sleep_start_time` / `sleep_end_time`）  |
-| 2 | 体重看板：点击单日查看晨重 + 睡前重           | 前端看板 + 移动端交互          | 附带修复手机端折线图节点触点不灵敏问题                   |
-| 3 | 体重趋势图改为「体重 + 腰围」双折线（腰围紫色） | 前端图表                       | 同一时间轴双系列                                         |
-| 4 | 记一笔顶部录入顺序改为：睡前体重 → 晨起体重 → 腰围 | 前端录入表单布局            | 纯 UI 顺序调整                                           |
-| 5 | 运动训练允许"有氧 + 无氧"同时选择记录         | `ExerciseDetail` 结构 + 前后端 | 需将单值 `type` 扩展为多值（如 `types []string`）或并列记录，注意 JSON 兼容 |
-| 6 | 睡前小总结表单                               | 前端 + 可能新增字段            | 待明确字段清单                                           |
-| 7 | 批量导入历史数据功能                         | 后端导入接口 + 前端上传         | 用户有大量手工录入的历史数据需要一次性导入               |
-| 8 | 统一 CI 与本地 `versionCode` 基线（方案 A：改用仓库提交数） | `.github/workflows/build-apk.yml` + `scripts/build-android.ps1` | 解决 CI 包落后于本地包、无法覆盖安装（`INSTALL_FAILED_VERSION_DOWNGRADE`）问题，详见 §8.2「版本号基线差异说明」 |
+| 1 | 运动训练允许"有氧 + 无氧"同时选择记录         | `ExerciseDetail` 结构 + 前后端 | 需将单值 `type` 扩展为多值（如 `types []string`）或并列记录，注意 JSON 兼容 |
+| 2 | 批量导入历史数据功能                         | 后端导入接口 + 前端上传         | 用户有大量手工录入的历史数据需要一次性导入               |
+| 3 | 统一 CI 与本地 `versionCode` 基线（方案 A：改用仓库提交数） | `.github/workflows/build-apk.yml` + `scripts/build-android.ps1` | 解决 CI 包落后于本地包、无法覆盖安装（`INSTALL_FAILED_VERSION_DOWNGRADE`）问题，详见 §8.2「版本号基线差异说明」 |
+| 4 | 睡前小结支持手写签名                         | 前端画板 + 后端存储             | 用户已提出、**暂缓**；方案待研究（关联 §10.1 ✅③）        |
 
 ---
 
