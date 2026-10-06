@@ -652,10 +652,18 @@ func FindProjectRoot() string
 **Android 工程约束**：
 
 * `AGP 8.5.2` + `Gradle 8.7`；`compileSdk/targetSdk 34`、`minSdk 26`；`sourceCompatibility/targetCompatibility = JavaVersion.VERSION_17`。
-* `versionCode` 取自环境变量 `VERSION_CODE`（CI 用 run_number，本地脚本用"已装版本 +1"）。
+* `versionCode` 取自环境变量 `VERSION_CODE`：**CI 用 `github.run_number`，本地脚本用"手机已装版本 + 1"**（两者的基线差异见下方说明）。
 * `packaging { jniLibs { useLegacyPackaging = true } }`（应对 Android 10+ `filesDir` noexec，需解压 JNI 库）。
 * 本地与 CI **必须使用同一把签名密钥**（项目根 `healthtrack-release.jks`，alias `healthtrack`），否则无法覆盖安装、会清空手机数据。
 * WebView 需注册 `DownloadListener` 与 JS 桥（`window.HealthTrack.openDownloads()`）才能处理导出文件下载，否则手机端点击导出无反应。
+
+**版本号基线差异说明（CI 与本地，已知问题，暂不修改）**：
+
+* **两套计数器无共同基线**：CI 的 `github.run_number` 只随仓库 CI 运行次数递增，与代码提交无关；本地脚本取"手机已装 versionCode + 1"，随本地安装持续上爬。因此本地包通常领先 CI 包若干档，两者的 `versionCode` 天然对不上。
+* **签名不受影响**：CI 与本地共用同一把固定密钥（项目根 `healthtrack-release.jks`，alias `healthtrack`），证书指纹一致，不会触发 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`。
+* **覆盖安装后果**：目标设备**从未装过** HealthTrack，或已装包的 `versionCode` **更低**时，CI 包可正常覆盖安装；若已装包 `versionCode` **更高**（例如你自己的开发机上装的本地包），则会报 `INSTALL_FAILED_VERSION_DOWNGRADE`。临时绕过用 `adb install -r -d`（允许降级）；**卸载会清空本地数据库，严禁使用**。
+* **结论**：CI 包仍适用于**全新设备/他人设备安装**与**按提交归档**（文件名带日期与短哈希、随邮件与 artifact 分发），但不保证能覆盖你自己开发机上的更新包。
+* **拟修复方案（方案 A，尚未实施）**：两端统一以仓库提交数 `git rev-list --count HEAD` 作为 `versionCode` 基线，本地脚本取 `max(已装 + 1, 提交数)`。同一提交在 CI 与本地算出的 `versionCode` 相同（相等允许覆盖安装），新提交自动 +1，跨端永远一致。前提：`main` 分支不重写历史（`reset`/`rebase` 会使提交数回退）。详见 §10.2 第 8 条。
 
 ### 8.3 统一 Git 忽略规则（`.gitignore`）
 
@@ -774,6 +782,7 @@ scripts/build-android.ps1
 | 5 | 运动训练允许"有氧 + 无氧"同时选择记录         | `ExerciseDetail` 结构 + 前后端 | 需将单值 `type` 扩展为多值（如 `types []string`）或并列记录，注意 JSON 兼容 |
 | 6 | 睡前小总结表单                               | 前端 + 可能新增字段            | 待明确字段清单                                           |
 | 7 | 批量导入历史数据功能                         | 后端导入接口 + 前端上传         | 用户有大量手工录入的历史数据需要一次性导入               |
+| 8 | 统一 CI 与本地 `versionCode` 基线（方案 A：改用仓库提交数） | `.github/workflows/build-apk.yml` + `scripts/build-android.ps1` | 解决 CI 包落后于本地包、无法覆盖安装（`INSTALL_FAILED_VERSION_DOWNGRADE`）问题，详见 §8.2「版本号基线差异说明」 |
 
 ---
 
