@@ -512,6 +512,25 @@
           </p>
         </div>
 
+        <!-- 腰围趋势图卡片（模板同体重折线图） -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-[10px] uppercase font-bold text-slate-400">腰围变化趋势 (cm)</p>
+              <p id="dash-waist-stat" class="text-xl font-black text-slate-900">--</p>
+            </div>
+            <div class="flex items-center space-x-3 text-[10px] text-slate-500">
+              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-purple-500 mr-1"></span>腰围</span>
+            </div>
+          </div>
+          <div class="h-44 w-full">
+            <canvas id="chart-waist"></canvas>
+          </div>
+          <p id="dash-waist-detail" class="text-[11px] text-slate-500 flex items-start space-x-1">
+            <span>👆</span><span>点击折线查看当日腰围</span>
+          </p>
+        </div>
+
         <!-- 睡眠时长与熬夜分级柱状图 -->
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
           <div class="flex justify-between items-center">
@@ -644,6 +663,7 @@
     let dashRange = 7;
     let insightDays = 30;
     let weightChart = null;
+    let waistChart = null;
     let sleepChart = null;
 
     // AI 洞察历史页状态（游标分页 + 搜索筛选）
@@ -1276,6 +1296,7 @@
       const labels = records.map(r => r.record_date.slice(5));
       const weightAmData = records.map(r => r.weight_am);
       const weightPmData = records.map(r => r.weight_pm);
+      const waistData = records.map(r => r.waist_size);
       const sleepHoursData = records.map(r => r.sleep_hours);
       const sleepColors = records.map(r => {
         if (r.sleep_tag === 'RED') return '#f43f5e';
@@ -1361,7 +1382,52 @@
         }
       });
 
-      // 2. 睡眠柱状图（点击某根柱子查看当日就寝 / 起床时间）
+      // 2. 腰围趋势图（点击某天查看当日腰围）
+      const validWaists = waistData.filter(v => v !== null && v !== undefined);
+      if (validWaists.length > 0) {
+        document.getElementById('dash-waist-stat').innerText = `${validWaists[validWaists.length - 1]} cm`;
+      } else {
+        document.getElementById('dash-waist-stat').innerText = '--';
+      }
+      const waistDetailEl = document.getElementById('dash-waist-detail');
+      waistDetailEl.innerHTML = '<span>👆</span><span>点击折线查看当日腰围</span>';
+      const ctxWaist = document.getElementById('chart-waist').getContext('2d');
+      if (waistChart) waistChart.destroy();
+      waistChart = new Chart(ctxWaist, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '腰围',
+            data: waistData,
+            borderColor: '#a855f7',
+            backgroundColor: '#a855f7',
+            tension: 0.3,
+            spanGaps: true,
+            pointHitRadius: 12
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          // 移动端：手指落在该日期对应的 x 轴列任意高度即可命中最近一天，无需精确戳中数据点
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: false } },
+          onClick: (evt, elements) => {
+            if (!elements || !elements.length) return;
+            const r = records[elements[0].index];
+            if (!r) return;
+            const waistText = (r.waist_size === null || r.waist_size === undefined) ? '--' : `${r.waist_size} cm`;
+            waistDetailEl.innerHTML = `<span>📏</span><span><b class="text-slate-700">${r.record_date}</b>　腰围 ${waistText}</span>`;
+          },
+          scales: {
+            y: { beginAtZero: false, ticks: { font: { size: 10 } } },
+            x: { ticks: { font: { size: 10 } } }
+          }
+        }
+      });
+
+      // 3. 睡眠柱状图（点击某根柱子查看当日就寝 / 起床时间）
       const sleepDetailEl = document.getElementById('dash-sleep-detail');
       sleepDetailEl.innerHTML = '<span>👆</span><span>点击柱状图查看当日就寝 / 起床时间</span>';
       const ctxSleep = document.getElementById('chart-sleep').getContext('2d');
@@ -1398,7 +1464,7 @@
         }
       });
 
-      // 3. 活动流水
+      // 4. 活动流水
       const listEl = document.getElementById('dash-activities-list');
       listEl.innerHTML = '';
       if (records.length === 0) {
