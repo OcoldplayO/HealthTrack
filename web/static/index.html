@@ -1037,6 +1037,7 @@
     let currentTab = 'log';
     let dashRange = 7;
     let insightDays = 30;
+    let insightTodayGenerated = false; // 当前档位今天是否已生成过洞察（用于重新生成前二次确认）
     let weightChart = null;
     let waistChart = null;
     let sleepChart = null;
@@ -1892,8 +1893,21 @@
           el.className = 'flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
         }
       });
-      // 各档位状态彼此独立：切换后按新档位重新判断"今日是否已生成"
+      // 三档彼此独立：先同步清掉上一档位残留内容，避免切换瞬间串档，再按新档位回显
+      applyEmptyInsightUI();
       checkTodayInsight();
+    }
+
+    // 生成期间禁用档位胶囊，避免流式写卡片时切档导致内容错位
+    function setInsightPillsDisabled(disabled) {
+      ['7', '30', '60'].forEach(d => {
+        const el = document.getElementById(`pill-${d}`);
+        if (!el) return;
+        el.disabled = disabled;
+        el.classList.toggle('opacity-50', disabled);
+        el.classList.toggle('cursor-not-allowed', disabled);
+        el.classList.toggle('pointer-events-none', disabled);
+      });
     }
 
     // 轻量原生 Markdown 解析器 (支持标题、列表、粗体、分割线、行内强调与段落)
@@ -1981,6 +1995,10 @@
       btn.disabled = true;
       btn.classList.add('opacity-50', 'cursor-not-allowed');
       btn.innerHTML = `<span>⏳ AI 正在全盘深度分析中...</span>`;
+
+      // 作废可能在途的回显请求，防止其覆盖本次流式内容；并锁定档位胶囊
+      insightLoadSeq++;
+      setInsightPillsDisabled(true);
 
       contentEl.innerHTML = '';
       contentEl.classList.add('typing-cursor');
@@ -2081,8 +2099,8 @@
           updateUI();
           statusTag.innerText = '分析失败';
         } else if (responseText || thinkingText) {
-          updateUI();
-          statusTag.innerText = '复盘完成 · 已存档';
+          // 生成即已按本档位存今日一条：卡片、状态栏、按钮统一为"本档位今天已生成"口径
+          applyTodayInsightUI(responseText, thinkingText, new Date());
         } else {
           contentEl.innerHTML = '<p class="text-slate-400">未能获取到分析内容，请检查后端大模型连接。</p>';
           statusTag.innerText = '暂无分析内容';
@@ -2106,6 +2124,7 @@
         contentEl.classList.remove('typing-cursor');
         btn.disabled = false;
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        setInsightPillsDisabled(false);
         // 有产出即说明已自动存档，按钮语义转为「重新生成」（同天同档位为追加保留）
         btn.innerHTML = (responseText || thinkingText) ? '<span>🔄 重新生成</span>' : originalBtnText;
       }
@@ -2480,37 +2499,102 @@
         .replace(/>/g, '&gt;');
     }
 
-    // 洞察页状态提示：按"当前档位"判断今日是否已生成过该档位洞察。
-    // 各档位独立：仅当本档位今日已有存档时才提示并切换按钮为「重新生成」。
-    async function checkTodayInsight() {
+    // 洞察页默认欢迎介绍词（该档位今天未生成时展示）
+    const DEFAULT_INSIGHT_WELCOME = '<p>欢迎来到 AI 洞察页面！系统会自动提取你在选定周期内的体重走势、夜间呼吸失水、熬夜红黄绿分布、以及饮食运动日记，并由大模型进行深度因果归因与复盘。</p>';
+
+    // 将存档的洞察渲染进卡片：思维链折叠卡在上、正文在下（与历史页展开态一致）
+    function renderInsightArchive(content, thinking) {
+      let html = '';
+      const think = (thinking || '').trim();
+      if (think) {
+        html += `
+          <details class="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500">
+            <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">💭 深度思维链推导 (${think.length} 字)</summary>
+            <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${escapeHtml(think)}</div>
+          </details>`;
+      }
+      if (content && content.trim()) {
+        html += renderMarkdown(content);
+      } else {
+        html += '<p class="text-slate-400 text-xs">该洞察没有正文内容。</p>';
+      }
+      return html;
+    }
+
+    // 默认空态（卡片 + 状态栏 + 按钮三处统一）
+    function applyEmptyInsightUI() {
+      insightTodayGenerated = false;
+      const contentEl = document.getElementById('insight-content');
       const statusTag = document.getElementById('insight-status-tag');
       const btn = document.getElementById('btn-generate-insight');
-      if (!statusTag || !btn) return;
+      if (contentEl) contentEl.innerHTML = DEFAULT_INSIGHT_WELCOME;
+      if (statusTag) statusTag.innerText = '点击上方按钮开始';
+      if (btn) btn.innerHTML = '<span>🚀 生成阶段深度洞察</span>';
+    }
+
+    // 今日已生成回显态（卡片 + 状态栏 + 按钮三处统一）
+    function applyTodayInsightUI(content, thinking, createdAt) {
+      insightTodayGenerated = true;
+      const contentEl = document.getElementById('insight-content');
+      const statusTag = document.getElementById('insight-status-tag');
+      const btn = document.getElementById('btn-generate-insight');
+      const d = createdAt instanceof Date ? createdAt : new Date(createdAt);
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      if (contentEl) contentEl.innerHTML = renderInsightArchive(content, thinking);
+      if (statusTag) statusTag.innerHTML = `近 ${insightDays} 天 · 生成于 ${hh}:${mm} · <span onclick="openInsightHistory()" class="text-blue-600 cursor-pointer font-bold">点击查看</span>`;
+      if (btn) btn.innerHTML = '<span>🔄 重新生成</span>';
+    }
+
+    // 洞察页回显：按"当前档位 + 当天"判断并渲染。
+    // 三档彼此独立且每日重置（昨天的"近 7 天"与今天的"近 7 天"不是同一段数据）：
+    // 仅当本档位【今天】已有存档时回显其全文并把按钮切为「重新生成」；否则一律显示默认空态。
+    let insightLoadSeq = 0;
+    async function checkTodayInsight() {
+      const contentEl = document.getElementById('insight-content');
+      const statusTag = document.getElementById('insight-status-tag');
+      const btn = document.getElementById('btn-generate-insight');
+      if (!statusTag || !btn || !contentEl) return;
 
       const range = insightDays; // 记录本次查询档位，防止快速切换导致的过期响应
+      const seq = ++insightLoadSeq;
+      const isStale = () => seq !== insightLoadSeq || range !== insightDays;
+
       try {
         const resp = await fetch(`/api/v1/insights?limit=1&range_days=${range}`);
-        if (range !== insightDays) return; // 已切换到其他档位，丢弃过期结果
+        if (isStale()) return;
         const json = await resp.json();
-        if (range !== insightDays) return;
+        if (isStale()) return;
+
         const items = (json.data && json.data.items) || [];
+        let todayItem = null;
         if (items.length > 0) {
           const d = new Date(items[0].created_at);
           const now = new Date();
           const sameDay = !isNaN(d.getTime()) &&
             d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-          if (sameDay) {
-            const hh = String(d.getHours()).padStart(2, '0');
-            const mm = String(d.getMinutes()).padStart(2, '0');
-            statusTag.innerHTML = `<span class="text-emerald-600">今日已生成过（${hh}:${mm}）</span> · <span onclick="openInsightHistory()" class="text-blue-600 cursor-pointer font-bold">点击查看</span>`;
-            btn.innerHTML = '<span>🔄 重新生成</span>';
-            return;
-          }
+          if (sameDay) todayItem = items[0];
         }
-        statusTag.innerText = '点击上方按钮开始';
-        btn.innerHTML = '<span>🚀 生成阶段深度洞察</span>';
+        if (!todayItem) {
+          applyEmptyInsightUI();
+          return;
+        }
+
+        // 列表只返回正文预览且不含思维链，需按 id 取全文
+        const detailResp = await fetch(`/api/v1/insights/${todayItem.id}`);
+        if (isStale()) return;
+        const detailJson = await detailResp.json();
+        if (isStale()) return;
+
+        const detail = (detailJson.code === 200 && detailJson.data) ? detailJson.data : null;
+        if (!detail) {
+          applyEmptyInsightUI();
+          return;
+        }
+        applyTodayInsightUI(detail.content || '', detail.thinking || '', todayItem.created_at);
       } catch (e) {
-        // 静默失败，不打扰用户
+        if (isStale()) return;
+        applyEmptyInsightUI();
       }
     }
 
