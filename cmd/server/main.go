@@ -155,9 +155,8 @@ func main() {
 		staticHandler = http.FileServer(http.FS(staticSub))
 	}
 
-	// 内嵌前端随二进制更新，HTML 必须禁用客户端缓存。否则浏览器 / Android WebView
-	// 可能复用旧 index.html，导致 App 覆盖安装后仍渲染上一版页面（新功能「看不见」）。
-	staticHandler = noCacheHTML(staticHandler)
+	// 内嵌静态资源下发缓存策略：HTML 禁用缓存，vendor/ 下的第三方库长期强缓存。
+	staticHandler = staticCachePolicy(staticHandler)
 	mux.Handle("/", staticHandler)
 
 	// 6. HTTP 服务启动
@@ -208,12 +207,18 @@ func main() {
 	slog.Info("HealthTrack 服务已安全停止")
 }
 
-// noCacheHTML 给 HTML 文档响应加上禁止缓存的响应头。
-// 前端内嵌在二进制里，每次重新编译都会变化；若客户端缓存了旧页面，
-// 用户在浏览器或 Android WebView 中会看到上一版界面，误以为新功能没做出来。
-func noCacheHTML(next http.Handler) http.Handler {
+// staticCachePolicy 给内嵌静态资源下发缓存策略。
+//   - HTML 文档：禁用缓存。前端内嵌在二进制里，每次重新编译都会变化；若客户端缓存了旧页面，
+//     浏览器或 Android WebView 会渲染上一版界面，误以为新功能没做出来。
+//   - vendor/ 下的第三方库：文件名内含版本号、内容不可变，可长期强缓存，
+//     避免每次打开页面都重新传输数百 KB 的 Tailwind / Chart.js。
+func staticCachePolicy(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if p := r.URL.Path; p == "/" || strings.HasSuffix(p, ".html") {
+		p := r.URL.Path
+		switch {
+		case strings.HasPrefix(p, "/vendor/"):
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		case p == "/" || strings.HasSuffix(p, ".html"):
 			w.Header().Set("Cache-Control", "no-cache, must-revalidate")
 		}
 		next.ServeHTTP(w, r)
