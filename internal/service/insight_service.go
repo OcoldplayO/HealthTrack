@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"healthtrack/internal/model"
 	"healthtrack/internal/repository"
@@ -71,8 +72,19 @@ func (s *InsightService) BuildPromptContext(records []*model.HealthRecord) strin
 	}
 	weightNetDelta := endWeight - startWeight
 
-	sb.WriteString(fmt.Sprintf("- 统计区间: %s 至 %s (跨度 %d 天, 有效记录 %d 天)\n",
-		startRec.RecordDate, endRec.RecordDate, len(records), validCount))
+	// 日历跨度按首尾记录日期计算（含首尾）；记录条数单独列出，
+	// 避免把"记录条数"当成"天数"（例如 09-01~10-05 实际跨 35 天，但只有 30 条记录）。
+	spanDays := len(records)
+	if sd, errS := time.Parse("2006-01-02", startRec.RecordDate); errS == nil {
+		if ed, errE := time.Parse("2006-01-02", endRec.RecordDate); errE == nil {
+			if d := int(ed.Sub(sd).Hours()/24) + 1; d > 0 {
+				spanDays = d
+			}
+		}
+	}
+
+	sb.WriteString(fmt.Sprintf("- 数据实际覆盖区间: %s 至 %s (日历跨度 %d 天, 共 %d 条记录, 其中 %d 条含有效晨重)\n",
+		startRec.RecordDate, endRec.RecordDate, spanDays, len(records), validCount))
 	sb.WriteString(fmt.Sprintf("- 期间净体重变化: %+.1f kg (起始: %.1f kg -> 结束: %.1f kg)\n",
 		weightNetDelta, startWeight, endWeight))
 	sb.WriteString(fmt.Sprintf("- 平均夜间排汗排毒失水 (睡前 - 今晨): %.2f kg (正常基准: 0.4~0.9 kg)\n", avgSleepLoss))

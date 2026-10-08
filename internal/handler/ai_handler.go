@@ -91,7 +91,13 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 		promptTpl = []byte(service.DefaultPrompt())
 	}
 
-	fullUserContent := fmt.Sprintf("%s\n\n%s", string(promptTpl), dataContext)
+	// 显式声明本次分析周期。数据上下文只反映"实际有记录的区间"，
+	// 若不声明请求窗口，模型会把"数据覆盖了多少天"误当成"本次分析的是多少天"。
+	windowStart := time.Now().AddDate(0, 0, -(days - 1)).Format("2006-01-02")
+	windowEnd := time.Now().Format("2006-01-02")
+	windowLine := fmt.Sprintf("【本次分析周期】近 %d 天（请求窗口 %s 至 %s）\n\n", days, windowStart, windowEnd)
+
+	fullUserContent := fmt.Sprintf("%s\n\n%s%s", string(promptTpl), windowLine, dataContext)
 
 	if cfg.AI.APIKey == "" || strings.Contains(cfg.AI.APIKey, "your_api_key") {
 		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"未检测到有效的大模型 API Key，请在 config.yaml 中配置 AI.APIKey。\"}}]}\n\n")
