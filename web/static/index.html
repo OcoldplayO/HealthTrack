@@ -1991,6 +1991,15 @@
       const statusTag = document.getElementById('insight-status-tag');
       const btn = document.getElementById('btn-generate-insight');
 
+      // 本档位今日已生成过时，覆盖前先二次确认，避免误触重新生成
+      if (insightTodayGenerated) {
+        const ok = await appConfirm(
+          `近 ${insightDays} 天今天已生成过洞察，重新生成会覆盖当前展示的内容并重新消耗大模型额度，确定继续吗？`,
+          { title: '重新生成洞察', confirmText: '确定重新生成', danger: false }
+        );
+        if (!ok) return;
+      }
+
       const originalBtnText = btn.innerHTML;
       btn.disabled = true;
       btn.classList.add('opacity-50', 'cursor-not-allowed');
