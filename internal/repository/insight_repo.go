@@ -99,6 +99,45 @@ func (r *InsightRepository) List(userID int64, scope string, limit int, beforeID
 	return items, hasMore, nil
 }
 
+// GetByPeriod 查询指定档位 + 指定分析周期（窗口首日 ~ 截止日）下最新生成的一条洞察（含全文）。
+// startDate/endDate 为该周期的窗口边界，二者由上层按档位换算后传入。
+// 同时校验 start_date 与 end_date：一是精确锁定周期，避免不同档位互相串扰；
+// 二是天然排除按旧规则（end_date 存"最后一条记录日期"）落库的历史数据。
+// 同一周期允许存在多条（重新生成即新增），此处只取最新一条用于洞察页回显。
+// 不存在时返回 (nil, nil)，供上层直接判定「该周期尚未生成」。
+func (r *InsightRepository) GetByPeriod(userID int64, scope string, rangeDays int, startDate, endDate string) (*model.AIInsight, error) {
+	if scope == "" {
+		scope = "health"
+	}
+
+	row := r.db.QueryRow(`
+		SELECT id, user_id, scope, range_days, start_date, end_date, content, thinking, model, created_at
+		FROM ai_insights
+		WHERE user_id = ? AND scope = ? AND range_days = ?
+		  AND start_date = ? AND end_date = ?
+		ORDER BY id DESC LIMIT 1`, userID, scope, rangeDays, startDate, endDate)
+
+	it := &model.AIInsight{}
+	var scopeVal, startDateVal, endDateVal, content, thinking, modelName sql.NullString
+	var createdAt sql.NullTime
+	if err := row.Scan(&it.ID, &it.UserID, &scopeVal, &it.RangeDays, &startDateVal, &endDateVal, &content, &thinking, &modelName, &createdAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("查询周期洞察失败: %w", err)
+	}
+	it.Scope = scopeVal.String
+	it.StartDate = startDateVal.String
+	it.EndDate = endDateVal.String
+	it.Content = content.String
+	it.Thinking = thinking.String
+	it.Model = modelName.String
+	if createdAt.Valid {
+		it.CreatedAt = createdAt.Time
+	}
+	return it, nil
+}
+
 // Get 查询单条洞察全文（含思维链）
 func (r *InsightRepository) Get(userID, id int64) (*model.AIInsight, error) {
 	row := r.db.QueryRow(`

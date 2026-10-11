@@ -729,6 +729,15 @@
           <button onclick="setInsightDays(60)" id="pill-60" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 60 天</button>
         </div>
 
+        <!-- 分析窗口截止日：默认跟随今天；选昨天或手选日期即可回溯补生成 -->
+        <div class="flex items-center space-x-2">
+          <span class="text-xs font-bold text-slate-500 shrink-0">截止日</span>
+          <button onclick="setInsightEndMode('today')" id="endpill-today" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">今天</button>
+          <button onclick="setInsightEndMode('yesterday')" id="endpill-yesterday" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">昨天</button>
+          <input type="date" id="insight-end-date" onchange="setInsightEndDate(this.value)"
+                 class="flex-1 min-w-0 px-2 py-1.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+        </div>
+
         <button onclick="generateInsightStream()" id="btn-generate-insight" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 rounded-2xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex justify-center items-center space-x-2">
           <span>🚀 生成阶段深度洞察</span>
         </button>
@@ -1037,7 +1046,10 @@
     let currentTab = 'log';
     let dashRange = 7;
     let insightDays = 30;
-    let insightTodayGenerated = false; // 当前档位今天是否已生成过洞察（用于重新生成前二次确认）
+    // 分析窗口截止日的模式：today=跟随今天（跨午夜自动滚动）/ yesterday=昨天 / custom=用户手选日期
+    let insightEndMode = 'today';
+    let insightEndDate = '';            // 实际使用的截止日 YYYY-MM-DD，由模式解析得出
+    let insightPeriodGenerated = false; // 当前「档位 + 截止日」是否已生成过洞察（用于重新生成前二次确认）
     let weightChart = null;
     let waistChart = null;
     let sleepChart = null;
@@ -1262,7 +1274,7 @@
         loadDashboardData(dashRange);
       }
       if (tab === 'insight') {
-        checkTodayInsight();
+        checkPeriodInsight();
       }
       if (tab === 'evening') {
         loadEveningTab();
@@ -1895,10 +1907,72 @@
       });
       // 三档彼此独立：先同步清掉上一档位残留内容，避免切换瞬间串档，再按新档位回显
       applyEmptyInsightUI();
-      checkTodayInsight();
+      checkPeriodInsight();
     }
 
-    // 生成期间禁用档位胶囊，避免流式写卡片时切档导致内容错位
+    // 本地时区的 YYYY-MM-DD。不能用 toISOString()——那是 UTC，东八区凌晨会拿到前一天。
+    function localDateStr(d) {
+      const dt = d instanceof Date ? d : new Date();
+      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    }
+
+    function shiftDateStr(dateStr, deltaDays) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const t = new Date(y, m - 1, d);
+      t.setDate(t.getDate() + deltaDays);
+      return localDateStr(t);
+    }
+
+    // 按模式解析出实际截止日：today 跟随本地今天、yesterday 为本地昨天、custom 用用户手选值
+    function resolveInsightEndDate() {
+      if (insightEndMode === 'yesterday') return shiftDateStr(localDateStr(new Date()), -1);
+      if (insightEndMode === 'custom' && insightEndDate) return insightEndDate;
+      return localDateStr(new Date());
+    }
+
+    const INSIGHT_PILL_ON  = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all';
+    const INSIGHT_PILL_OFF = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+
+    // 同步截止日控件的选中态；日期框上限恒为本地今天（不允许选未来日期）
+    function syncInsightEndUI() {
+      const today = localDateStr(new Date());
+      const pt = document.getElementById('endpill-today');
+      const py = document.getElementById('endpill-yesterday');
+      if (pt) pt.className = insightEndMode === 'today' ? INSIGHT_PILL_ON : INSIGHT_PILL_OFF;
+      if (py) py.className = insightEndMode === 'yesterday' ? INSIGHT_PILL_ON : INSIGHT_PILL_OFF;
+
+      const input = document.getElementById('insight-end-date');
+      if (!input) return;
+      input.max = today;
+      input.value = insightEndDate || today;
+      input.classList.toggle('ring-2', insightEndMode === 'custom');
+      input.classList.toggle('ring-blue-500/40', insightEndMode === 'custom');
+    }
+
+    function setInsightEndMode(mode) {
+      insightEndMode = mode;
+      insightEndDate = resolveInsightEndDate();
+      syncInsightEndUI();
+      applyEmptyInsightUI();
+      checkPeriodInsight();
+    }
+
+    // 手选日期：非法或未来日期直接回滚，不改变当前窗口
+    function setInsightEndDate(value) {
+      const today = localDateStr(new Date());
+      if (!value || value > today) {
+        syncInsightEndUI();
+        appToast('截止日不能晚于今天');
+        return;
+      }
+      insightEndMode = 'custom';
+      insightEndDate = value;
+      syncInsightEndUI();
+      applyEmptyInsightUI();
+      checkPeriodInsight();
+    }
+
+    // 生成期间禁用档位胶囊与截止日控件，避免流式写卡片时切换窗口导致内容错位
     function setInsightPillsDisabled(disabled) {
       ['7', '30', '60'].forEach(d => {
         const el = document.getElementById(`pill-${d}`);
@@ -1908,6 +1982,18 @@
         el.classList.toggle('cursor-not-allowed', disabled);
         el.classList.toggle('pointer-events-none', disabled);
       });
+      ['endpill-today', 'endpill-yesterday'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.disabled = disabled;
+        el.classList.toggle('pointer-events-none', disabled);
+        el.classList.toggle('opacity-50', disabled);
+      });
+      const endInput = document.getElementById('insight-end-date');
+      if (endInput) {
+        endInput.disabled = disabled;
+        endInput.classList.toggle('opacity-50', disabled);
+      }
     }
 
     // 轻量原生 Markdown 解析器 (支持标题、列表、粗体、分割线、行内强调与段落)
@@ -1991,10 +2077,14 @@
       const statusTag = document.getElementById('insight-status-tag');
       const btn = document.getElementById('btn-generate-insight');
 
-      // 本档位今日已生成过时，覆盖前先二次确认，避免误触重新生成
-      if (insightTodayGenerated) {
+      // 生成前按模式重算一次截止日（mode=today 在跨午夜后会自动滚动到新的今天）
+      insightEndDate = resolveInsightEndDate();
+      syncInsightEndUI();
+
+      // 该窗口已生成过时，新增前先二次确认，避免误触重复生成
+      if (insightPeriodGenerated) {
         const ok = await appConfirm(
-          `近 ${insightDays} 天今天已生成过洞察，重新生成会覆盖当前展示的内容并重新消耗大模型额度，确定继续吗？`,
+          `截至 ${insightEndDate} 的近 ${insightDays} 天已生成过洞察，重新生成会新增一条存档并重新消耗大模型额度，确定继续吗？`,
           { title: '重新生成洞察', confirmText: '确定重新生成', danger: false }
         );
         if (!ok) return;
@@ -2044,8 +2134,11 @@
         contentEl.innerHTML = fullHTML;
       }
 
+      // getTimezoneOffset() 返回"本地落后 UTC 的分钟数"（东八区为 -480），取反得到东向偏移。
+      const tzOffset = -new Date().getTimezoneOffset();
+
       try {
-        const response = await fetch(`/api/v1/insights/stream?days=${insightDays}`);
+        const response = await fetch(`/api/v1/insights/stream?days=${insightDays}&end_date=${insightEndDate}&tz_offset=${tzOffset}`);
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
@@ -2108,8 +2201,8 @@
           updateUI();
           statusTag.innerText = '分析失败';
         } else if (responseText || thinkingText) {
-          // 生成即已按本档位存今日一条：卡片、状态栏、按钮统一为"本档位今天已生成"口径
-          applyTodayInsightUI(responseText, thinkingText, new Date());
+          // 生成即已按「档位 + 截止日」存档一条：卡片、状态栏、按钮统一为该窗口的口径
+          applyInsightPeriodUI(responseText, thinkingText, new Date());
         } else {
           contentEl.innerHTML = '<p class="text-slate-400">未能获取到分析内容，请检查后端大模型连接。</p>';
           statusTag.innerText = '暂无分析内容';
@@ -2475,7 +2568,7 @@
         if (!historyState.items.length) historyState.manageMode = false;
         syncHistoryManageUI();
         renderHistoryList();
-        checkTodayInsight(); // 同步刷新洞察页"今日已生成"状态
+        checkPeriodInsight(); // 同步刷新洞察页当前窗口的已生成状态
       } catch (e) {
         appToast('删除失败：' + e.message);
       }
@@ -2532,7 +2625,7 @@
 
     // 默认空态（卡片 + 状态栏 + 按钮三处统一）
     function applyEmptyInsightUI() {
-      insightTodayGenerated = false;
+      insightPeriodGenerated = false;
       const contentEl = document.getElementById('insight-content');
       const statusTag = document.getElementById('insight-status-tag');
       const btn = document.getElementById('btn-generate-insight');
@@ -2541,9 +2634,9 @@
       if (btn) btn.innerHTML = '<span>🚀 生成阶段深度洞察</span>';
     }
 
-    // 今日已生成回显态（卡片 + 状态栏 + 按钮三处统一）
-    function applyTodayInsightUI(content, thinking, createdAt) {
-      insightTodayGenerated = true;
+    // 该窗口已生成的回显态（卡片 + 状态栏 + 按钮三处统一）
+    function applyInsightPeriodUI(content, thinking, createdAt) {
+      insightPeriodGenerated = true;
       const contentEl = document.getElementById('insight-content');
       const statusTag = document.getElementById('insight-status-tag');
       const btn = document.getElementById('btn-generate-insight');
@@ -2551,61 +2644,62 @@
       const hh = String(d.getHours()).padStart(2, '0');
       const mm = String(d.getMinutes()).padStart(2, '0');
       if (contentEl) contentEl.innerHTML = renderInsightArchive(content, thinking);
-      if (statusTag) statusTag.innerHTML = `近 ${insightDays} 天 · 生成于 ${hh}:${mm} · <span onclick="openInsightHistory()" class="text-blue-600 cursor-pointer font-bold">点击查看</span>`;
+      if (statusTag) statusTag.innerHTML = `近 ${insightDays} 天（截至 ${insightEndDate}）· 生成于 ${hh}:${mm} · <span onclick="openInsightHistory()" class="text-blue-600 cursor-pointer font-bold">点击查看</span>`;
       if (btn) btn.innerHTML = '<span>🔄 重新生成</span>';
     }
 
-    // 洞察页回显：按"当前档位 + 当天"判断并渲染。
-    // 三档彼此独立且每日重置（昨天的"近 7 天"与今天的"近 7 天"不是同一段数据）：
-    // 仅当本档位【今天】已有存档时回显其全文并把按钮切为「重新生成」；否则一律显示默认空态。
+    // 洞察页回显：按"当前档位 + 截止日"这一分析窗口判断并渲染。
+    // 报告的身份是窗口本身（档位 × 截止日），而不是"生成时刻"——因此可以回溯补生成昨天的窗口。
+    // 窗口换算与"是否已生成"完全由后端判定（GET /insights/period）：前端只上报截止日与时区偏移，
+    // 后端返回 {exists, insight}；exists=false（含"生成过但已删除"）一律显示默认空态。
     let insightLoadSeq = 0;
-    async function checkTodayInsight() {
+    async function checkPeriodInsight() {
       const contentEl = document.getElementById('insight-content');
       const statusTag = document.getElementById('insight-status-tag');
       const btn = document.getElementById('btn-generate-insight');
       if (!statusTag || !btn || !contentEl) return;
 
-      const range = insightDays; // 记录本次查询档位，防止快速切换导致的过期响应
+      // 每次判定前重算窗口：mode=today 时跨午夜会自动跟随到新的今天
+      insightEndDate = resolveInsightEndDate();
+      syncInsightEndUI();
+
+      const range = insightDays; // 记录本次查询窗口，防止快速切换导致的过期响应
+      const end = insightEndDate;
       const seq = ++insightLoadSeq;
-      const isStale = () => seq !== insightLoadSeq || range !== insightDays;
+      const isStale = () => seq !== insightLoadSeq || range !== insightDays || end !== insightEndDate;
+
+      // getTimezoneOffset() 返回"本地落后 UTC 的分钟数"（东八区为 -480），取反得到东向偏移。
+      const tzOffset = -new Date().getTimezoneOffset();
 
       try {
-        const resp = await fetch(`/api/v1/insights?limit=1&range_days=${range}`);
+        const resp = await fetch(`/api/v1/insights/period?range_days=${range}&end_date=${end}&tz_offset=${tzOffset}`);
         if (isStale()) return;
         const json = await resp.json();
         if (isStale()) return;
 
-        const items = (json.data && json.data.items) || [];
-        let todayItem = null;
-        if (items.length > 0) {
-          const d = new Date(items[0].created_at);
-          const now = new Date();
-          const sameDay = !isNaN(d.getTime()) &&
-            d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-          if (sameDay) todayItem = items[0];
-        }
-        if (!todayItem) {
+        const data = (json.code === 200 && json.data) ? json.data : null;
+        if (!data || !data.exists || !data.insight) {
           applyEmptyInsightUI();
           return;
         }
-
-        // 列表只返回正文预览且不含思维链，需按 id 取全文
-        const detailResp = await fetch(`/api/v1/insights/${todayItem.id}`);
-        if (isStale()) return;
-        const detailJson = await detailResp.json();
-        if (isStale()) return;
-
-        const detail = (detailJson.code === 200 && detailJson.data) ? detailJson.data : null;
-        if (!detail) {
-          applyEmptyInsightUI();
-          return;
-        }
-        applyTodayInsightUI(detail.content || '', detail.thinking || '', todayItem.created_at);
+        const item = data.insight;
+        applyInsightPeriodUI(item.content || '', item.thinking || '', item.created_at);
       } catch (e) {
         if (isStale()) return;
         applyEmptyInsightUI();
       }
     }
+
+    // App 长时间挂在后台（手机端覆盖安装后 WebView/JS 内存状态不会重建）或被系统杀进程前的
+    // 页面往返缓存恢复时，时间可能已经跨天。此时必须重新判定一次窗口，
+    // 否则会残留昨天的「🔄 重新生成 + 洞察正文」，被误当成当前窗口已生成过洞察。
+    function refreshInsightOnResume() {
+      if (document.visibilityState !== 'visible') return;
+      if (currentTab !== 'insight') return;
+      checkPeriodInsight();
+    }
+    document.addEventListener('visibilitychange', refreshInsightOnResume);
+    window.addEventListener('pageshow', refreshInsightOnResume);
 
     // ===== 导出数据 =====
     let exportRange = 'all';

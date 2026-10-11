@@ -99,6 +99,7 @@ func main() {
 	mux.HandleFunc("/api/v1/records", recordHandler.SaveRecord)
 	mux.HandleFunc("/api/v1/records/history", recordHandler.GetHistory)
 	mux.HandleFunc("GET /api/v1/insights/stream", aiHandler.StreamInsight)
+	mux.HandleFunc("GET /api/v1/insights/period", insightHandler.Period)
 	mux.HandleFunc("GET /api/v1/insights", insightHandler.List)
 	mux.HandleFunc("GET /api/v1/insights/{id}", insightHandler.Detail)
 	mux.HandleFunc("DELETE /api/v1/insights/{id}", insightHandler.Delete)

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"healthtrack/internal/model"
 	"healthtrack/internal/repository"
@@ -43,6 +44,73 @@ func (h *InsightHandler) List(w http.ResponseWriter, r *http.Request) {
 		"items":    items,
 		"has_more": hasMore,
 	}))
+}
+
+// Period 判定指定档位 + 指定分析周期（截止日）是否已生成洞察：
+// GET /api/v1/insights/period?range_days=7&end_date=2026-10-10&tz_offset=480
+// end_date 缺省为客户端本地今天；tz_offset 为客户端相对 UTC 的分钟偏移（东八区 = 480）。
+// 周期的换算（窗口首日）与"是否已生成"一律由后端判定，前端只上报自己的日期与时区。
+// 返回 data={exists, insight, start_date, end_date}；无记录时 exists=false 供前端展示默认空态。
+func (h *InsightHandler) Period(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, model.Error(http.StatusMethodNotAllowed, "Method Not Allowed"))
+		return
+	}
+
+	q := r.URL.Query()
+	rangeDays := atoiDefault(q.Get("range_days"), 0)
+	if rangeDays != 7 && rangeDays != 30 && rangeDays != 60 {
+		writeJSON(w, http.StatusOK, model.Error(model.CodeParamError, "非法的 range_days，仅支持 7/30/60"))
+		return
+	}
+
+	// tz_offset 校验上限 ±14 小时，缺省按 UTC 处理。
+	tzOffset := atoiDefault(q.Get("tz_offset"), 0)
+	if tzOffset < -720 || tzOffset > 840 {
+		writeJSON(w, http.StatusOK, model.Error(model.CodeParamError, "非法的 tz_offset"))
+		return
+	}
+
+	today := clientToday(tzOffset)
+
+	endDate := q.Get("end_date")
+	if endDate == "" {
+		endDate = today
+	}
+	et, err := time.Parse("2006-01-02", endDate)
+	if err != nil {
+		writeJSON(w, http.StatusOK, model.Error(model.CodeParamError, "非法的 end_date，应为 YYYY-MM-DD"))
+		return
+	}
+	// 不支持未来日期。ISO 日期可直接做字符串比较。
+	if endDate > today {
+		writeJSON(w, http.StatusOK, model.Error(model.CodeParamError, "end_date 不能晚于今天"))
+		return
+	}
+	startDate := et.AddDate(0, 0, -(rangeDays - 1)).Format("2006-01-02")
+
+	item, err := h.repo.GetByPeriod(1, "health", rangeDays, startDate, endDate)
+	if err != nil {
+		slog.Error("查询周期洞察失败", "err", err)
+		writeJSON(w, http.StatusOK, model.Error(model.CodeDBError, err.Error()))
+		return
+	}
+
+	// 判定结果强时效，禁止任何层缓存。
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, model.Success(map[string]any{
+		"exists":     item != nil,
+		"insight":    item,
+		"start_date": startDate,
+		"end_date":   endDate,
+	}))
+}
+
+// clientToday 按客户端时区偏移（分钟，东八区 = 480）推导客户端本地日期。
+// 不能直接用 time.Now().Format：安卓端 Go 进程运行在 UTC，桌面端可能是本地时区，
+// 由服务器进程时区推导"今天"会把客户端凌晨的请求算到前一天。
+func clientToday(tzOffsetMinutes int) string {
+	return time.Now().UTC().Add(time.Duration(tzOffsetMinutes) * time.Minute).Format("2006-01-02")
 }
 
 // Detail 查询单条洞察全文：GET /api/v1/insights/{id}

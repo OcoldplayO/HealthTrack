@@ -52,7 +52,10 @@ func (h *AIHandler) setupSSE(w http.ResponseWriter) (http.Flusher, bool) {
 	return flusher, ok
 }
 
-// StreamInsight 生理周期洞察：GET /api/v1/insights/stream?days=7|30|60
+// StreamInsight 生理周期洞察：GET /api/v1/insights/stream?days=7|30|60&end_date=YYYY-MM-DD&tz_offset=480
+// end_date 为分析窗口的截止日（缺省 = 客户端本地今天），窗口 = 截止日向前回溯 days-1 天。
+// 日期与时区一律由前端上报：服务端进程时区不可信（安卓端 Go 进程运行在 UTC），
+// 若直接用 time.Now() 当"今天"，会把客户端凌晨的请求算到前一天。
 func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 	cfg := h.configs.Snapshot()
 	flusher, ok := h.setupSSE(w)
@@ -61,27 +64,51 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 解析分析天数 (支持 7、30、60，默认 30 天)
+	// 解析分析档位（仅支持 7、30、60，默认 30 天）
 	days := 30
 	if daysStr := r.URL.Query().Get("days"); daysStr != "" {
-		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 60 {
+		if d, err := strconv.Atoi(daysStr); err == nil && (d == 7 || d == 30 || d == 60) {
 			days = d
 		}
 	}
 
+	tzOffset := atoiDefault(r.URL.Query().Get("tz_offset"), 0)
+	if tzOffset < -720 || tzOffset > 840 {
+		tzOffset = 0
+	}
+	today := clientToday(tzOffset)
+
+	endDate := r.URL.Query().Get("end_date")
+	if endDate == "" {
+		endDate = today
+	}
+	et, err := time.Parse("2006-01-02", endDate)
+	if err != nil {
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"截止日参数非法，应为 YYYY-MM-DD。\"}}]}\n\n")
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+		flusher.Flush()
+		return
+	}
+	// 不支持未来日期。ISO 日期可直接做字符串比较。
+	if endDate > today {
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"不支持生成未来日期的洞察，请选择今天或更早的截止日。\"}}]}\n\n")
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+		flusher.Flush()
+		return
+	}
+	startDate := et.AddDate(0, 0, -(days - 1)).Format("2006-01-02")
+
 	userID := int64(1)
-	records, err := h.repoSvc.GetRecentRecords(userID, days)
+	records, err := h.repoSvc.GetHistoryRecords(userID, startDate, endDate)
 	if err != nil || len(records) == 0 {
-		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"暂未检索到足够的历史健康数据，请先在【记一笔】中打卡后再生成洞察。\"}}]}\n\n")
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"该分析周期内暂未检索到健康数据，请调整截止日后重试，或先在【记一笔】中打卡。\"}}]}\n\n")
 		fmt.Fprintf(w, "data: [DONE]\n\n")
 		flusher.Flush()
 		return
 	}
 
-	// 构建预计算特征上下文（同时记录该期数据实际起止日期，用于存档）
+	// 构建预计算特征上下文
 	dataContext := h.insight.BuildPromptContext(records)
-	startDate := records[0].RecordDate
-	endDate := records[len(records)-1].RecordDate
 
 	// 读取提示词模板 prompts/insight_v1.txt。
 	// 磁盘读取失败（例如 Android 端 prompts 目录未打包进 APK）时，回退到内嵌的默认模板，避免报“模板文件不存在”。
@@ -91,11 +118,9 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 		promptTpl = []byte(service.DefaultPrompt())
 	}
 
-	// 显式声明本次分析周期。数据上下文只反映"实际有记录的区间"，
+	// 显式声明本次分析周期（以用户所选截止日为准）。数据上下文只反映"实际有记录的区间"，
 	// 若不声明请求窗口，模型会把"数据覆盖了多少天"误当成"本次分析的是多少天"。
-	windowStart := time.Now().AddDate(0, 0, -(days - 1)).Format("2006-01-02")
-	windowEnd := time.Now().Format("2006-01-02")
-	windowLine := fmt.Sprintf("【本次分析周期】近 %d 天（请求窗口 %s 至 %s）\n\n", days, windowStart, windowEnd)
+	windowLine := fmt.Sprintf("【本次分析周期】截至 %s 的近 %d 天（请求窗口 %s 至 %s）\n\n", endDate, days, startDate, endDate)
 
 	fullUserContent := fmt.Sprintf("%s\n\n%s%s", string(promptTpl), windowLine, dataContext)
 
