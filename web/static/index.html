@@ -503,10 +503,11 @@
                 </span>
               </div>
               <div class="flex space-x-2" id="exerciseTypePills">
-                <button type="button" class="pill-btn active" data-val="none" onclick="setExerciseType('none')">无运动</button>
-                <button type="button" class="pill-btn" data-val="cardio" onclick="setExerciseType('cardio')">有氧运动</button>
-                <button type="button" class="pill-btn" data-val="strength" onclick="setExerciseType('strength')">力量抗阻</button>
+                <button type="button" class="pill-btn active" data-val="none" onclick="toggleExerciseType('none')">无运动</button>
+                <button type="button" class="pill-btn" data-val="cardio" onclick="toggleExerciseType('cardio')">有氧运动</button>
+                <button type="button" class="pill-btn" data-val="strength" onclick="toggleExerciseType('strength')">力量抗阻</button>
               </div>
+              <p class="text-[10px] text-slate-400">有氧与力量可同时选中；点「无运动」清空其他选择</p>
               <div id="exerciseSubForm" class="space-y-2 pt-1 hidden">
                 <div class="flex items-center justify-between text-xs text-slate-500">
                   <span>强度:</span>
@@ -1071,7 +1072,7 @@
 
     // 生物黑客交互状态
     let exerciseState = {
-      type: 'none',
+      types: [],            // 运动类型多选：cardio / strength，空数组表示无运动
       intensity: 'light'
     };
     let coldShowerState = {
@@ -1378,23 +1379,47 @@
       }
     }
 
-    // 运动打卡交互
-    function setExerciseType(type) {
-      exerciseState.type = type;
-      const pills = document.querySelectorAll('#exerciseTypePills .pill-btn');
-      pills.forEach(p => {
-        if (p.getAttribute('data-val') === type) {
-          p.classList.add('active');
-        } else {
-          p.classList.remove('active');
-        }
+    // 运动打卡交互：类型多选（有氧 + 力量可同时记录）
+    const EXERCISE_TYPE_ORDER = ['cardio', 'strength'];
+
+    // 从记录中取出运动类型列表，兼容早期单值 type 字段
+    function exerciseTypesOf(ex) {
+      if (!ex) return [];
+      let list = Array.isArray(ex.types) ? ex.types.slice() : [];
+      if (list.length === 0 && ex.type) list = [ex.type];
+      return list.filter(t => t && t !== 'none');
+    }
+
+    // 整体设定选中项（回显 / 重置用），空数组表示「无运动」
+    function setExerciseTypes(types) {
+      exerciseState.types = (types || []).filter(t => t && t !== 'none');
+      syncExerciseTypeUI();
+    }
+
+    // 胶囊点击：有氧与力量互相独立可多选，「无运动」为互斥的清空项
+    function toggleExerciseType(val) {
+      if (val === 'none') {
+        setExerciseTypes([]);
+        return;
+      }
+      const i = exerciseState.types.indexOf(val);
+      if (i >= 0) {
+        exerciseState.types.splice(i, 1);
+      } else {
+        exerciseState.types.push(val);
+        exerciseState.types.sort((a, b) => EXERCISE_TYPE_ORDER.indexOf(a) - EXERCISE_TYPE_ORDER.indexOf(b));
+      }
+      syncExerciseTypeUI();
+    }
+
+    function syncExerciseTypeUI() {
+      const selected = exerciseState.types;
+      document.querySelectorAll('#exerciseTypePills .pill-btn').forEach(p => {
+        const val = p.getAttribute('data-val');
+        p.classList.toggle('active', val === 'none' ? selected.length === 0 : selected.includes(val));
       });
       const sub = document.getElementById('exerciseSubForm');
-      if (type === 'none') {
-        sub.classList.add('hidden');
-      } else {
-        sub.classList.remove('hidden');
-      }
+      if (sub) sub.classList.toggle('hidden', selected.length === 0);
     }
 
     function setExerciseIntensity(intensity) {
@@ -1489,14 +1514,15 @@
             document.getElementById('sleepDuration').value = rec.sleep_hours;
           }
 
-          // 回显运动
-          if (rec.exercise && rec.exercise.type && rec.exercise.type !== 'none') {
-            setExerciseType(rec.exercise.type);
+          // 回显运动（兼容早期单值 type 字段）
+          const recExTypes = exerciseTypesOf(rec.exercise);
+          if (recExTypes.length > 0) {
+            setExerciseTypes(recExTypes);
             setExerciseIntensity(rec.exercise.intensity || 'light');
             document.getElementById('exerciseDuration').value = rec.exercise.duration || 40;
             document.getElementById('exerciseItems').value = rec.exercise.items || '';
           } else {
-            setExerciseType('none');
+            setExerciseTypes([]);
           }
 
           // 回显专注达
@@ -1557,7 +1583,7 @@
           document.getElementById('sleepWakeTime').value = '07:15';
           handleSleepCalculation();
 
-          setExerciseType('none');
+          setExerciseTypes([]);
           document.getElementById('concertaEnabled').checked = false;
           toggleConcerta(false);
           document.querySelectorAll('#concertaSideEffects .chip, #concertaCompensations .chip').forEach(c => c.classList.remove('active'));
@@ -1582,7 +1608,8 @@
 
       // 组装运动详情
       let exercisePayload = {
-        type: exerciseState.type,
+        types: exerciseState.types.slice(),
+        type: exerciseState.types[0] || 'none', // 兼容字段：跟随首个类型
         duration: parseInt(document.getElementById('exerciseDuration').value) || 0,
         intensity: exerciseState.intensity,
         items: document.getElementById('exerciseItems').value || ''
@@ -1862,7 +1889,8 @@
         listEl.innerHTML = '<p class="text-slate-400 text-center py-2">暂无记录</p>';
       } else {
         records.slice().reverse().forEach(r => {
-          if (r.journal_text || r.activity_tags || (r.exercise && r.exercise.type !== 'none') || (r.concerta && r.concerta.taken) || (r.cold_shower && r.cold_shower.enabled)) {
+          const rowExTypes = exerciseTypesOf(r.exercise);
+          if (r.journal_text || r.activity_tags || rowExTypes.length > 0 || (r.concerta && r.concerta.taken) || (r.cold_shower && r.cold_shower.enabled)) {
             let tagsHtml = '';
             if (r.activity_tags) {
               try {
@@ -1870,8 +1898,8 @@
                 tagsHtml += tags.map(t => `<span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">${t}</span>`).join('');
               } catch(e){}
             }
-            if (r.exercise && r.exercise.type !== 'none') {
-              tagsHtml += `<span class="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">🏋️ ${r.exercise.type}</span>`;
+            if (rowExTypes.length > 0) {
+              tagsHtml += `<span class="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">🏋️ ${rowExTypes.join(' + ')}</span>`;
             }
             if (r.concerta && r.concerta.taken) {
               tagsHtml += `<span class="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">💊 专注达${r.concerta.dose}mg</span>`;

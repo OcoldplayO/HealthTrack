@@ -8,11 +8,53 @@ import (
 )
 
 // ExerciseDetail 运动明细
+// 运动类型支持多选：「有氧 + 力量」可同时记录。
+// Types 为主用字段（取值 none/cardio/strength 的子集，不含 none）；
+// Type 为早期单值字段，仅作向后兼容保留——写入前由 SyncLegacyType 同步为首个类型，
+// 读取旧记录时由 NormalizeTypes 回退使用，避免出现"两个事实来源"。
 type ExerciseDetail struct {
-	Type      string `json:"type"`      // none, cardio, strength
-	Duration  int    `json:"duration"`  // 时长 (分钟)
-	Intensity string `json:"intensity"` // light, medium, failure
-	Items     string `json:"items"`     // 备注，如 "骑行 3km" 或 "腿部深蹲"
+	Types     []string `json:"types,omitempty"` // 运动类型（多选）：cardio / strength
+	Type      string   `json:"type"`            // 兼容旧数据：none, cardio, strength
+	Duration  int      `json:"duration"`        // 时长 (分钟)
+	Intensity string   `json:"intensity"`       // light, medium, failure
+	Items     string   `json:"items"`           // 备注，如 "骑行 3km" 或 "腿部深蹲"
+}
+
+// NormalizeTypes 归一化运动类型：Types 非空时以其为准，否则回退到旧单值 Type；
+// 剔除 none / 空值并去重。读取端（AI 特征工程、列表标签）统一用它判定口径。
+func (e *ExerciseDetail) NormalizeTypes() []string {
+	if e == nil {
+		return nil
+	}
+	src := e.Types
+	if len(src) == 0 && e.Type != "" {
+		src = []string{e.Type}
+	}
+	out := make([]string, 0, len(src))
+	seen := make(map[string]bool, len(src))
+	for _, t := range src {
+		if t == "" || t == "none" || seen[t] {
+			continue
+		}
+		seen[t] = true
+		out = append(out, t)
+	}
+	return out
+}
+
+// SyncLegacyType 写入前调用：把多选结果写回 Types（去重后的规范值），
+// 并让兼容字段 Type 跟随首个类型（无运动时为 none），保证旧读取方拿到的仍是单值语义。
+func (e *ExerciseDetail) SyncLegacyType() {
+	if e == nil {
+		return
+	}
+	types := e.NormalizeTypes()
+	e.Types = types
+	if len(types) > 0 {
+		e.Type = types[0]
+	} else {
+		e.Type = "none"
+	}
 }
 
 // ColdShowerDetail 冷水澡记录

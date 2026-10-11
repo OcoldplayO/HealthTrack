@@ -4,8 +4,11 @@
 
 | 文档版本               | 状态                             | 适用角色                                    | 效力说明                                                  |
 | :--------------------- | :------------------------------- | :------------------------------------------ | :-------------------------------------------------------- |
-| **v3.1.0 (Reconciled)** | **Approved & Frozen (最高权威)** | AI Agent / 全栈工程师                       | **项目全局唯一事实源 (SSOT)**，所有代码实现与重构以此为准 |
+| **v3.2.0 (Reconciled)** | **Approved & Frozen (最高权威)** | AI Agent / 全栈工程师                       | **项目全局唯一事实源 (SSOT)**，所有代码实现与重构以此为准 |
+| **v3.1.0 (Reconciled)** | **Approved & Frozen**            | AI Agent / 全栈工程师                       | 上一版快照（睡前小结模块落地）                            |
 
+> **v3.2.0 修订说明**：① 【运动训练多选】由单值 `type` 扩展为多选 `types`（有氧 + 抗阻可同时记录，兼容旧单值），补齐 §2.6 / §3.1 / §4.2 / §6.1，并将原 §10.2 第 1 条移入 §10.1 ✅⑤；② 【AI 洞察自选截止日】生成窗口改为「档位 + 截止日」周期模型，允许自选分析截止日（不允许未来日期），存在性判定接口由 `/api/v1/insights/today` 改为 `/api/v1/insights/period`，补齐 §3.2 / §5.2 / §6.2 / §10.1 ②。本版将 §10.2 待办重编号，相关交叉引用已同步。
+>
 > **v3.1.0 修订说明**：新增【睡前小结】模块（第 4 个底部导航）与侧重心理解读的小结洞察（独立提示词模板、思维链展示、图片存取、评分文案可配置、左滑删除），补齐正文 §3.4 / §4.3 / §5.2 / §5.3 / §6.3 / §7.2 / §8.1 / §8.2；并回填【第十章】Backlog 状态（原 10.2 的第 1~4、6 项已实现，移入 10.1 归档）。
 >
 > **v3.0.0 修订说明**：本节版对齐了工程实际实现（表名、字段、驱动、接口、构建方式），修正了 v2.0.0 中已失效的内容，并新增【第十章 待办需求清单 (Backlog)】。凡本文档与代码冲突之处，以本文档为准；如发现新的偏差，须更新本文档而非放任代码偏离。
@@ -114,13 +117,13 @@
 ### 2.6 运动分类与次日肌肉水肿归因机制
 
 * **极简运动量化**（`ExerciseDetail`）：
-  * 类型 `type`：`none` (无), `cardio` (有氧), `strength` (抗阻/力量)
+  * 类型 `types`（**多选**）：`cardio` (有氧) 与 `strength` (抗阻/力量) **可同时选中**；空数组表示无运动。兼容字段 `type` 保留（写入时同步为首个类型，读取旧记录时回退使用）
   * 强度 `intensity`（主观疲劳度 RPE）：`light` (轻松), `medium` (中等), `failure` (力竭/高负荷)
   * 时长 `duration`：分钟数（如 40）
   * 备注 `items`：自由文本，如 "骑行 3km" 或 "腿部深蹲"
 * **水肿归因锚点**：
   抗阻力量训练（尤其包含力竭大肌群训练如腿部）会引发肌纤维微损伤与急性充血修复，导致**皮质醇脉冲与炎症性水分潴留 (Water Retention)**。若次日 $\Delta W_{day}$ 暴增 $0.5 \sim 1.5\text{kg}$，系统与 AI 必须优先解释为肌肉修复储水，严禁误判为脂肪增长。
-* **待办**：目前 `type` 为单值，无法同时记录"有氧 + 无氧"，见第十章 Backlog 第 1 条。
+* **说明**：运动类型已支持「有氧 + 抗阻」同时记录（详见 §3.1 / §4.2 / §6.1，实现记录见 §10.1 ✅⑤）。
 
 ### 2.7 专注达 (Concerta) 多维药效与晚间断崖代偿
 
@@ -163,11 +166,15 @@ package model
 import "time"
 
 // ExerciseDetail 运动明细
+// 运动类型支持多选：Types 为主用字段（cardio / strength 的子集，不含 none）；
+// Type 为早期单值字段，仅作向后兼容——写入前由 SyncLegacyType 同步为首个类型，
+// 读取旧记录时由 NormalizeTypes 回退使用（剔除 none、去重）。
 type ExerciseDetail struct {
-	Type      string `json:"type"`      // none, cardio, strength
-	Duration  int    `json:"duration"`  // 时长 (分钟)
-	Intensity string `json:"intensity"` // light, medium, failure
-	Items     string `json:"items"`     // 备注，如 "骑行 3km" 或 "腿部深蹲"
+	Types     []string `json:"types,omitempty"` // 运动类型（多选）：cardio / strength
+	Type      string   `json:"type"`            // 兼容旧数据：none, cardio, strength
+	Duration  int      `json:"duration"`        // 时长 (分钟)
+	Intensity string   `json:"intensity"`       // light, medium, failure
+	Items     string   `json:"items"`           // 备注，如 "骑行 3km" 或 "腿部深蹲"
 }
 
 // ColdShowerDetail 冷水澡记录
@@ -343,7 +350,7 @@ func (m *DBManager) migrate() error {
 * **多用户预留**：所有读写均带 `user_id` 条件，当前单机版固定 `userID = 1`；唯一键为 `UNIQUE(user_id, record_date)`。
 * **历史遗留列**：`sleep_start_time` / `sleep_end_time` 为主用字段；`sleep_bed_time` / `sleep_wake_time` 为兼容早期前端而保留的冗余列，写入时二者同步维护，读取时若主用字段为空则回退读取遗留列。
 * **结构化对象 JSON 列**：`exercise_json` / `cold_shower_json` / `concerta_json` 存 `TEXT`，空值约定为 `"{}"`，读取时忽略空对象。
-* **AI 洞察存档表 `ai_insights`**：独立于 `health_records`，持久化每次生成的洞察。`content` 存正文 Markdown、`thinking` 存思维链原文，`range_days` 记录档位（7/30/60），`start_date` / `end_date` 为该期数据实际起止日期；游标分页按 `id DESC`。
+* **AI 洞察存档表 `ai_insights`**：独立于 `health_records`，持久化每次生成的洞察。`content` 存正文 Markdown、`thinking` 存思维链原文，`range_days` 记录档位（7/30/60），`start_date` / `end_date` 为**分析窗口边界**（`start_date = end_date - (range_days - 1)`）。窗口身份 = 「档位 + 截止日」，存在性判定同时校验 `scope` + `range_days` + `start_date` + `end_date`，取 `id DESC` 最新一条；游标分页按 `id DESC`。
   * **`scope` 列区分归属**：`health`（生理周期洞察，默认值）与 `evening`（睡前小结洞察）。列表查询默认只取 `health`，两类洞察互不串页；`evening` 洞察按 `record_date` 唯一，重新生成时先删除同日旧条。
 * **睡前小结两表**：`evening_summaries` 存小结主体（`done_1` / `done_2` / `done_3` 三列在模型层聚合为 `done_items` 数组，`score` 为 1~10 自评，`photo_id` 可空）；`evening_photos` 以 `BLOB` 直接存图并记录 `mime`（不经文件系统，规避 Android 路径与权限问题）。
 * **自动冷备份**：每次启动若当日尚无备份，则复制一份到 `data/backups/health_backup_YYYYMMDD.db`。
@@ -438,10 +445,11 @@ function handleSleepCalculation() {
     <div class="tracker-block">
       <div class="block-title">🏋️ 运动训练</div>
       <div class="pill-group" id="exerciseTypePills">
-        <button type="button" class="pill-btn active" data-val="none">无运动</button>
-        <button type="button" class="pill-btn" data-val="cardio">有氧运动</button>
-        <button type="button" class="pill-btn" data-val="strength">力量抗阻</button>
+        <button type="button" class="pill-btn active" data-val="none" onclick="toggleExerciseType('none')">无运动</button>
+        <button type="button" class="pill-btn" data-val="cardio" onclick="toggleExerciseType('cardio')">有氧运动</button>
+        <button type="button" class="pill-btn" data-val="strength" onclick="toggleExerciseType('strength')">力量抗阻</button>
       </div>
+      <p class="hint">有氧与力量可同时选中；点「无运动」清空其他选择</p>
       <div class="sub-row">
         <label>强度: </label>
         <div class="pill-group-sm" id="exerciseIntensityPills">
@@ -511,6 +519,8 @@ function handleSleepCalculation() {
 </div>
 ```
 
+> **运动类型多选（有氧 + 抗阻）**：运动胶囊为**独立多选**——点「有氧运动 / 力量抗阻」各自切换勾选，可同时选中；点「无运动」为互斥清空项（清掉其他选择）。状态为 `exerciseState.types`（数组），交互函数 `toggleExerciseType()` / `syncExerciseTypeUI()`；回显用 `exerciseTypesOf()`（兼容旧单值 `type`）。提交载荷同时带主用 `types` 与兼容字段 `type`（= 首个类型，无运动为 `none`）。历史列表标签形如 `🏋️ cardio + strength`。
+
 ---
 
 ### 4.3 睡前小结 Tab（第 4 个底部导航）
@@ -556,7 +566,8 @@ function handleSleepCalculation() {
 | `GET`  | `/api/v1/records/today`   | 获取今日已有记录，用于表单初始回显     | 无                                                |
 | `POST` | `/api/v1/records`         | 新建或幂等合并单日数据                 | `SaveRecordDTO` 完整 JSON                         |
 | `GET`  | `/api/v1/records/history` | 按日期区间拉取数据，供给看板图表       | `?start_date=2026-09-01&end_date=2026-09-28`      |
-| `GET`  | `/api/v1/insights/stream` | **AI 深度洞察流式接口 (SSE)**          | `?days=7` / `?days=30`（缺省） / `?days=60`       |
+| `GET`  | `/api/v1/insights/stream` | **AI 深度洞察流式接口 (SSE)**          | `?days=7\|30\|60&end_date=YYYY-MM-DD&tz_offset=<分钟>`（`end_date` 缺省为客户端今天；`tz_offset` 为客户端时区偏移，分钟） |
+| `GET`  | `/api/v1/insights/period` | 判定某分析窗口是否已生成洞察（存在性）  | `?range_days=7\|30\|60&end_date=YYYY-MM-DD&tz_offset=<分钟>`；返回 `{exists, insight, start_date, end_date}`；`end_date` 不得为未来日期 |
 | `GET`  | `/api/v1/insights`        | AI 洞察历史列表（游标分页）             | `?limit=10&before_id=<id>&range_days=7\|30\|60&q=<关键词>` |
 | `GET`  | `/api/v1/insights/{id}`   | AI 洞察历史详情（含思维链原文）         | 路径参数 `id`                                     |
 | `DELETE` | `/api/v1/insights/{id}` | 删除单条洞察存档                        | 路径参数 `id`                                     |
@@ -616,7 +627,7 @@ function handleSleepCalculation() {
 `InsightService.BuildPromptContext(records []*model.HealthRecord) string` 负责把记录数组压成两段式文本：
 
 1. **【系统预计算：宏观生理与行为特征大盘】**：统计区间、有效记录天数、期间净体重变化、平均夜间失水（对比 0.4~0.9kg 基准）、力竭抗阻训练天数、专注达服药天数。
-2. **【逐日微观多维流水】**：按日输出晨重（含日变化、睡前排水）、睡眠（时长 / 就寝 / 标签）、运动、药物、冷水澡（含预估体感水温）、饮食日记。
+2. **【逐日微观多维流水】**：按日输出晨重（含日变化、睡前排水）、睡眠（时长 / 就寝 / 标签）、运动（多选类型以 `+` 连接，如 `cardio+strength(medium/55分钟)`，经 `NormalizeTypes()` 归一化、兼容旧单值）、药物、冷水澡（含预估体感水温）、饮食日记。
 
 ### 6.2 AI 流式实现：`internal/service/ai_service.go`
 
@@ -632,6 +643,8 @@ function handleSleepCalculation() {
 5. **已配置时**：`callOpenAIStream` 请求 `{base_url}/chat/completions`，`temperature=0.7`、`stream=true`、超时 45s；逐行解析上游 `data:` 帧，抽取 `choices[0].delta.content` 后以本项目 `{delta,status}` 帧转发。
 
 > `cmd/server/main.go` 中 `/api/v1/insights/stream` 与 `/api/v1/evening/insight/stream` 均由 `AIHandler` 直接实现（装载模板 → `proxyChat` 转发上游），**不经过 `AIService.StreamInsight`**；后者为早期实现（含无 Key 时的本地演示分析），保留 `buildPrompt` 与内嵌模板兜底能力。
+>
+> **分析窗口口径（AI 洞察）**：窗口身份 = 「档位 + 截止日」。`StreamInsight` 读取 `days`（白名单 `7/30/60`）、`end_date`、`tz_offset` 三个参数，窗口 = `end_date` 向前回溯 `days - 1` 天；`end_date` 缺省取「客户端今天」（由 `tz_offset` 换算——安卓端 Go 进程运行于 UTC，服务端 `time.Now()` 不可信）。落库时 `start_date` / `end_date` 存窗口边界，**重新生成不替换旧记录**（同档位同窗口可并存多条），存在性判定与状态展示取 `id DESC` 最新一条（见 §5.2 的 `/api/v1/insights/period`）。
 
 ### 6.3 睡前小结洞察流式实现（`internal/handler/ai_handler.go`）
 
@@ -639,7 +652,7 @@ function handleSleepCalculation() {
 
 1. **参数解析**：`date`（缺省为今天）与 `days`——**白名单 `{7, 30}`**，缺省 7。
 2. **取小结**：`eveningRepo.GetByDate`；该日无小结则直接回一句提示并以 `done` 结束，不调用大模型、不落库。
-3. **关联生理数据**：以**小结日期为终点向前回溯 `days - 1` 天**（起点 = `date - (days-1)`），`RecordService.GetHistoryRecords` 取区间记录后交 `InsightService.BuildPromptContext` 压成宏观特征 + 逐日流水文本。注意此处区间为"以小结日为终点的近 N 天"，与「洞察」页"以今天为终点的近 N 天"口径不同。
+3. **关联生理数据**：以**小结日期为终点向前回溯 `days - 1` 天**（起点 = `date - (days-1)`），`RecordService.GetHistoryRecords` 取区间记录后交 `InsightService.BuildPromptContext` 压成宏观特征 + 逐日流水文本。注意此处区间为"以小结日为终点的近 N 天"，与「洞察」页"以**自选截止日**为终点的近 N 天"口径不同。
 4. **双消息下发**：`system` = `eveningSystemInstruction`（在通用中文硬约束 `systemInstruction` 之上追加"侧重心理状态与成就感、生理数据仅作辅助佐证"的角色定位）；`user` = 模板固定指令段 + 动态数据块（小结日期 / 关联范围 / 自评 / 三件事 / 感想 / 生理上下文）。
 5. **流结束落库**：以 `scope='evening'` + `record_date` **唯一**，落库前先 `DeleteByDateScope` 清理同日旧条，保证同一天只保留最新一条小结洞察（与「洞察」页"追加保留"策略不同）。
 6. `proxyChat` 统一承担请求组装（`temperature=0.4`、`ai.max_tokens` 封顶、`ai.thinking` 开关）、SSE 透明转发与正文 / 思维链双缓冲累积。
@@ -749,7 +762,7 @@ func FindProjectRoot() string
 * **签名不受影响**：CI 与本地共用同一把固定密钥（项目根 `healthtrack-release.jks`，alias `healthtrack`），证书指纹一致，不会触发 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`。
 * **覆盖安装后果**：目标设备**从未装过** HealthTrack，或已装包的 `versionCode` **更低**时，CI 包可正常覆盖安装；若已装包 `versionCode` **更高**（例如你自己的开发机上装的本地包），则会报 `INSTALL_FAILED_VERSION_DOWNGRADE`。临时绕过用 `adb install -r -d`（允许降级）；**卸载会清空本地数据库，严禁使用**。
 * **结论**：CI 包仍适用于**全新设备/他人设备安装**与**按提交归档**（文件名带日期与短哈希、随邮件与 artifact 分发），但不保证能覆盖你自己开发机上的更新包。
-* **拟修复方案（方案 A，尚未实施）**：两端统一以仓库提交数 `git rev-list --count HEAD` 作为 `versionCode` 基线，本地脚本取 `max(已装 + 1, 提交数)`。同一提交在 CI 与本地算出的 `versionCode` 相同（相等允许覆盖安装），新提交自动 +1，跨端永远一致。前提：`main` 分支不重写历史（`reset`/`rebase` 会使提交数回退）。详见 §10.2 第 3 条。
+* **拟修复方案（方案 A，尚未实施）**：两端统一以仓库提交数 `git rev-list --count HEAD` 作为 `versionCode` 基线，本地脚本取 `max(已装 + 1, 提交数)`。同一提交在 CI 与本地算出的 `versionCode` 相同（相等允许覆盖安装），新提交自动 +1，跨端永远一致。前提：`main` 分支不重写历史（`reset`/`rebase` 会使提交数回退）。详见 §10.2 第 2 条。
 
 ### 8.3 统一 Git 忽略规则（`.gitignore`）
 
@@ -809,7 +822,7 @@ scripts/build-android.ps1
 
 ### 1. 唯一事实源原则 (Single Source of Truth)
 
-* 表名、列名、目录架构以本规范（`v3.0.0 Reconciled`）为**最高也是唯一裁决标准**。
+* 表名、列名、目录架构以本规范（`v3.2.0 Reconciled`）为**最高也是唯一裁决标准**。
 * 核心表名**为 `health_records`**；数据存放于 **`data/health.db`**（Android 为 App 私有 `filesDir`）；桌面构建输出为 **`bin/HealthTrack.exe`**；Android 输出为 `app-debug.apk`。
 * SQLite 驱动**固定为 `modernc.org/sqlite`**，以维持 `CGO_ENABLED=0` 的跨平台/交叉编译能力。
 
@@ -854,7 +867,8 @@ scripts/build-android.ps1
   2. **同天重复生成**：采用**追加保留**（不覆盖），每次生成均为新增一条存档，列表按时间倒序、同天多条可区分。
   3. **入口与页面**：洞察面板标题栏右侧「🕘 历史」按钮进入独立视图 `view-history`；页面含关键词搜索、档位筛选（全部/近7天/近30天/近60天）、历史列表与「加载更多」。
   4. **分页**：**游标分页**（`id DESC` + `before_id`），每批 **10 条**，不做页码翻页。
-  5. **重复生成提醒（文字，按档位独立）**：进入洞察页或切换档位时，仅按**当前档位**判断今日是否已生成该档位洞察——若有则状态标签显示「今日已生成过（HH:mm）· 点击查看」、按钮文案改为「重新生成」；若该档位今日未生成过（即使其他档位已生成）则显示「点击上方按钮开始」与默认按钮文案。各档位（7/30/60）状态互不影响。生成完成后状态显示「复盘完成 · 已存档」。
+  5. **重复生成提醒（文字，「档位 + 截止日」窗口独立）**：存在性判定**统一收归后端**——前端携带客户端时区偏移 `tz_offset` 与所选截止日 `end_date` 调 `GET /api/v1/insights/period`，由后端按窗口边界（`range_days` + `start_date` + `end_date`）精确匹配最新一条记录并返回 `{exists, insight}`，前端不再自行做日期比对。有则状态标签显示「已生成过（HH:mm）· 点击查看」、按钮文案改为「重新生成」（需二次确认）；无则显示「点击上方按钮开始」与默认文案。各档位（7/30/60）状态互不影响，生成完成后显示「复盘完成 · 已存档」。
+  6. **自选分析截止日（已实现，提交 `206ee3b`）**：生成窗口终点不再硬编码为服务器当天，改为「档位 + 截止日」周期模型——洞察页可选截止日为「今天 / 昨天」或具体日期（**不允许未来日期**），窗口 = 截止日向前回溯 `range_days - 1` 天；服务端一律以客户端上报的 `end_date` + `tz_offset` 为准（安卓端 Go 进程运行于 UTC，`time.Now()` 不可信）。**重新生成不替换旧记录**，同档位同窗口可并存多条，历史列表按 `id DESC` 取最新一条用于状态展示（删除最新一条后会浮现上一条）。见 §3.2 / §5.2 / §6.2。
 * **详情**：点击列表项内联展开全文（含可折叠的「💭 思维链推导」区块）。
 * **删除（管理模式）**：历史页头部「管理」按钮进入管理模式——条目左侧出现复选框，支持逐条勾选、全选/取消全选，底部浮出「删除所选 (n)」操作条并二次确认后调用 `POST /api/v1/insights/batch-delete`。移动端额外支持**长按条目**直接进入管理模式并选中该项；切换搜索/筛选会自动退出管理模式。展开区不再提供单条删除入口（避免可发现性差）。
 * **说明**：按用户要求**不内置演示数据**，首次进入历史页为空态。
@@ -862,7 +876,7 @@ scripts/build-android.ps1
 **✅ ③ 睡前小总结（已实现）**
 * **背景**：在生理数据之外，补一层"心理与成就感"的自我复盘，帮助用户看见每天的进展。
 * **实现**：新增底部第 4 个 Tab「睡前小结」（段落详见 §4.3），含今日填写（自评分滑块 / 完成的三件事 / 感想 / 照片）、往期回顾（日期 + 评分组合筛选、分页加载、左滑删除）与小结洞察卡片。数据层新增 `evening_summaries` / `evening_photos` 两表、`ai_insights` 增加 `scope` 列（见 §3.2 / §3.4），后端 `EveningHandler` 提供 summary / summaries / photo / insight 系列接口（见 §5.2）。小结洞察复用了「磁盘模板 → 内嵌兜底」的双轨提示词机制，但模板**侧重心理状态与成就感**、生理数据仅作辅助佐证（见 §7.2）；`system` 硬约束与模板顶部【思考与推演硬性约束】双重保证思维链为简体中文；前端思维链在上、正文在下，正文未输出时思维链自动展开、正文开始输出即自动收起。评分文案落 `config.yaml` 的 `summary.score_bands`，可自定义（见 §8.1）。提交：`ab7e1f1`。
-* **待办**：手写签名尚未实现（见 10.2 第 4 条）。
+* **待办**：手写签名尚未实现（见 10.2 第 3 条）。
 
 **✅ ④ 看板交互与录入顺序（已实现）**
 * **睡眠看板点击查看**：点击某天显示当日就寝 / 起床时间（数据后端已具备 `sleep_start_time` / `sleep_end_time`）。提交 `3e7e386`。
@@ -871,14 +885,17 @@ scripts/build-android.ps1
 * **录入顺序**：记一笔顶部输入框顺序调整为「睡前体重 → 晨起空腹 → 腰围」（仅调整 DOM 顺序，相关 `id` 与取值逻辑未变）。提交 `3e7e386`。
 * **通用基建**：为 `/` 与 `*.html` 增加 `Cache-Control: no-cache, must-revalidate`，避免覆盖安装后 WebView 复用旧页面（见 §8.2）。
 
+**✅ ⑤ 运动训练支持「有氧 + 力量」同时记录（已实现）**
+* **背景**：原 `ExerciseDetail.Type` 为单值，无法记录同一天既做有氧又做力量训练的情况（原为 §10.2 第 1 条）。
+* **实现**：`ExerciseDetail` 新增 `Types []string` 主用字段——`NormalizeTypes()` 归一化（兼容旧单值 `type`、剔除 `none`、去重），`SyncLegacyType()` 落库前把兼容字段 `type` 同步为首个类型（无运动为 `none`）；**无需数据库改动**（沿用 `exercise_json` 列）。前端运动胶囊改为**多选**（有氧 / 力量各自独立可勾选，「无运动」为互斥清空项），回显兼容旧单值；AI 特征上下文以 `+` 连接呈现（如 `cardio+strength(medium/55分钟)`）。详见 §2.6 / §3.1 / §4.2 / §6.1。
+
 ### 10.2 历史遗留待办（尚未实现）
 
 | # | 需求                                         | 涉及范围                       | 备注                                                     |
 | :- | :------------------------------------------- | :----------------------------- | :------------------------------------------------------- |
-| 1 | 运动训练允许"有氧 + 无氧"同时选择记录         | `ExerciseDetail` 结构 + 前后端 | 需将单值 `type` 扩展为多值（如 `types []string`）或并列记录，注意 JSON 兼容 |
-| 2 | 批量导入历史数据功能                         | 后端导入接口 + 前端上传         | 用户有大量手工录入的历史数据需要一次性导入               |
-| 3 | 统一 CI 与本地 `versionCode` 基线（方案 A：改用仓库提交数） | `.github/workflows/build-apk.yml` + `scripts/build-android.ps1` | 解决 CI 包落后于本地包、无法覆盖安装（`INSTALL_FAILED_VERSION_DOWNGRADE`）问题，详见 §8.2「版本号基线差异说明」 |
-| 4 | 睡前小结支持手写签名                         | 前端画板 + 后端存储             | 用户已提出、**暂缓**；方案待研究（关联 §10.1 ✅③）        |
+| 1 | 批量导入历史数据功能                         | 后端导入接口 + 前端上传         | 用户有大量手工录入的历史数据需要一次性导入               |
+| 2 | 统一 CI 与本地 `versionCode` 基线（方案 A：改用仓库提交数） | `.github/workflows/build-apk.yml` + `scripts/build-android.ps1` | 解决 CI 包落后于本地包、无法覆盖安装（`INSTALL_FAILED_VERSION_DOWNGRADE`）问题，详见 §8.2「版本号基线差异说明」 |
+| 3 | 睡前小结支持手写签名                         | 前端画板 + 后端存储             | 用户已提出、**暂缓**；方案待研究（关联 §10.1 ✅③）        |
 
 ---
 

@@ -104,6 +104,8 @@ func (r *RecordRepository) SaveOrMerge(userID int64, dto *model.SaveRecordDTO, s
 	// 序列化扩展 JSON
 	exerciseJSONStr := "{}"
 	if dto.Exercise != nil {
+		// 落库前把多选类型规范化为 Types 并把兼容字段 Type 同步为首个类型
+		dto.Exercise.SyncLegacyType()
 		if b, err := json.Marshal(dto.Exercise); err == nil {
 			exerciseJSONStr = string(b)
 		}

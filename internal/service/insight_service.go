@@ -121,10 +121,12 @@ func (s *InsightService) BuildPromptContext(records []*model.HealthRecord) strin
 			sleepBedText = *r.SleepStartTime
 		}
 
-		// 格式化运动明细
+		// 格式化运动明细（运动类型支持多选，如 cardio+strength）
 		exText := "无运动"
-		if r.Exercise != nil && r.Exercise.Type != "none" {
-			exText = fmt.Sprintf("%s(%s/%d分钟)", r.Exercise.Type, r.Exercise.Intensity, r.Exercise.Duration)
+		if r.Exercise != nil {
+			if types := r.Exercise.NormalizeTypes(); len(types) > 0 {
+				exText = fmt.Sprintf("%s(%s/%d分钟)", strings.Join(types, "+"), r.Exercise.Intensity, r.Exercise.Duration)
+			}
 		}
 
 		// 格式化专注达明细
