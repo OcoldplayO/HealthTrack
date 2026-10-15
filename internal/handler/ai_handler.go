@@ -25,12 +25,13 @@ type AIHandler struct {
 	configs     *config.RuntimeStore
 	insight     *service.InsightService
 	repoSvc     *service.RecordService
+	compare     *service.CompareService
 	insightRepo *repository.InsightRepository
 	eveningRepo *repository.EveningRepository
 }
 
-func NewAIHandler(configs *config.RuntimeStore, insight *service.InsightService, repoSvc *service.RecordService, insightRepo *repository.InsightRepository, eveningRepo *repository.EveningRepository) *AIHandler {
-	return &AIHandler{configs: configs, insight: insight, repoSvc: repoSvc, insightRepo: insightRepo, eveningRepo: eveningRepo}
+func NewAIHandler(configs *config.RuntimeStore, insight *service.InsightService, repoSvc *service.RecordService, compare *service.CompareService, insightRepo *repository.InsightRepository, eveningRepo *repository.EveningRepository) *AIHandler {
+	return &AIHandler{configs: configs, insight: insight, repoSvc: repoSvc, compare: compare, insightRepo: insightRepo, eveningRepo: eveningRepo}
 }
 
 // systemInstruction 以 system 角色下发硬性约束。
@@ -40,6 +41,9 @@ const systemInstruction = "你是严谨的中文健康分析顾问。硬性要�
 
 // eveningSystemInstruction 睡前小结洞察的 system 硬约束（中文思考 + 角色定位）。
 const eveningSystemInstruction = systemInstruction + " 你正在解读用户当晚写下的「睡前小结」，重点是用户的心理状态、成就感与自我评价，生理数据仅作为辅助佐证；语气温和、具体、不评判，多肯定真实的努力，不喊空泛口号。若数据不足以支撑某个结论，须明确说明而不是强行归因。"
+
+// compareSystemInstruction 阶段对比的 system 硬约束（中文思考 + 只读表不许自算）。
+const compareSystemInstruction = systemInstruction + " 你正在做「阶段对比」：系统已把两个自然月的七项指标全部聚合好并以表格给出，你的职责是读表并做机制性归因，严禁自行重算或修正表中数值；表中为「—」的项即数据缺失，必须明确说明缺口，严禁估算或以 0 代替。若某月标注「尚未过完」或「数据不足」，须显式提示结论置信度低。"
 
 // setupSSE 写入标准 SSE 响应头并返回 flusher。
 func (h *AIHandler) setupSSE(w http.ResponseWriter) (http.Flusher, bool) {
@@ -148,6 +152,207 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 			slog.Info("AI 洞察已存档", "range_days", days, "start", startDate, "end", endDate)
 		}
 	})
+}
+
+// sseFail 以下发「错误帧」的方式结束本次 SSE（沿用本项目既有约定：`{"error":"..."}`），
+// 让前端能识别为失败（而非把提示语当成生成好的正文，从而误判为「已生成」）。
+func sseFail(w io.Writer, text string) {
+	payload, err := json.Marshal(map[string]string{"error": text})
+	if err != nil {
+		return
+	}
+	fmt.Fprintf(w, "data: %s\n\n", payload)
+	fmt.Fprintf(w, "data: [DONE]\n\n")
+}
+
+// StreamCompare 阶段对比洞察：GET /api/v1/insights/compare/stream?month_a=YYYY-MM&month_b=YYYY-MM&tz_offset=480
+// 两个月份缺省时回落到「上月 vs 上上个月」（按客户端本地今天推算），服务端只做三类校验：
+// ① 月份格式合法；② 两月不是同一个；③ 不得选择未来的月（未过完的当月允许，但会带上数据不足标注）。
+// 七项指标一律由 CompareService 在后端先行聚合，模型只读表与归因，不做任何跨月数值减法。
+func (h *AIHandler) StreamCompare(w http.ResponseWriter, r *http.Request) {
+	cfg := h.configs.Snapshot()
+	flusher, ok := h.setupSSE(w)
+	if !ok {
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	q := r.URL.Query()
+	tzOffset := atoiDefault(q.Get("tz_offset"), 0)
+	if tzOffset < -720 || tzOffset > 840 {
+		tzOffset = 0
+	}
+	today := clientToday(tzOffset)
+
+	monthA := strings.TrimSpace(q.Get("month_a"))
+	monthB := strings.TrimSpace(q.Get("month_b"))
+	if monthA == "" {
+		monthA = service.PrevMonth(today[:7])
+	}
+	if monthB == "" {
+		monthB = service.PrevMonth(monthA)
+	}
+
+	fail := func(msg string) {
+		sseFail(w, msg)
+		flusher.Flush()
+	}
+
+	if monthA == monthB {
+		fail("对比的两个月份不能相同，请重新选择。")
+		return
+	}
+
+	userID := int64(1)
+	metricsA, err := h.compare.BuildMonthMetrics(userID, monthA, today)
+	if err != nil {
+		slog.Warn("阶段对比聚合失败", "month_a", monthA, "err", err)
+		fail("对比月份参数非法：不能选择未来的月份，或月份格式不是 YYYY-MM。")
+		return
+	}
+	metricsB, err := h.compare.BuildMonthMetrics(userID, monthB, today)
+	if err != nil {
+		slog.Warn("阶段对比聚合失败", "month_b", monthB, "err", err)
+		fail("对比月份参数非法：不能选择未来的月份，或月份格式不是 YYYY-MM。")
+		return
+	}
+	if metricsA.RecordDays == 0 || metricsB.RecordDays == 0 {
+		fail(fmt.Sprintf("对比的两个月中至少有一个月没有打卡记录（%s 共 %d 条 / %s 共 %d 条），请更换月份后重试。",
+			metricsA.Month, metricsA.RecordDays, metricsB.Month, metricsB.RecordDays))
+		return
+	}
+
+	if cfg.AI.APIKey == "" || strings.Contains(cfg.AI.APIKey, "your_api_key") {
+		fail("未检测到有效的大模型 API Key，请在 config.yaml 中配置 AI.APIKey。")
+		return
+	}
+
+	fullUserContent := fmt.Sprintf("%s\n\n%s",
+		strings.TrimRight(loadComparePromptTemplate(), "\n"),
+		service.ComparePromptContext(metricsA, metricsB, h.compareNotes(userID, metricsA), h.compareNotes(userID, metricsB)))
+
+	// 记录的窗口取两月并集（实际识别以 meta_json 里的月 A / 月 B 为准）
+	spanStart, spanEnd := metricsA.StartDate, metricsA.EndDate
+	if metricsB.StartDate < spanStart {
+		spanStart = metricsB.StartDate
+	}
+	if metricsB.EndDate > spanEnd {
+		spanEnd = metricsB.EndDate
+	}
+	meta := &model.CompareMeta{MonthA: monthA, MonthB: monthB, MetricsA: metricsA, MetricsB: metricsB}
+	metaJSON, err := json.Marshal(meta)
+	if err != nil {
+		slog.Error("序列化阶段对比快照失败", "err", err)
+		metaJSON = []byte("{}")
+	}
+
+	h.proxyChat(r.Context(), w, flusher, cfg.AI, compareSystemInstruction, fullUserContent, func(content, thinking string) {
+		saved := &model.AIInsight{
+			UserID:    userID,
+			Scope:     "compare",
+			RangeDays: 0,
+			StartDate: spanStart,
+			EndDate:   spanEnd,
+			Content:   content,
+			Thinking:  thinking,
+			Model:     cfg.AI.Model,
+			MetaJSON:  string(metaJSON),
+		}
+		if _, err := h.insightRepo.Insert(saved); err != nil {
+			slog.Error("保存阶段对比洞察失败", "err", err)
+		} else {
+			slog.Info("阶段对比洞察已存档", "month_a", monthA, "month_b", monthB)
+		}
+	})
+}
+
+// ComparePeriod 阶段对比窗口探测：GET /api/v1/insights/compare/period?month_a=YYYY-MM&month_b=YYYY-MM&tz_offset=480
+// 一次返回：① 两月的七项指标快照（前端收到即可渲染对比表，不必等 AI）；
+// ② 该「月份对」是否已生成 AI 综述（exists / insight 含全文）。
+// 与「洞察」页同一策略：窗口合法性与记录存在性判定统一收归后端，前端不再自行做日期比对。
+func (h *AIHandler) ComparePeriod(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, model.Error(http.StatusMethodNotAllowed, "Method Not Allowed"))
+		return
+	}
+
+	q := r.URL.Query()
+	tzOffset := atoiDefault(q.Get("tz_offset"), 0)
+	if tzOffset < -720 || tzOffset > 840 {
+		writeJSON(w, http.StatusOK, model.Error(model.CodeParamError, "非法的 tz_offset"))
+		return
+	}
+	today := clientToday(tzOffset)
+
+	monthA := strings.TrimSpace(q.Get("month_a"))
+	monthB := strings.TrimSpace(q.Get("month_b"))
+	if monthA == "" {
+		monthA = service.PrevMonth(today[:7])
+	}
+	if monthB == "" {
+		monthB = service.PrevMonth(monthA)
+	}
+	if monthA == monthB {
+		writeJSON(w, http.StatusOK, model.Error(model.CodeParamError, "对比的两个月份不能相同"))
+		return
+	}
+
+	userID := int64(1)
+	metricsA, err := h.compare.BuildMonthMetrics(userID, monthA, today)
+	if err != nil {
+		writeJSON(w, http.StatusOK, model.Error(model.CodeParamError, "非法的对比月份，不能选择未来的月份"))
+		return
+	}
+	metricsB, err := h.compare.BuildMonthMetrics(userID, monthB, today)
+	if err != nil {
+		writeJSON(w, http.StatusOK, model.Error(model.CodeParamError, "非法的对比月份，不能选择未来的月份"))
+		return
+	}
+
+	item, err := h.insightRepo.GetByCompareMonths(userID, monthA, monthB)
+	if err != nil {
+		slog.Error("查询阶段对比洞察失败", "err", err)
+		writeJSON(w, http.StatusOK, model.Error(model.CodeDBError, err.Error()))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, model.Success(map[string]any{
+		"exists":    item != nil,
+		"insight":   item,
+		"month_a":   monthA,
+		"month_b":   monthB,
+		"metrics_a": metricsA,
+		"metrics_b": metricsB,
+	}))
+}
+
+// compareNotes 取指定月份区间内用户已生成的生理洞察结论摘要（最多 2 条）。
+// 阶段对比以聚合数据为主，历史洞察只作为「结论引用」，避免模型从零重新归因。
+func (h *AIHandler) compareNotes(userID int64, m *model.CompareMetrics) []string {
+	if m == nil {
+		return nil
+	}
+	items, err := h.insightRepo.ListHealthByWindow(userID, m.StartDate, m.EndDate, 2)
+	if err != nil {
+		slog.Warn("读取区间内洞察结论失败", "month", m.Month, "err", err)
+		return nil
+	}
+	notes := make([]string, 0, len(items))
+	for _, it := range items {
+		notes = append(notes, fmt.Sprintf("（%s 至 %s 的洞察）%s", it.StartDate, it.EndDate, it.Content))
+	}
+	return notes
+}
+
+// loadComparePromptTemplate 读取阶段对比的提示词模板。
+// 与「洞察」页同一套策略：优先读磁盘 prompts/compare_v1.txt，
+// 读取失败或内容为空时（例如 Android 端未打包 prompts 目录）回退到内嵌模板。
+func loadComparePromptTemplate() string {
+	path := filepath.Join(config.FindProjectRoot(), "prompts", "compare_v1.txt")
+	if data, err := os.ReadFile(path); err == nil && strings.TrimSpace(string(data)) != "" {
+		return string(data)
+	}
+	return service.DefaultComparePrompt()
 }
 
 // StreamEveningInsight 睡前小结洞察：GET /api/v1/evening/insight/stream?date=YYYY-MM-DD

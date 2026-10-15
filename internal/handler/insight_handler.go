@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"healthtrack/internal/model"
@@ -33,7 +34,13 @@ func (h *InsightHandler) List(w http.ResponseWriter, r *http.Request) {
 	beforeID := int64(atoiDefault(q.Get("before_id"), 0))
 	rangeDays := atoiDefault(q.Get("range_days"), 0)
 
-	items, hasMore, err := h.repo.List(1, "health", limit, beforeID, rangeDays, q.Get("q"))
+	// scope 区分历史列表归属：health（生理周期洞察）/ compare（阶段对比）；其余取值一律回落到 health
+	scope := strings.ToLower(strings.TrimSpace(q.Get("scope")))
+	if scope != "compare" {
+		scope = "health"
+	}
+
+	items, hasMore, err := h.repo.List(1, scope, limit, beforeID, rangeDays, q.Get("q"))
 	if err != nil {
 		slog.Error("查询洞察历史失败", "err", err)
 		writeJSON(w, http.StatusOK, model.Error(model.CodeDBError, err.Error()))

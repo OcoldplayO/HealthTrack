@@ -132,8 +132,10 @@ func (m *DBManager) migrate() error {
 		`ALTER TABLE health_records ADD COLUMN exercise_json TEXT DEFAULT '{}';`,
 		`ALTER TABLE health_records ADD COLUMN cold_shower_json TEXT DEFAULT '{}';`,
 		`ALTER TABLE health_records ADD COLUMN concerta_json TEXT DEFAULT '{}';`,
-		// scope 区分洞察归属：health（生理周期洞察）/ evening（睡前小结洞察）
+		// scope 区分洞察归属：health（生理周期洞察）/ evening（睡前小结洞察）/ compare（阶段对比）
 		`ALTER TABLE ai_insights ADD COLUMN scope TEXT NOT NULL DEFAULT 'health';`,
+		// meta_json 保存阶段对比（scope=compare）的两月边界与七项聚合指标快照
+		`ALTER TABLE ai_insights ADD COLUMN meta_json TEXT DEFAULT '{}';`,
 	}
 
 	for _, stmt := range alterStatements {

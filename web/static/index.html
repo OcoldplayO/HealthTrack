@@ -839,14 +839,19 @@
 
       <!-- 3. AI 洞察页 (Insight View) -->
       <section id="view-insight" class="fade-in space-y-4 hidden">
-        <div class="flex justify-between items-center">
-          <div class="flex items-center space-x-1.5">
-            <span class="text-lg">✨</span>
-            <h2 class="text-base font-bold text-slate-900">AI 智能健康复盘</h2>
+        <div class="flex justify-between items-center gap-2">
+          <div class="flex items-center space-x-1.5 min-w-0 shrink">
+            <span class="text-lg shrink-0">✨</span>
+            <h2 class="text-base font-bold text-slate-900 truncate">AI 智能健康复盘</h2>
           </div>
-          <button onclick="openInsightHistory()" class="flex items-center space-x-1 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors">
-            <span>🕘</span><span>历史</span>
-          </button>
+          <div class="flex items-center space-x-1.5 shrink-0">
+            <button onclick="openCompareView()" class="flex items-center space-x-1 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors">
+              <span>⇄</span><span>阶段对比</span>
+            </button>
+            <button onclick="openInsightHistory()" class="flex items-center space-x-1 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors">
+              <span>🕘</span><span>历史</span>
+            </button>
+          </div>
         </div>
 
         <!-- 分析周期选择胶囊 -->
@@ -908,6 +913,7 @@
           <button onclick="setHistoryFilter(7)" id="hfilter-7" class="flex-1 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 7 天</button>
           <button onclick="setHistoryFilter(30)" id="hfilter-30" class="flex-1 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 30 天</button>
           <button onclick="setHistoryFilter(60)" id="hfilter-60" class="flex-1 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 60 天</button>
+          <button onclick="setHistoryFilterCompare()" id="hfilter-compare" class="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">⇄ 阶段对比</button>
         </div>
 
         <!-- 历史列表 -->
@@ -921,6 +927,83 @@
           <button onclick="toggleHistorySelectAll()" id="history-selectall-btn" class="text-xs font-bold text-slate-200 hover:text-white transition-colors">全选</button>
           <span id="history-selected-count" class="text-xs text-slate-300">已选 0 项</span>
           <button onclick="deleteSelectedInsights()" id="history-delete-btn" class="text-xs font-bold bg-slate-600/60 text-slate-300 px-3.5 py-1.5 rounded-xl cursor-not-allowed transition-colors" disabled>删除所选</button>
+        </div>
+      </section>
+
+      <!-- 5. 阶段对比独立视图 (Compare View) -->
+      <section id="view-compare" class="fade-in space-y-4 hidden">
+        <!-- topbar -->
+        <div class="flex justify-between items-center">
+          <button onclick="cmpBack()" class="flex items-center space-x-0.5 text-slate-500 hover:text-slate-800 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            <span class="text-xs font-bold">返回</span>
+          </button>
+          <h2 class="text-base font-bold text-slate-900">⇄ 阶段对比</h2>
+          <span class="w-12"></span>
+        </div>
+
+        <!-- 两月选择器 -->
+        <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex-1 min-w-0 flex items-center justify-center space-x-0.5">
+              <button onclick="cmpStepMonth('a',-1)" id="cmp-a-prev" class="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 text-base font-bold leading-none transition-colors">‹</button>
+              <div class="text-center min-w-0">
+                <p class="text-[9px] uppercase font-bold text-slate-400">对比月 A</p>
+                <p id="cmp-a-label" class="text-[13px] font-black text-slate-900 whitespace-nowrap">—</p>
+              </div>
+              <button onclick="cmpStepMonth('a',1)" id="cmp-a-next" class="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 text-base font-bold leading-none transition-colors">›</button>
+            </div>
+            <span class="px-1 text-[9px] font-black text-slate-300 shrink-0">vs</span>
+            <div class="flex-1 min-w-0 flex items-center justify-center space-x-0.5">
+              <button onclick="cmpStepMonth('b',-1)" id="cmp-b-prev" class="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 text-base font-bold leading-none transition-colors">‹</button>
+              <div class="text-center min-w-0">
+                <p class="text-[9px] uppercase font-bold text-slate-400">对比月 B</p>
+                <p id="cmp-b-label" class="text-[13px] font-black text-slate-900 whitespace-nowrap">—</p>
+              </div>
+              <button onclick="cmpStepMonth('b',1)" id="cmp-b-next" class="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 text-base font-bold leading-none transition-colors">›</button>
+            </div>
+          </div>
+          <p class="text-[10px] text-slate-400 text-center">默认「上月 vs 上上个月」· 两月互不重叠 · 支持跨年对比</p>
+        </div>
+
+        <!-- 未过完 / 数据不足 提示条 -->
+        <div id="cmp-warn" class="hidden bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-3 py-2 text-[11px] leading-relaxed"></div>
+
+        <!-- 生成按钮 -->
+        <button onclick="cmpGenerateStream()" id="compare-gen-btn" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 rounded-2xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex justify-center items-center space-x-2">
+          <span>🚀 生成阶段对比综述</span>
+        </button>
+
+        <!-- 指标对比表 -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <span class="text-xs font-bold text-slate-700">📊 指标对比</span>
+            <span id="cmp-table-meta" class="text-[10px] text-slate-400"></span>
+          </div>
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-[10px] text-slate-400">
+                <th class="text-left font-bold pb-2">指标</th>
+                <th id="cmp-col-a" class="text-right font-bold pb-2">月 A</th>
+                <th id="cmp-col-b" class="text-right font-bold pb-2">月 B</th>
+                <th class="text-right font-bold pb-2">Δ</th>
+              </tr>
+            </thead>
+            <tbody id="compare-table-body"></tbody>
+          </table>
+        </div>
+
+        <!-- AI 阶段对比综述卡片 -->
+        <div class="bg-white border border-indigo-100 rounded-2xl p-5 shadow-sm space-y-3 min-h-[300px]">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <span class="text-xs font-bold text-indigo-600 flex items-center space-x-1">
+              <span>💡 阶段对比综述</span>
+            </span>
+            <span id="cmp-status-tag" class="text-[10px] text-slate-400">点击上方按钮开始</span>
+          </div>
+          <div id="compare-insight-card" class="text-sm text-slate-700 leading-relaxed markdown-body">
+            <p>选择两个月，点击「生成阶段对比综述」，AI 将对两个自然月的体重、腰围、睡眠、运动与服药情况做横向对比与归因分析。</p>
+          </div>
         </div>
       </section>
 
@@ -1188,6 +1271,7 @@
       hasMore: false,
       loading: false,
       rangeDays: 0,   // 0=全部；7/30/60
+      compareMode: false, // true=只列「阶段对比」存档（请求带 scope=compare）
       q: '',
       error: '',
       expanded: {},   // id -> 是否展开
@@ -1372,10 +1456,10 @@
 
     function switchTab(tab) {
       currentTab = tab;
-      // 历史页没有对应的底部 Tab，导航高亮仍归属「洞察」；60天详情归属「看板」
-      const navKey = tab === 'history' ? 'insight' : ((tab === 'trend' || tab === 'trend-detail') ? 'dash' : tab);
+      // 历史页/阶段对比页没有对应的底部 Tab，导航高亮仍归属「洞察」；60天详情归属「看板」
+      const navKey = (tab === 'history' || tab === 'compare') ? 'insight' : ((tab === 'trend' || tab === 'trend-detail') ? 'dash' : tab);
 
-      ['log', 'dash', 'trend', 'trend-detail', 'insight', 'history', 'evening'].forEach(t => {
+      ['log', 'dash', 'trend', 'trend-detail', 'insight', 'history', 'compare', 'evening'].forEach(t => {
         const view = document.getElementById(`view-${t}`);
         if (!view) return;
         if (t === tab) {
@@ -1411,6 +1495,9 @@
       }
       if (tab === 'insight') {
         checkPeriodInsight();
+      }
+      if (tab === 'compare') {
+        cmpRefreshPeriod();
       }
       if (tab === 'evening') {
         loadEveningTab();
@@ -2816,6 +2903,7 @@
     // 进入历史页：重置筛选与搜索后加载首批
     function openInsightHistory() {
       historyState.rangeDays = 0;
+      historyState.compareMode = false;
       historyState.q = '';
       exitHistoryManage();
       const searchEl = document.getElementById('history-search');
@@ -2827,8 +2915,18 @@
 
     function setHistoryFilter(days) {
       historyState.rangeDays = days;
+      historyState.compareMode = false;
       exitHistoryManage();
       setHistoryFilterPills(days);
+      if (currentTab === 'history') loadHistory(true);
+    }
+
+    // 第 5 档：阶段对比存档（scope=compare，不传 range_days）
+    function setHistoryFilterCompare() {
+      historyState.rangeDays = 0;
+      historyState.compareMode = true;
+      exitHistoryManage();
+      setHistoryFilterPills('compare');
       if (currentTab === 'history') loadHistory(true);
     }
 
@@ -2842,6 +2940,12 @@
           el.className = 'flex-1 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
         }
       });
+      const cEl = document.getElementById('hfilter-compare');
+      if (cEl) {
+        cEl.className = days === 'compare'
+          ? 'flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-blue-600 text-white transition-all'
+          : 'flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+      }
     }
 
     let historySearchTimer = null;
@@ -2871,7 +2975,8 @@
       const params = new URLSearchParams();
       params.set('limit', '10');
       if (historyState.beforeId > 0) params.set('before_id', String(historyState.beforeId));
-      if (historyState.rangeDays > 0) params.set('range_days', String(historyState.rangeDays));
+      if (historyState.compareMode) params.set('scope', 'compare');
+      else if (historyState.rangeDays > 0) params.set('range_days', String(historyState.rangeDays));
       if (historyState.q) params.set('q', historyState.q);
 
       try {
@@ -2919,15 +3024,24 @@
           `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
         const preview = (it.content || '').replace(/[#*`>|\-]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90) || '（无正文）';
 
+        // 阶段对比存档：标题用 meta 里的两个月份，缺失则回退到起止日期
+        const isCompare = it.scope === 'compare';
+        const m = it.meta || {};
+        const cmpTitle = (m.month_a && m.month_b)
+          ? `${escapeHtml(m.month_a)} vs ${escapeHtml(m.month_b)}`
+          : `${escapeHtml(it.start_date)} ~ ${escapeHtml(it.end_date)}`;
+        const headTitle = isCompare ? cmpTitle : `${escapeHtml(it.start_date)} ~ ${escapeHtml(it.end_date)}`;
+        const headBadge = isCompare ? '阶段对比' : `近 ${it.range_days} 天`;
+
         const head = `
           <div class="flex justify-between items-center mb-1.5">
-            <span class="text-xs font-bold text-slate-800">${escapeHtml(it.start_date)} ~ ${escapeHtml(it.end_date)}</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-bold">近 ${it.range_days} 天</span>
+            <span class="text-xs font-bold text-slate-800">${headTitle}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-bold">${headBadge}</span>
           </div>
           <p class="text-xs text-slate-500 leading-relaxed ${(isOpen && !historyState.manageMode) ? '' : 'line-clamp-2'}">${escapeHtml(preview)}</p>
           <div class="flex justify-between items-center mt-2">
             <span class="text-[10px] text-slate-400">${timeStr}${it.model ? ' · ' + escapeHtml(it.model) : ''}</span>
-            ${historyState.manageMode ? '' : `<span class="text-[10px] text-blue-600 font-bold">${isOpen ? '收起 ▴' : '展开 ▾'}</span>`}
+            ${historyState.manageMode ? '' : (isCompare ? '<span class="text-[10px] text-blue-600 font-bold">查看对比 ›</span>' : `<span class="text-[10px] text-blue-600 font-bold">${isOpen ? '收起 ▴' : '展开 ▾'}</span>`)}
           </div>`;
 
         // 管理模式：整卡作为勾选热区，不展开详情
@@ -2975,6 +3089,14 @@
     function onHistoryItemClick(id) {
       if (historyLongPressFired) { historyLongPressFired = false; return; }
       if (historyState.manageMode) { toggleHistorySelect(id); return; }
+      // 阶段对比存档：点击直接进入对比独立视图并带上两月（返回时回到历史页）
+      const it = historyState.items.find(x => x.id === id);
+      if (it && it.scope === 'compare') {
+        const meta = it.meta || {};
+        const ma = meta.month_a || (it.start_date || '').slice(0, 7);
+        const mb = meta.month_b || (it.end_date || '').slice(0, 7);
+        if (ma && mb) { cmpOpenFromHistory(ma, mb); return; }
+      }
       toggleHistoryItem(id);
     }
 
@@ -4191,6 +4313,418 @@
       } else {
         afterRemove();
         appToast('已删除 ' + evoMmdd(date) + ' 的小结');
+      }
+    }
+
+    /* ============================================================
+       阶段对比（独立视图）：两月选择 + 指标对比表 + AI 对比综述（SSE 流式）
+       命名统一用 cmp 前缀，与既有函数隔离，避免被 try/catch 吞掉。
+       ============================================================ */
+    let cmpState = {
+      monthA: '',        // 对比月 A（YYYY-MM），默认上月
+      monthB: '',        // 对比月 B（YYYY-MM），默认上上个月
+      metricsA: null,    // 单月指标快照
+      metricsB: null,
+      generated: false,  // 当前月份对是否已生成过综述
+      busy: false,       // SSE 生成中
+      loadSeq: 0,        // 作废在途回显
+      returnTab: 'insight' // 返回目标：insight / history
+    };
+
+    // offset=0 当前月，-1 上月，-2 上上个月…
+    function cmpMonthStr(offset) {
+      const d = new Date();
+      d.setDate(1);
+      d.setMonth(d.getMonth() + offset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    function cmpMonthIndex(ym) {
+      const [y, m] = ym.split('-').map(Number);
+      return y * 12 + (m - 1);
+    }
+
+    // 当前本地月，作为「不允许选未来」的边界
+    function cmpCurrentMonth() { return cmpMonthStr(0); }
+
+    function cmpShiftMonth(ym, delta) {
+      const [y, m] = ym.split('-').map(Number);
+      const d = new Date(y, m - 1 + delta, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    function cmpMonthLabel(ym) {
+      if (!ym) return '—';
+      const [y, m] = ym.split('-');
+      return `${y} 年 ${parseInt(m, 10)} 月`;
+    }
+
+    function cmpIsFuture(ym) {
+      return cmpMonthIndex(ym) > cmpMonthIndex(cmpCurrentMonth());
+    }
+
+    // 入口：可选月份参数（从历史页带月份进来）；无参数时用已选月份，首次取「上月 vs 上上个月」
+    function openCompareView(monthA, monthB, fromTab) {
+      cmpState.returnTab = fromTab === 'history' ? 'history' : 'insight';
+      if (monthA && monthB) {
+        cmpState.monthA = monthA;
+        cmpState.monthB = monthB;
+      } else {
+        if (!cmpState.monthA) cmpState.monthA = cmpMonthStr(-1);
+        if (!cmpState.monthB) cmpState.monthB = cmpMonthStr(-2);
+      }
+      switchTab('compare'); // 进入后由 switchTab 触发 cmpRefreshPeriod()
+    }
+
+    // 历史页卡片入口：记住来源为历史页，返回时回到历史列表
+    function cmpOpenFromHistory(monthA, monthB) {
+      openCompareView(monthA, monthB, 'history');
+    }
+
+    function cmpBack() {
+      switchTab(cmpState.returnTab === 'history' ? 'history' : 'insight');
+    }
+
+    // 同步月份标签与步进按钮可用态（到边界时禁用「下一月」，避免选到未来）
+    function cmpSyncMonthUI() {
+      const la = document.getElementById('cmp-a-label');
+      const lb = document.getElementById('cmp-b-label');
+      if (la) la.innerText = cmpMonthLabel(cmpState.monthA);
+      if (lb) lb.innerText = cmpMonthLabel(cmpState.monthB);
+      ['a', 'b'].forEach(k => {
+        const ym = k === 'a' ? cmpState.monthA : cmpState.monthB;
+        const nextEl = document.getElementById(`cmp-${k}-next`);
+        if (!nextEl) return;
+        const atMax = !ym || cmpIsFuture(cmpShiftMonth(ym, 1));
+        nextEl.disabled = atMax || cmpState.busy;
+        nextEl.classList.toggle('opacity-40', atMax || cmpState.busy);
+        nextEl.classList.toggle('cursor-not-allowed', atMax || cmpState.busy);
+      });
+    }
+
+    // 生成期间锁定两个月份胶囊与生成按钮
+    function cmpSetControlsDisabled(disabled) {
+      ['cmp-a-prev', 'cmp-a-next', 'cmp-b-prev', 'cmp-b-next'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.disabled = disabled;
+        el.classList.toggle('opacity-40', disabled);
+        el.classList.toggle('pointer-events-none', disabled);
+        el.classList.toggle('cursor-not-allowed', disabled);
+      });
+      if (!disabled) cmpSyncMonthUI();
+    }
+
+    function cmpStepMonth(which, delta) {
+      if (cmpState.busy) return;
+      const cur = which === 'a' ? cmpState.monthA : cmpState.monthB;
+      const next = cmpShiftMonth(cur, delta);
+      if (cmpIsFuture(next)) { appToast('不能选择未来的月份'); cmpSyncMonthUI(); return; }
+      if (which === 'a') cmpState.monthA = next; else cmpState.monthB = next;
+      cmpClearInsightCard();
+      cmpRefreshPeriod();
+    }
+
+    // 切换月份后先清空综述卡片残留，再由 cmpRefreshPeriod 按新月份回显
+    function cmpClearInsightCard() {
+      const contentEl = document.getElementById('compare-insight-card');
+      const statusTag = document.getElementById('cmp-status-tag');
+      if (contentEl) contentEl.innerHTML = '<p class="text-slate-400 text-xs">加载该月份对的对比数据…</p>';
+      if (statusTag) statusTag.innerText = '加载中…';
+    }
+
+    // 数值格式化：缺失（null/undefined/空/NaN）一律显示 —，严禁填 0
+    function cmpCell(v, digits) {
+      if (v === null || v === undefined || v === '' || isNaN(Number(v))) return '—';
+      return Number(v).toFixed(digits);
+    }
+
+    // 任一侧缺失则 Δ 为 null
+    function cmpDeltaVal(a, b) {
+      if (a === null || a === undefined || b === null || b === undefined || a === '' || b === '') return null;
+      const na = Number(a), nb = Number(b);
+      if (isNaN(na) || isNaN(nb)) return null;
+      return na - nb; // A - B：正=上升，负=下降
+    }
+
+    function cmpDeltaCell(a, b, digits, dir) {
+      const d = cmpDeltaVal(a, b);
+      if (d === null) return '<span class="text-slate-300">—</span>';
+      const txt = (d > 0 ? '+' : '') + d.toFixed(digits);
+      let cls = 'text-slate-500';
+      if (dir === 'down') cls = d < 0 ? 'text-emerald-600' : (d > 0 ? 'text-red-500' : 'text-slate-400');
+      else if (dir === 'up') cls = d > 0 ? 'text-emerald-600' : (d < 0 ? 'text-red-500' : 'text-slate-400');
+      return `<span class="font-bold ${cls}">${txt}</span>`;
+    }
+
+    function cmpMetricRow(label, aHtml, bHtml, deltaHtml) {
+      return `<tr class="border-b border-slate-50 last:border-0">
+        <td class="py-2 pr-2 text-slate-500 align-top">${label}</td>
+        <td class="py-2 text-right font-bold text-slate-800 tabular-nums">${aHtml}</td>
+        <td class="py-2 text-right font-bold text-slate-800 tabular-nums">${bHtml}</td>
+        <td class="py-2 text-right whitespace-nowrap">${deltaHtml}</td>
+      </tr>`;
+    }
+
+    function cmpSleepDistText(m) {
+      if (!m) return '—';
+      const g = cmpCell(m.green_days, 0), y = cmpCell(m.yellow_days, 0), r = cmpCell(m.red_days, 0);
+      if (g === '—' && y === '—' && r === '—') return '—';
+      return `${g} / ${y} / ${r}`;
+    }
+
+    function cmpWorkoutText(m) {
+      if (!m) return '—';
+      const days = cmpCell(m.workout_days, 0);
+      if (days === '—') return '—';
+      const sub = [];
+      if (m.workout_light !== null && m.workout_light !== undefined) sub.push(`轻 ${m.workout_light}`);
+      if (m.workout_medium !== null && m.workout_medium !== undefined) sub.push(`中 ${m.workout_medium}`);
+      if (m.workout_failure !== null && m.workout_failure !== undefined) sub.push(`力竭 ${m.workout_failure}`);
+      return sub.length ? `${days} <span class="text-[10px] text-slate-400 font-normal">(${sub.join(' / ')})</span>` : days;
+    }
+
+    function cmpRenderTable() {
+      const body = document.getElementById('compare-table-body');
+      if (!body) return;
+      const colA = document.getElementById('cmp-col-a');
+      const colB = document.getElementById('cmp-col-b');
+      const metaEl = document.getElementById('cmp-table-meta');
+      if (colA) colA.innerText = cmpMonthLabel(cmpState.monthA);
+      if (colB) colB.innerText = cmpMonthLabel(cmpState.monthB);
+
+      const a = cmpState.metricsA;
+      const b = cmpState.metricsB;
+      if (!a && !b) {
+        body.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-slate-400">暂无数据</td></tr>';
+        if (metaEl) metaEl.innerText = '';
+        return;
+      }
+      if (metaEl) {
+        const rows = [a, b].filter(m => m && m.record_days !== null && m.record_days !== undefined).map(m => `${m.month} ${m.record_days} 天`);
+        metaEl.innerText = rows.join(' · ');
+      }
+
+      const g = (m, f) => m ? m[f] : null;
+      const html = [
+        // 体重
+        cmpMetricRow('体重均值 (kg)', cmpCell(g(a, 'weight_avg'), 1), cmpCell(g(b, 'weight_avg'), 1), cmpDeltaCell(g(a, 'weight_avg'), g(b, 'weight_avg'), 1, 'down')),
+        cmpMetricRow('体重净变化 (kg)', cmpCell(g(a, 'weight_delta'), 1), cmpCell(g(b, 'weight_delta'), 1), cmpDeltaCell(g(a, 'weight_delta'), g(b, 'weight_delta'), 1, 'down')),
+        // 腰围
+        cmpMetricRow('腰围均值 (cm)', cmpCell(g(a, 'waist_avg'), 1), cmpCell(g(b, 'waist_avg'), 1), cmpDeltaCell(g(a, 'waist_avg'), g(b, 'waist_avg'), 1, 'down')),
+        cmpMetricRow('腰围净变化 (cm)', cmpCell(g(a, 'waist_delta'), 1), cmpCell(g(b, 'waist_delta'), 1), cmpDeltaCell(g(a, 'waist_delta'), g(b, 'waist_delta'), 1, 'down')),
+        // 睡眠
+        cmpMetricRow('平均睡眠时长 (小时)', cmpCell(g(a, 'sleep_avg_hours'), 1), cmpCell(g(b, 'sleep_avg_hours'), 1), cmpDeltaCell(g(a, 'sleep_avg_hours'), g(b, 'sleep_avg_hours'), 1, 'up')),
+        // 熬夜分布（无单一 Δ）
+        cmpMetricRow('熬夜分布 (绿/黄/红 天数)', cmpSleepDistText(a), cmpSleepDistText(b), '<span class="text-slate-300">—</span>'),
+        // 运动
+        cmpMetricRow('有运动天数', cmpWorkoutText(a), cmpWorkoutText(b), cmpDeltaCell(g(a, 'workout_days'), g(b, 'workout_days'), 0, 'up')),
+        // 服药
+        cmpMetricRow('专注达服药天数 (天)', cmpCell(g(a, 'concerta_days'), 0), cmpCell(g(b, 'concerta_days'), 0), cmpDeltaCell(g(a, 'concerta_days'), g(b, 'concerta_days'), 0, null)),
+        // 夜间排水
+        cmpMetricRow('平均夜间排水 (kg)', cmpCell(g(a, 'night_loss_avg'), 2), cmpCell(g(b, 'night_loss_avg'), 2), cmpDeltaCell(g(a, 'night_loss_avg'), g(b, 'night_loss_avg'), 2, 'down'))
+      ];
+      body.innerHTML = html.join('');
+    }
+
+    // 未过完 / 数据不足 提示条
+    function cmpRenderWarn() {
+      const el = document.getElementById('cmp-warn');
+      if (!el) return;
+      const parts = [];
+      [['a', cmpState.monthA, cmpState.metricsA], ['b', cmpState.monthB, cmpState.metricsB]].forEach(pair => {
+        const ym = pair[1], m = pair[2];
+        if (!m) return;
+        if (m.incomplete_month) parts.push(`⚠️ ${cmpMonthLabel(ym)}尚未过完，结论置信度低`);
+        else if (m.data_insufficient) parts.push(`⚠️ ${cmpMonthLabel(ym)}数据不足，结论置信度低`);
+      });
+      if (parts.length) {
+        el.innerHTML = parts.join('<br>');
+        el.classList.remove('hidden');
+      } else {
+        el.innerHTML = '';
+        el.classList.add('hidden');
+      }
+    }
+
+    // 空态 / 回显态（卡片 + 状态栏 + 按钮三处统一）
+    function cmpApplyEmptyUI() {
+      cmpState.generated = false;
+      const contentEl = document.getElementById('compare-insight-card');
+      const statusTag = document.getElementById('cmp-status-tag');
+      const btn = document.getElementById('compare-gen-btn');
+      if (contentEl) contentEl.innerHTML = '<p>选择两个月，点击「生成阶段对比综述」，AI 将对两个自然月的体重、腰围、睡眠、运动与服药情况做横向对比与归因分析。</p>';
+      if (statusTag) statusTag.innerText = '点击上方按钮开始';
+      if (btn) btn.innerHTML = '<span>🚀 生成阶段对比综述</span>';
+    }
+
+    function cmpApplyInsightUI(content, thinking, createdAt) {
+      cmpState.generated = true;
+      const contentEl = document.getElementById('compare-insight-card');
+      const statusTag = document.getElementById('cmp-status-tag');
+      const btn = document.getElementById('compare-gen-btn');
+      const d = createdAt instanceof Date ? createdAt : new Date(createdAt);
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      if (contentEl) contentEl.innerHTML = renderInsightArchive(content, thinking);
+      if (statusTag) statusTag.innerText = `${cmpMonthLabel(cmpState.monthA)} vs ${cmpMonthLabel(cmpState.monthB)} · 生成于 ${hh}:${mm}`;
+      if (btn) btn.innerHTML = '<span>🔄 重新生成阶段对比</span>';
+    }
+
+    // 拉取两月指标快照 + 是否已生成（无论是否已生成都先渲染对比表）
+    async function cmpRefreshPeriod() {
+      if (!cmpState.monthA) cmpState.monthA = cmpMonthStr(-1);
+      if (!cmpState.monthB) cmpState.monthB = cmpMonthStr(-2);
+      cmpSyncMonthUI();
+      const seq = ++cmpState.loadSeq;
+      const a = cmpState.monthA, b = cmpState.monthB;
+      const tzOffset = -new Date().getTimezoneOffset(); // 与洞察页同一算法：东向偏移
+      try {
+        const resp = await fetch(`/api/v1/insights/compare/period?month_a=${a}&month_b=${b}&tz_offset=${tzOffset}`);
+        if (seq !== cmpState.loadSeq) return;
+        const json = await resp.json();
+        if (seq !== cmpState.loadSeq) return;
+        if (json.code !== 200 || !json.data) throw new Error(json.message || '加载失败');
+        const data = json.data;
+        if (seq !== cmpState.loadSeq) return;
+        cmpState.metricsA = data.metrics_a || null;
+        cmpState.metricsB = data.metrics_b || null;
+        cmpRenderTable();
+        cmpRenderWarn();
+        if (data.exists && data.insight) {
+          cmpApplyInsightUI(data.insight.content || '', data.insight.thinking || '', data.insight.created_at);
+        } else {
+          cmpApplyEmptyUI();
+        }
+      } catch (e) {
+        if (seq !== cmpState.loadSeq) return;
+        cmpState.metricsA = null;
+        cmpState.metricsB = null;
+        cmpRenderTable();
+        cmpRenderWarn();
+        const contentEl = document.getElementById('compare-insight-card');
+        if (contentEl) contentEl.innerHTML = `<p class="text-red-500 text-xs">加载对比数据失败：${escapeHtml(e.message)}</p>`;
+        const statusTag = document.getElementById('cmp-status-tag');
+        if (statusTag) statusTag.innerText = '加载失败';
+        appToast('加载对比数据失败：' + e.message);
+      }
+    }
+
+    // 生成阶段对比综述（SSE，复用洞察页的消费写法：思维链折叠在上、正文在下）
+    async function cmpGenerateStream() {
+      if (cmpState.busy) return;
+      const contentEl = document.getElementById('compare-insight-card');
+      const statusTag = document.getElementById('cmp-status-tag');
+      const btn = document.getElementById('compare-gen-btn');
+      if (!contentEl || !btn) return;
+
+      if (cmpState.generated) {
+        const ok = await appConfirm(
+          `「${cmpMonthLabel(cmpState.monthA)} vs ${cmpMonthLabel(cmpState.monthB)}」已生成过阶段对比综述，重新生成会新增一条存档并重新消耗大模型额度，确定继续吗？`,
+          { title: '重新生成阶段对比', confirmText: '确定重新生成', danger: false }
+        );
+        if (!ok) return;
+      }
+
+      const originalBtnText = btn.innerHTML;
+      cmpState.busy = true;
+      btn.disabled = true;
+      btn.classList.add('opacity-50', 'cursor-not-allowed');
+      btn.innerHTML = '<span>⏳ AI 正在对比分析中...</span>';
+      cmpSetControlsDisabled(true);
+
+      cmpState.loadSeq++; // 作废在途回显请求，防止覆盖本次流式内容
+      contentEl.innerHTML = '';
+      contentEl.classList.add('typing-cursor');
+      statusTag.innerText = 'AI 正在推导两月差异...';
+
+      let thinkingText = '';
+      let responseText = '';
+      let hasError = false;
+
+      function updateUI() {
+        let fullHTML = '';
+        if (thinkingText) {
+          // 正文未输出时默认展开思维链；正文一开始输出就自动收起
+          const isOpen = !responseText ? 'open' : '';
+          fullHTML += `
+            <details class="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500" ${isOpen}>
+              <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">
+                💭 深度思维链推导 (${thinkingText.length} 字)
+              </summary>
+              <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${thinkingText}</div>
+            </details>
+          `;
+        }
+        if (responseText) fullHTML += renderMarkdown(responseText);
+        contentEl.innerHTML = fullHTML;
+      }
+
+      const tzOffset = -new Date().getTimezoneOffset();
+      try {
+        const response = await fetch(`/api/v1/insights/compare/stream?month_a=${cmpState.monthA}&month_b=${cmpState.monthB}&tz_offset=${tzOffset}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+          for (let line of lines) {
+            line = line.trim();
+            if (!line || !line.startsWith('data:')) continue;
+            const dataStr = line.slice(5).trim();
+            if (dataStr === '[DONE]') { statusTag.innerText = '对比完成'; continue; }
+            try {
+              const parsed = JSON.parse(dataStr);
+              if (parsed.error) {
+                responseText += `\n> ⚠️ **服务提示**: ${parsed.error}\n`;
+                hasError = true;
+                updateUI();
+              } else if (parsed.choices && parsed.choices.length > 0) {
+                const delta = parsed.choices[0].delta || {};
+                let hasUpdate = false;
+                if (delta.reasoning_content) { thinkingText += delta.reasoning_content; hasUpdate = true; }
+                if (delta.content) { responseText += delta.content; hasUpdate = true; }
+                if (hasUpdate) updateUI();
+              }
+            } catch (e) { /* 忽略心跳等非 JSON 帧 */ }
+          }
+        }
+
+        if (hasError) {
+          updateUI();
+          statusTag.innerText = '分析失败';
+        } else if (responseText || thinkingText) {
+          cmpApplyInsightUI(responseText, thinkingText, new Date());
+        } else {
+          contentEl.innerHTML = '<p class="text-slate-400">未能获取到对比内容，请检查后端大模型连接。</p>';
+          statusTag.innerText = '暂无对比内容';
+        }
+      } catch (err) {
+        if (responseText || thinkingText) {
+          responseText += `\n\n> ⚠️ *[网络连接已完成或阶段传输结束]*`;
+          updateUI();
+          statusTag.innerText = '分析完成(部分)';
+        } else if (err instanceof TypeError) {
+          contentEl.innerHTML = `<p class="text-red-500">无法连接本地服务（${location.host}）。请确认 HealthTrack 程序正在运行，然后重试。</p>`;
+          statusTag.innerText = '本地服务未连接';
+        } else {
+          contentEl.innerHTML = `<p class="text-red-500">连接 AI 对比服务失败: ${err.message}</p>`;
+          statusTag.innerText = '生成异常';
+        }
+      } finally {
+        contentEl.classList.remove('typing-cursor');
+        cmpState.busy = false;
+        cmpSetControlsDisabled(false);
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        // 仅在「确实产出且无错误」时才说明已自动存档，按钮语义才转为「重新生成」
+        btn.innerHTML = (!hasError && (responseText || thinkingText)) ? '<span>🔄 重新生成阶段对比</span>' : originalBtnText;
       }
     }
   </script>
