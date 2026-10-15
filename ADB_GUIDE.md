@@ -1,6 +1,6 @@
 # ADB 连接速查（USB / 无线）
 
-> 本机：adb 位于 `D:\AndroidDev\sdk\platform-tools\adb.exe`；手机无线地址 `XXX.xxxx.xxx.xxx:5555`。
+> 本机：adb 位于 `<Android SDK 路径>\platform-tools\adb.exe`；手机无线地址 `XXX.xxxx.xxx.xxx:5555`。
 
 ## 一、USB 连接
 
@@ -82,7 +82,7 @@ adb devices -l
 
 
 
-**这台是鸿蒙 4.0.0，底层安卓 10（API 29） ，不是安卓 8。截图里那个`10.1.0.162` 只是华为沿用了老 EMUI 构建号格式，容易误以为是 EMUI 10.1。**
+**这台是鸿蒙 4.0.0，底层安卓 10（API 29） ，不是安卓 8。截图里那个 `x.x.x.xxx` 只是华为沿用了老 EMUI 构建号格式，容易误以为是 EMUI 10.1。**
 
 顺带说一下，ADB 这几种查法你以后能直接用：·
 
@@ -93,4 +93,4 @@ adb shell getprop hw_sc.build.platform.version  # 鸿蒙版本，如 4.0.0
 adb shell getprop ro.product.model           # 机型`
 ```
 
-比装 App 更可靠——取的就是系统给所有 App 的实际值。另外你无线连不上不是手机问题，是 PC 和手机不在同一网段（手机 192.168.9.2），USB 够用就不用折腾
+比装 App 更可靠——取的就是系统给所有 App 的实际值。另外你无线连不上不是手机问题，是 PC 和手机不在同一网段（手机 `XXX.xxxx.xxx.xxx`），USB 够用就不用折腾
