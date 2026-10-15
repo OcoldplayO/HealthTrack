@@ -11,6 +11,22 @@
   <style>
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    /* 手机横屏 + 「60天详情」视图：临时解除手机框宽高限制，让 60 天能整屏铺满 */
+    /* 选择器特异性(1,1,0) 高于 Tailwind 的 .max-w-md/.sm\:h-\[840px\](0,1,0)，可稳定覆盖 */
+    #app-frame.frame-wide { max-width: none; height: 100vh; margin-top: 0; margin-bottom: 0; border-radius: 0; border: none; }
+    /* 横屏高度仅 360px 左右，竖向空间紧张：收紧为「一行头部(返回+标题+指标Tab) + 大图」紧凑布局，
+       避免图表被底部导航裁切（隐藏统计块/提示条/口径说明，压缩内边距） */
+    #app-frame.frame-wide #td-topbar { display: flex; flex-direction: row; align-items: center; }
+    #app-frame.frame-wide #td-topbar > * + * { margin-top: 0; }
+    #app-frame.frame-wide #td-header { justify-content: flex-start; }
+    #app-frame.frame-wide #td-header-spacer { display: none; }
+    #app-frame.frame-wide #td-tabs { flex: 1; margin-left: 12px; }
+    #app-frame.frame-wide #td-tabs > button { padding-top: 6px; padding-bottom: 6px; }
+    #app-frame.frame-wide #td-card { padding: 8px; }
+    #app-frame.frame-wide #td-card > * + * { margin-top: 8px; }
+    #app-frame.frame-wide #td-metric-head { display: none; }
+    #app-frame.frame-wide #td-detail { display: none; }
+    #app-frame.frame-wide #td-legend-card { display: none; }
     .fade-in { animation: fadeIn 0.25s ease-out forwards; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .typing-cursor::after { content: '▋'; animation: blink 1s infinite; color: #3b82f6; }
@@ -301,7 +317,7 @@
   </div>
 
   <!-- 主容器 (移动端居中适配) -->
-  <div class="max-w-md w-full mx-auto h-screen flex flex-col bg-white sm:shadow-2xl sm:my-4 sm:rounded-3xl sm:h-[840px] overflow-hidden relative border border-slate-100">
+  <div id="app-frame" class="max-w-md w-full mx-auto h-screen flex flex-col bg-white sm:shadow-2xl sm:my-4 sm:rounded-3xl sm:h-[840px] overflow-hidden relative border border-slate-100">
 
     <!-- 顶部状态栏 -->
     <header class="pt-6 pb-3 px-6 bg-white border-b border-slate-100 flex justify-between items-center shrink-0 z-10">
@@ -639,8 +655,19 @@
           <div class="flex bg-slate-200/80 p-0.5 rounded-xl text-xs font-semibold">
             <button onclick="switchDashRange(7)" id="btn-range-7" class="px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all">近7天</button>
             <button onclick="switchDashRange(30)" id="btn-range-30" class="px-3 py-1 rounded-lg text-slate-600 transition-all">近30天</button>
+            <button onclick="switchDashRange(60)" id="btn-range-60" class="px-3 py-1 rounded-lg text-slate-600 transition-all">近60天</button>
           </div>
         </div>
+
+        <!-- 60天详情入口（独立视图，逐日；与周平均趋势互补） -->
+        <button onclick="openTrendDetailView()" class="w-full flex items-center justify-between bg-white border border-slate-200 hover:border-blue-300 rounded-2xl px-4 py-3 shadow-sm transition-colors">
+          <span class="flex items-center space-x-2 min-w-0">
+            <span class="text-lg">📊</span>
+            <span class="text-xs font-bold text-slate-700 shrink-0">60 天详情</span>
+            <span class="text-[10px] text-slate-400 truncate">三指标 · 逐日</span>
+          </span>
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        </button>
 
         <!-- 周平均趋势分析入口（独立视图，不占用底部导航） -->
         <button onclick="openTrendView()" class="w-full flex items-center justify-between bg-white border border-slate-200 hover:border-emerald-300 rounded-2xl px-4 py-3 shadow-sm transition-colors">
@@ -761,6 +788,52 @@
           <p><span class="inline-block w-4 h-2.5 rounded bg-slate-300/70 align-middle mr-1.5"></span>区间带 = 该周内所有日值的 min ~ max（非标准差）</p>
           <p><span class="inline-block w-2.5 h-2.5 rounded-full border-2 border-slate-400 bg-white align-middle mr-1.5"></span>空心节点 + 虚线 = 该周仅 1~3 天数据，均值置信偏低</p>
           <p><span class="inline-block w-4 h-0.5 bg-slate-300 align-middle mr-1.5"></span>某周 0 天数据时折线断开、区间带留空（不按 0 计）</p>
+        </div>
+      </section>
+
+      <!-- 2b. 60天详情独立视图（方案 A：单一总入口 → 独立视图，逐日折线） -->
+      <section id="view-trend-detail" class="fade-in space-y-4 hidden">
+        <div id="td-topbar" class="space-y-4">
+          <div id="td-header" class="flex justify-between items-center">
+            <button onclick="switchTab('dash')" class="flex items-center space-x-0.5 text-slate-500 hover:text-slate-800 transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+              <span class="text-xs font-bold">返回</span>
+            </button>
+            <h2 class="text-base font-bold text-slate-900">📊 60天详情</h2>
+            <span id="td-header-spacer" class="w-12"></span>
+          </div>
+
+          <!-- 指标切换：体重 / 腰围 / 睡眠时长 -->
+          <div id="td-tabs" class="flex space-x-2">
+            <button onclick="setTrendDetailMetric('weight')" id="td-tab-weight" class="flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">体重</button>
+            <button onclick="setTrendDetailMetric('waist')" id="td-tab-waist" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">腰围</button>
+            <button onclick="setTrendDetailMetric('sleep')" id="td-tab-sleep" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">睡眠时长</button>
+          </div>
+        </div>
+
+        <!-- 逐日折线：竖屏固定日宽横向滚动 / 横屏自适应压进一屏 -->
+        <div id="td-card" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div id="td-metric-head" class="flex justify-between items-start">
+            <div>
+              <p id="td-metric-label" class="text-[10px] uppercase font-bold text-slate-400">体重逐日 (kg)</p>
+              <p id="td-metric-stat" class="text-xl font-black text-slate-900">--</p>
+            </div>
+            <div id="td-metric-note" class="text-[10px] text-slate-500 text-right leading-relaxed">近 60 天逐日</div>
+          </div>
+          <div id="td-chart-scroll" class="w-full overflow-x-auto no-scrollbar">
+            <div id="td-chart-box" style="width:1560px;height:220px;">
+              <canvas id="chart-trend-detail"></canvas>
+            </div>
+          </div>
+          <p id="td-detail" class="text-[11px] text-slate-500 flex items-start space-x-1">
+            <span>👆</span><span>横向拖动看全 60 天 · 点击节点看当日详情</span>
+          </p>
+        </div>
+
+        <!-- 口径说明 -->
+        <div id="td-legend-card" class="bg-slate-100/70 rounded-2xl p-3 text-[11px] text-slate-500 leading-relaxed space-y-1.5">
+          <p><span class="inline-block w-4 h-0.5 bg-slate-300 align-middle mr-1.5"></span>缺失日折线断开（不按 0 计），可横向拖动逐日查看</p>
+          <p><span class="inline-block w-4 h-2 bg-slate-200 align-middle mr-1.5"></span>横屏时图表自动压进一屏，x 轴约每 3 天一个刻度</p>
         </div>
       </section>
 
@@ -1299,10 +1372,10 @@
 
     function switchTab(tab) {
       currentTab = tab;
-      // 历史页没有对应的底部 Tab，导航高亮仍归属「洞察」
-      const navKey = tab === 'history' ? 'insight' : (tab === 'trend' ? 'dash' : tab);
+      // 历史页没有对应的底部 Tab，导航高亮仍归属「洞察」；60天详情归属「看板」
+      const navKey = tab === 'history' ? 'insight' : ((tab === 'trend' || tab === 'trend-detail') ? 'dash' : tab);
 
-      ['log', 'dash', 'trend', 'insight', 'history', 'evening'].forEach(t => {
+      ['log', 'dash', 'trend', 'trend-detail', 'insight', 'history', 'evening'].forEach(t => {
         const view = document.getElementById(`view-${t}`);
         if (!view) return;
         if (t === tab) {
@@ -1324,11 +1397,17 @@
         }
       });
 
+      // 离开「60天详情」时收回手机框的放宽态（进入时由 renderTrendDetailChart 内的 tdRelayout 处理）
+      tdSyncFrame();
+
       if (tab === 'dash') {
         loadDashboardData(dashRange);
       }
       if (tab === 'trend') {
         loadTrendData();
+      }
+      if (tab === 'trend-detail') {
+        loadTrendDetailData();
       }
       if (tab === 'insight') {
         checkPeriodInsight();
@@ -1747,6 +1826,7 @@
       dashRange = days;
       document.getElementById('btn-range-7').className = days === 7 ? 'px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all' : 'px-3 py-1 rounded-lg text-slate-600 transition-all';
       document.getElementById('btn-range-30').className = days === 30 ? 'px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all' : 'px-3 py-1 rounded-lg text-slate-600 transition-all';
+      document.getElementById('btn-range-60').className = days === 60 ? 'px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all' : 'px-3 py-1 rounded-lg text-slate-600 transition-all';
       loadDashboardData(days);
     }
 
@@ -2177,6 +2257,222 @@
         }
       });
     }
+
+    // ===== 60天详情（独立视图，方案 A；前端按日聚合，不改后端接口） =====
+    // 口径固定写死如下，改动需同步 SYSTEM_DESIGN.md §4.4.1：
+    //  - 近 60 个自然日逐日（含今天），由旧到新。
+    //  - 缺失日 = 断点（spanGaps:false），严禁以 0 填充。
+    //  - 竖屏手机 / 桌面窄列：固定日宽（每点 26px）横向滚动；
+    //    手机横屏：临时放宽手机框，60 点压进一屏（x 轴约每 3 天一刻度）。
+    const TD_DAYS = 60;
+    const TD_POINT_PX = 26;                       // 竖屏每点固定宽度
+    const TD_PORTRAIT_W = TD_DAYS * TD_POINT_PX;  // 竖屏图宽 1560px
+    const TD_FIT_MIN_W = 560;                     // 容器宽于此值即视为「够宽」，60 点压进一屏
+    const TD_METRICS = {
+      weight: { label: '体重逐日 (kg)', field: 'weight_am', unit: 'kg', color: '#2563eb' },
+      waist: { label: '腰围逐日 (cm)', field: 'waist_size', unit: 'cm', color: '#a855f7' },
+      sleep: { label: '睡眠时长逐日 (小时)', field: 'sleep_hours', unit: '小时', color: '#10b981' }
+    };
+    let trendDetailState = { metric: 'weight', records: [] };
+    let trendDetailChart = null;
+
+    // 构造近 60 个自然日（由旧到新，含今天）
+    function tdBuildDays() {
+      const days = [];
+      const now = new Date();
+      for (let i = TD_DAYS - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        d.setDate(d.getDate() - i);
+        days.push(localDateStr(d));
+      }
+      return days;
+    }
+
+    // 手机横屏（且屏幕较矮，排除桌面宽窗口）：这是「60天详情」能整屏铺满的前提
+    function tdIsPhoneLandscape() {
+      return window.matchMedia('(orientation: landscape) and (max-height: 600px)').matches;
+    }
+
+    // 仅在「60天详情」视图 + 手机横屏时临时放宽手机框；其余情况一律维持原样
+    function tdSyncFrame() {
+      const frame = document.getElementById('app-frame');
+      if (!frame) return;
+      frame.classList.toggle('frame-wide', currentTab === 'trend-detail' && tdIsPhoneLandscape());
+    }
+
+    // 依当前容器可用宽度设定图表宽度：够宽（手机横屏整屏铺满）→ 60 点压进一屏；
+    // 否则（竖屏手机 / 桌面窄列）→ 固定日宽横向滚动。测量的是容器实测宽度，可自我校正。
+    function tdApplyWidth() {
+      const box = document.getElementById('td-chart-box');
+      const scroll = document.getElementById('td-chart-scroll');
+      if (!box || !scroll) return;
+      const fit = scroll.clientWidth >= TD_FIT_MIN_W;
+      box.style.width = fit ? '100%' : `${TD_PORTRAIT_W}px`;
+      // 横屏竖向空间紧张，图高收窄以免被底部导航裁切
+      box.style.height = fit ? '150px' : '220px';
+      if (trendDetailChart) trendDetailChart.resize();
+    }
+
+    // 方向 / 尺寸变化后重排（先同步手机框宽度，再按新容器宽度重绘图表）
+    function tdRelayout() {
+      tdSyncFrame();
+      tdApplyWidth();
+    }
+
+    // 方向变化监听（MediaQueryList.addEventListener 在旧 WebView 上不可用，回退 addListener）
+    function tdWatchOrientation() {
+      const handler = () => { if (currentTab === 'trend-detail') tdRelayout(); };
+      window.addEventListener('resize', handler);
+      const mq = window.matchMedia('(orientation: landscape) and (max-height: 600px)');
+      if (mq.addEventListener) mq.addEventListener('change', handler);
+      else if (mq.addListener) mq.addListener(handler);
+    }
+
+    function openTrendDetailView() {
+      setTrendDetailMetric(trendDetailState.metric);
+      switchTab('trend-detail');
+    }
+
+    function setTrendDetailMetric(metric) {
+      trendDetailState.metric = metric;
+      ['weight', 'waist', 'sleep'].forEach(m => {
+        const el = document.getElementById(`td-tab-${m}`);
+        if (!el) return;
+        el.className = m === metric
+          ? 'flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all'
+          : 'flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+      });
+      if (currentTab === 'trend-detail') renderTrendDetailChart();
+    }
+
+    async function loadTrendDetailData() {
+      const days = tdBuildDays();
+      const startStr = days[0];
+      const endStr = days[days.length - 1];
+      try {
+        const res = await fetch(`/api/v1/records/history?start_date=${startStr}&end_date=${endStr}`);
+        const json = await res.json();
+        trendDetailState.records = json.code === 200 ? (json.data || []) : [];
+      } catch (e) {
+        trendDetailState.records = [];
+      }
+      renderTrendDetailChart();
+    }
+
+    // 当日详情文案（体重→晨重/睡前/夜间排水；腰围→当日腰围；睡眠→就寝/起床/时长/档位）
+    function tdDetailText(metric, r) {
+      if (metric === 'weight') {
+        const fmtW = v => (v === null || v === undefined) ? '--' : `${v} kg`;
+        const am = r.weight_am, pm = r.weight_pm;
+        let diffHtml = '';
+        if (am !== null && am !== undefined && pm !== null && pm !== undefined) {
+          const d = Math.round((pm - am) * 10) / 10;
+          diffHtml = ` · 夜间排水 <b class="text-slate-700">${d.toFixed(1)} kg</b>`;
+        }
+        return `<b class="text-slate-700">${r.record_date}</b>　晨起 ${fmtW(am)} · 睡前 ${fmtW(pm)}${diffHtml}`;
+      }
+      if (metric === 'waist') {
+        const w = (r.waist_size === null || r.waist_size === undefined) ? '--' : `${r.waist_size} cm`;
+        return `<b class="text-slate-700">${r.record_date}</b>　腰围 ${w}`;
+      }
+      const tagText = r.sleep_tag === 'RED' ? '熬夜' : (r.sleep_tag === 'YELLOW' ? '轻度' : '正常');
+      const hours = (r.sleep_hours === null || r.sleep_hours === undefined) ? '--' : `${r.sleep_hours} 小时`;
+      return `<b class="text-slate-700">${r.record_date}</b>　就寝 ${r.sleep_start_time || '--'} · 起床 ${r.sleep_end_time || '--'} · ${hours} · ${tagText}`;
+    }
+
+    function renderTrendDetailChart() {
+      const cfg = TD_METRICS[trendDetailState.metric];
+      const days = tdBuildDays();
+      const byDate = {};
+      trendDetailState.records.forEach(r => { byDate[r.record_date] = r; });
+
+      // 逐日取值：缺失日 = null（断点，不按 0 计）
+      const values = days.map(ds => {
+        const r = byDate[ds];
+        if (!r) return null;
+        const v = r[cfg.field];
+        if (v === null || v === undefined || v === '' || isNaN(Number(v))) return null;
+        return Number(v);
+      });
+      const labels = days.map(ds => ds.slice(5));
+
+      const detailEl = document.getElementById('td-detail');
+      detailEl.innerHTML = '<span>👆</span><span>横向拖动看全 60 天 · 点击节点看当日详情</span>';
+
+      document.getElementById('td-metric-label').innerText = cfg.label;
+      const statEl = document.getElementById('td-metric-stat');
+      const noteEl = document.getElementById('td-metric-note');
+      const valid = values.filter(v => v !== null);
+      if (valid.length > 0) {
+        if (trendDetailState.metric === 'sleep') {
+          const avg = (valid.reduce((a, c) => a + c, 0) / valid.length).toFixed(1);
+          statEl.innerText = `${avg} 小时 (均值)`;
+        } else {
+          statEl.innerText = `${valid[valid.length - 1]} ${cfg.unit}`;
+        }
+        noteEl.innerHTML = `近 ${TD_DAYS} 天逐日<br>有效 ${valid.length} 天`;
+      } else {
+        statEl.innerText = '--';
+        noteEl.innerHTML = `近 ${TD_DAYS} 天暂无数据`;
+      }
+
+      const ctx = document.getElementById('chart-trend-detail').getContext('2d');
+      if (trendDetailChart) trendDetailChart.destroy();
+      trendDetailChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: cfg.label,
+            data: values,
+            borderColor: cfg.color,
+            backgroundColor: cfg.color,
+            tension: 0.25,
+            spanGaps: false,        // 缺失日断点，严禁以 0 填充
+            pointHitRadius: 16,
+            pointRadius: 3,
+            pointBackgroundColor: cfg.color
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              displayColors: false,
+              callbacks: {
+                title: items => days[items[0].dataIndex],
+                label: item => {
+                  const v = values[item.dataIndex];
+                  if (v === null) return '当日无数据';
+                  return `数值：${v} ${cfg.unit}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: { beginAtZero: false, ticks: { font: { size: 10 } } },
+            // 60 点，x 轴约每 3 天一个刻度（maxTicksLimit = 20）；横屏更窄时由 autoSkip 自动稀疏
+            x: { ticks: { font: { size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 20 } }
+          },
+          onClick: (evt, elements) => {
+            if (!elements || !elements.length) return;
+            const idx = elements[0].index;
+            const ds = days[idx];
+            const r = byDate[ds];
+            if (!r || values[idx] === null) return;
+            detailEl.innerHTML = `<span>📅</span><span>${tdDetailText(trendDetailState.metric, r)}</span>`;
+          }
+        }
+      });
+
+      // 应用当前容器宽度对应的模式（先同步手机框宽度，再设定图表宽度）
+      tdRelayout();
+    }
+
+    tdWatchOrientation();
 
     function setInsightDays(days) {
       insightDays = days;
