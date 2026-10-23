@@ -28,11 +28,16 @@ const (
 )
 
 // ImportPreviewInput 预检入参：文件与备忘录文本二选一。
+// 后三个字段仅在服务内部（失败重试）使用，不从 HTTP 入参解析。
 type ImportPreviewInput struct {
 	FileName string
 	Data     []byte
 	Memo     string
 	YearBase int
+
+	cachePath   string // 复用已有原文件缓存，避免重试时重复落盘
+	rootBatchID int64  // 重试链的根批次
+	attemptNo   int    // 本次是第几次尝试
 }
 
 // ImportFieldChange 单个字段的变更，用于预览中的「旧值 → 新值」。
@@ -91,16 +96,19 @@ type ImportPreview struct {
 }
 
 type cachedPreview struct {
-	userID    int64
-	source    string
-	fileName  string
-	fileHash  string
-	fileSize  int64
-	encoding  string
-	delimiter string
-	rows      []ParsedRow
-	summaries []ParsedSummary
-	expiresAt time.Time
+	userID      int64
+	source      string
+	fileName    string
+	fileHash    string
+	fileSize    int64
+	encoding    string
+	delimiter   string
+	rows        []ParsedRow
+	summaries   []ParsedSummary
+	cachePath   string
+	rootBatchID int64
+	attemptNo   int
+	expiresAt   time.Time
 }
 
 // ImportService 负责预检、重复检测与后续的原子写入。
@@ -186,6 +194,18 @@ func (s *ImportService) Preview(userID int64, in ImportPreviewInput) (*ImportPre
 
 	preview.TotalRows = len(parsed.Rows)
 	preview.SummaryRows = len(parsed.Summaries)
+
+	// 原始数据落盘，供失败批次 7 天内重试与失败行导出；重试时复用原缓存。
+	var rawForCache []byte
+	if strings.TrimSpace(in.Memo) != "" {
+		rawForCache = []byte(in.Memo)
+	} else {
+		rawForCache = in.Data
+	}
+	cachePath := in.cachePath
+	if cachePath == "" {
+		cachePath = s.saveImportCache(parsed.SourceType, rawForCache)
+	}
 
 	// 一次性取出日期范围内的现有记录，避免逐行查库。
 	existing, err := s.existingRecords(userID, parsed.Rows)
@@ -277,16 +297,19 @@ func (s *ImportService) Preview(userID int64, in ImportPreviewInput) (*ImportPre
 	expiresAt := now.Add(importPreviewTTL)
 	s.mu.Lock()
 	s.previews[token] = &cachedPreview{
-		userID:    userID,
-		source:    parsed.SourceType,
-		fileName:  preview.FileName,
-		fileHash:  preview.FileHash,
-		fileSize:  preview.FileSize,
-		encoding:  parsed.Encoding,
-		delimiter: parsed.Delimiter,
-		rows:      parsed.Rows,
-		summaries: parsed.Summaries,
-		expiresAt: expiresAt,
+		userID:      userID,
+		source:      parsed.SourceType,
+		fileName:    preview.FileName,
+		fileHash:    preview.FileHash,
+		fileSize:    preview.FileSize,
+		encoding:    parsed.Encoding,
+		delimiter:   parsed.Delimiter,
+		rows:        parsed.Rows,
+		summaries:   parsed.Summaries,
+		cachePath:   cachePath,
+		rootBatchID: in.rootBatchID,
+		attemptNo:   in.attemptNo,
+		expiresAt:   expiresAt,
 	}
 	s.mu.Unlock()
 	preview.Token = token
@@ -651,6 +674,15 @@ func (s *ImportService) Confirm(userID int64, in ImportConfirmInput) (*ImportCon
 		SkipErrors:   in.SkipErrors,
 		Status:       model.ImportStatusPending,
 		DetailJSON:   detailJSON,
+		CachePath:    cached.cachePath,
+		AttemptNo:    cached.attemptNo,
+	}
+	if batch.AttemptNo <= 0 {
+		batch.AttemptNo = 1
+	}
+	if cached.rootBatchID > 0 {
+		rootID := cached.rootBatchID
+		batch.RootBatchID = &rootID
 	}
 	if err := s.importRepo.Create(batch); err != nil {
 		return nil, err
@@ -699,6 +731,10 @@ func (s *ImportService) Confirm(userID int64, in ImportConfirmInput) (*ImportCon
 	}
 	if err := s.importRepo.UpdateResult(batch); err != nil {
 		return nil, err
+	}
+	// 全部写入成功时原文件已无用途；部分写入仍需保留，供导出跳过行补导。
+	if errorRows == 0 {
+		s.removeImportCache(cached.cachePath)
 	}
 	// 写入成功后作废令牌，避免重复确认造成重复批次。
 	s.mu.Lock()

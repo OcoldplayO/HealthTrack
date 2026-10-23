@@ -45,6 +45,7 @@ type ParsedSummary struct {
 	DoneItems []string               `json:"done_items"`
 	NoteText  string                 `json:"note_text"`
 	Score     int                    `json:"score"`
+	Raw       string                 `json:"raw,omitempty"`
 	Warnings  []model.ImportRowIssue `json:"warnings,omitempty"`
 	Errors    []model.ImportRowIssue `json:"errors,omitempty"`
 }

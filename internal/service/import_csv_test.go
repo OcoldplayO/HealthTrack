@@ -40,8 +40,8 @@ func TestParseCSVBasic(t *testing.T) {
 	if first.DTO.WaistSize == nil || *first.DTO.WaistSize != 78 {
 		t.Fatalf("腰围解析错误")
 	}
-	if !first.HasActivityTags || first.ActivityTags != "骑行" {
-		t.Fatalf("运动标签应保留原值: %+v", first)
+	if !first.HasActivityTags || first.ActivityTags != `["骑行"]` {
+		t.Fatalf("运动标签应规范化为 JSON 数组: %+v", first)
 	}
 	if first.DTO.JournalText == nil || *first.DTO.JournalText != "早上牛奶 200ml" {
 		t.Fatalf("日记解析错误")
@@ -128,5 +128,18 @@ func TestParseCSVInvalidTime(t *testing.T) {
 	got := ParseCSV([]byte(body))
 	if len(got.Rows) != 1 || len(got.Rows[0].Errors) == 0 {
 		t.Fatal("25:00 应产生必须修正的错误")
+	}
+}
+
+func TestParseCSVNormalizesActivityTags(t *testing.T) {
+	content := "记录日期,运动标签\n2026-10-01,有氧;无氧\n2026-10-02,\"[\"\"有氧\"\",\"\"无氧\"\"]\"\n"
+	parsed := ParseCSV([]byte(content))
+	if len(parsed.Rows) != 2 {
+		t.Fatalf("应解析 2 行，实际 %d", len(parsed.Rows))
+	}
+	for _, row := range parsed.Rows {
+		if row.ActivityTags != `["有氧","无氧"]` {
+			t.Fatalf("运动标签应统一为 JSON 数组，实际 %q", row.ActivityTags)
+		}
 	}
 }

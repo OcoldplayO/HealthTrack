@@ -135,3 +135,112 @@ func isTruthy(s string) bool {
 	}
 	return false
 }
+
+// Batches 返回最近的导入批次历史：GET /api/v1/import/batches?limit=20
+func (h *ImportHandler) Batches(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, model.Error(http.StatusMethodNotAllowed, "Method Not Allowed"))
+		return
+	}
+	limit := 20
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
+	}
+	batches, err := h.svc.ListBatches(1, limit)
+	if err != nil {
+		writeImportError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, model.Success(batches))
+}
+
+// BatchDetail 返回单个批次详情（含行级问题明细）：GET /api/v1/import/batches/{id}
+func (h *ImportHandler) BatchDetail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, model.Error(http.StatusMethodNotAllowed, "Method Not Allowed"))
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, model.Error(model.CodeParamError, "批次 ID 非法"))
+		return
+	}
+	batch, err := h.svc.GetBatch(1, id)
+	if err != nil {
+		writeImportError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, model.Success(batch))
+}
+
+// Retry 失败批次重试：重新解析原文件并回到预检阶段，不直接写库。
+// POST /api/v1/import/batches/{id}/retry
+func (h *ImportHandler) Retry(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, model.Error(http.StatusMethodNotAllowed, "Method Not Allowed"))
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, model.Error(model.CodeParamError, "批次 ID 非法"))
+		return
+	}
+	preview, err := h.svc.Retry(1, id)
+	if err != nil {
+		writeImportError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, model.Success(preview))
+}
+
+// FailedRows 导出批次中的失败行，修正后可直接重新导入。
+// GET /api/v1/import/batches/{id}/failed-rows
+func (h *ImportHandler) FailedRows(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, model.Error(http.StatusMethodNotAllowed, "Method Not Allowed"))
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, model.Error(model.CodeParamError, "批次 ID 非法"))
+		return
+	}
+	filename, data, err := h.svc.FailedRowsCSV(1, id)
+	if err != nil {
+		writeImportError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename="+filename)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+
+// Template 下载导入模板：GET /api/v1/import/template
+func (h *ImportHandler) Template(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, model.Error(http.StatusMethodNotAllowed, "Method Not Allowed"))
+		return
+	}
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=HealthTrack_import_template.csv")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(service.ImportTemplateCSV())
+}
+
+// writeImportError 把服务层错误映射为 HTTP 状态码与业务错误码。
+func writeImportError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, service.ErrImportBatchNotFound):
+		writeJSON(w, http.StatusNotFound, model.Error(model.CodeParamError, err.Error()))
+	case errors.Is(err, service.ErrImportCacheExpired):
+		writeJSON(w, http.StatusGone, model.Error(model.CodeParamError, err.Error()))
+	case errors.Is(err, service.ErrImportBatchNotRetryable):
+		writeJSON(w, http.StatusBadRequest, model.Error(model.CodeParamError, err.Error()))
+	default:
+		slog.Error("导入批次操作失败", "err", err)
+		writeJSON(w, http.StatusOK, model.Error(model.CodeDBError, err.Error()))
+	}
+}

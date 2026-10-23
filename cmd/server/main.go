@@ -134,6 +134,16 @@ func main() {
 	mux.HandleFunc("/api/v1/export/json", recordHandler.ExportJSON)
 	mux.HandleFunc("POST /api/v1/import/preview", importHandler.Preview)
 	mux.HandleFunc("POST /api/v1/import/confirm", importHandler.Confirm)
+	mux.HandleFunc("GET /api/v1/import/template", importHandler.Template)
+	mux.HandleFunc("GET /api/v1/import/batches", importHandler.Batches)
+	mux.HandleFunc("GET /api/v1/import/batches/{id}", importHandler.BatchDetail)
+	mux.HandleFunc("POST /api/v1/import/batches/{id}/retry", importHandler.Retry)
+	mux.HandleFunc("GET /api/v1/import/batches/{id}/failed-rows", importHandler.FailedRows)
+
+	// 启动时清理超过 7 天或超出配额的失败原文件缓存。
+	if removed := importService.CleanupImportCache(); removed > 0 {
+		slog.Info("已清理过期导入缓存", "removed", removed)
+	}
 	mux.HandleFunc("/healthz", recordHandler.Healthz)
 	mux.HandleFunc("/api/config", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

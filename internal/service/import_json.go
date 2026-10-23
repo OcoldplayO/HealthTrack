@@ -164,7 +164,7 @@ func buildJSONSummaries(items []*model.EveningSummary) []ParsedSummary {
 }
 
 func buildJSONSummary(item *model.EveningSummary, index int) ParsedSummary {
-	s := ParsedSummary{DoneItems: []string{}}
+	s := ParsedSummary{DoneItems: []string{}, Raw: fmt.Sprintf("第 %d 篇小结", index+1)}
 	line := index + 1
 	addError := func(field, msg string) {
 		s.Errors = append(s.Errors, model.ImportRowIssue{

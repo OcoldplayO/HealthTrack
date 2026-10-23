@@ -55,4 +55,9 @@ type ImportBatch struct {
 	AttemptNo    int        `json:"attempt_no"`
 	CreatedAt    time.Time  `json:"created_at"`
 	FinishedAt   *time.Time `json:"finished_at"`
+
+	// 以下为按需计算的展示字段，不落库。
+	HasCache  bool             `json:"has_cache"`        // 原文件仍在 7 天保留期内，可重试 / 导出失败行
+	Retryable bool             `json:"retryable"`        // failed / interrupted 且缓存可用
+	Issues    []ImportRowIssue `json:"issues,omitempty"` // 由 DetailJSON 解析出的行级明细
 }

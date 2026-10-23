@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"io"
 	"regexp"
 	"strings"
@@ -44,6 +45,38 @@ func normalizeHeader(s string) string {
 	s = headerParenPattern.ReplaceAllString(s, "")
 	s = strings.NewReplacer("kg", "", "cm", "", "小时", "", "_", "", "-", "").Replace(s)
 	return s
+}
+
+// normalizeActivityTags 把运动标签统一为 JSON 字符串数组，
+// 兼容手写的「有氧;无氧」并保证前端 JSON.parse 不会报错。
+func normalizeActivityTags(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	var arr []string
+	if err := json.Unmarshal([]byte(raw), &arr); err == nil {
+		out, _ := json.Marshal(arr)
+		return string(out)
+	}
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		switch r {
+		case '、', ',', '，', ';', '；', '/', '|', '+':
+			return true
+		}
+		return false
+	})
+	tags := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if v := strings.TrimSpace(p); v != "" {
+			tags = append(tags, v)
+		}
+	}
+	if len(tags) == 0 {
+		return ""
+	}
+	out, _ := json.Marshal(tags)
+	return string(out)
 }
 
 type csvColumns struct {
@@ -225,8 +258,8 @@ func parseCSVRecord(record []string, line int, columns *csvColumns) ParsedRow {
 		if isClearMarker(tagsRaw) {
 			b.clear("activity_tags")
 		} else {
-			row.ActivityTags = tagsRaw
-			row.HasActivityTags = true
+			row.ActivityTags = normalizeActivityTags(tagsRaw)
+			row.HasActivityTags = row.ActivityTags != ""
 		}
 	}
 
