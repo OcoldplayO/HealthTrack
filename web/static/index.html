@@ -404,6 +404,35 @@
         </div>
         <div class="px-5 pb-6 space-y-3">
           <div>
+            <p class="text-[10px] font-bold text-slate-400 mb-1.5">导入</p>
+            <div class="space-y-2">
+              <button onclick="openImportFromSheet()" class="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors text-left">
+                <span class="flex items-center space-x-3">
+                  <span class="text-lg">📥</span>
+                  <span>
+                    <span class="block text-sm font-bold text-slate-800">从文件导入</span>
+                    <span class="block text-[11px] text-slate-400 mt-0.5">CSV 模板 / JSON 完整备份</span>
+                  </span>
+                </span>
+                <span class="text-slate-300 text-lg">›</span>
+              </button>
+              <button onclick="openMemoFromSheet()" class="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors text-left">
+                <span class="flex items-center space-x-3">
+                  <span class="text-lg">📝</span>
+                  <span>
+                    <span class="block text-sm font-bold text-slate-800">从备忘录导入</span>
+                    <span class="block text-[11px] text-slate-400 mt-0.5">粘贴手写笔记，自动逐行解析</span>
+                  </span>
+                </span>
+                <span class="text-slate-300 text-lg">›</span>
+              </button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <button onclick="openImportBatchesFromSheet()" class="py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-xs font-bold text-slate-700">🗂 导入记录</button>
+              <button onclick="downloadImportTemplate()" class="py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-xs font-bold text-slate-700">📄 下载模板</button>
+            </div>
+          </div>
+          <div>
             <p class="text-[10px] font-bold text-slate-400 mb-1.5">导出</p>
             <button onclick="openExportFromSheet()" class="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors text-left">
               <span class="flex items-center space-x-3">
@@ -456,6 +485,120 @@
           <div id="export-result" class="hidden text-xs rounded-xl px-3 py-2.5"></div>
           <button id="export-start-btn" type="button" onclick="exportCurrent()" class="w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">开始导出</button>
           <button id="export-json-btn" type="button" onclick="exportCurrent()" class="hidden w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">导出 JSON 备份</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 导入数据弹窗：选择文件 → 预检预览 → 确认写入 -->
+    <div id="import-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeImportOnBackdrop(event)">
+      <section class="w-full max-w-md sm:max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]" role="dialog" aria-modal="true" aria-labelledby="import-title">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <h2 id="import-title" class="font-bold text-slate-900">导入数据</h2>
+            <p id="import-subtitle" class="text-xs text-slate-400 mt-0.5">预检不写入数据，确认后才会导入</p>
+          </div>
+          <button onclick="closeImport()" aria-label="关闭导入" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500">✕</button>
+        </div>
+        <div class="p-5 space-y-4 overflow-y-auto no-scrollbar">
+          <div id="import-step-pick">
+            <!-- 安卓文件选择器对 text/csv 等 MIME 支持不一致，这里放开选择范围，由服务端校验文件类型 -->
+            <input id="import-file-input" type="file" accept="*/*" class="hidden" onchange="impFileSelected(this)">
+            <button id="import-pick-btn" type="button" onclick="impPickFile()" class="w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">选择文件</button>
+            <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">支持 CSV 模板与 HealthTrack JSON 备份，单次最多 5000 行 / 5 MB。手机端请先把文件保存到「下载」目录，xlsx 需另存为 CSV。</p>
+          </div>
+
+          <div id="import-step-preview" class="hidden space-y-3">
+            <div class="rounded-2xl bg-slate-50 px-3.5 py-3">
+              <p id="import-file-meta" class="text-[11px] text-slate-500 break-all"></p>
+              <div class="grid grid-cols-5 gap-1.5 mt-2.5 text-center">
+                <div><p class="text-[10px] text-slate-400">总行数</p><p id="imp-stat-total" class="text-sm font-bold text-slate-800">0</p></div>
+                <div><p class="text-[10px] text-slate-400">新增</p><p id="imp-stat-inserted" class="text-sm font-bold text-emerald-600">0</p></div>
+                <div><p class="text-[10px] text-slate-400">更新</p><p id="imp-stat-updated" class="text-sm font-bold text-blue-600">0</p></div>
+                <div><p class="text-[10px] text-slate-400">警告</p><p id="imp-stat-warnings" class="text-sm font-bold text-amber-600">0</p></div>
+                <div><p class="text-[10px] text-slate-400">错误</p><p id="imp-stat-errors" class="text-sm font-bold text-rose-600">0</p></div>
+              </div>
+            </div>
+            <div id="import-dup-tip" class="hidden rounded-xl bg-amber-50 border border-amber-100 px-3 py-2.5 text-[11px] leading-relaxed text-amber-800"></div>
+            <div id="import-fatal" class="hidden rounded-xl bg-rose-50 border border-rose-100 px-3 py-2.5 text-[11px] leading-relaxed text-rose-700"></div>
+            <div id="import-issue-wrap" class="hidden">
+              <p class="text-xs font-bold text-slate-600 mb-1.5">需要关注的行 <span id="import-issue-count" class="text-slate-400 font-normal"></span></p>
+              <div id="import-issue-list" class="space-y-1 max-h-36 overflow-y-auto no-scrollbar"></div>
+            </div>
+            <div id="import-diff-wrap" class="hidden">
+              <p class="text-xs font-bold text-slate-600 mb-1.5">将要写入的日期 <span id="import-diff-count" class="text-slate-400 font-normal"></span></p>
+              <div id="import-diff-list" class="space-y-1 max-h-36 overflow-y-auto no-scrollbar"></div>
+            </div>
+          </div>
+
+          <div id="import-step-options" class="hidden space-y-3">
+            <div>
+              <p class="text-xs font-bold text-slate-600 mb-1.5">同一天已有数据时</p>
+              <div class="space-y-2">
+                <button type="button" data-mode="merge" onclick="impSelectMode(this)" class="w-full text-left px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white transition-all">
+                  <span class="block text-xs font-bold text-slate-800">合并（推荐）</span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5">只覆盖文件中填写了值的字段，空单元格保留旧数据</span>
+                </button>
+                <button type="button" data-mode="overwrite" onclick="impSelectMode(this)" class="w-full text-left px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white transition-all">
+                  <span class="block text-xs font-bold text-slate-800">替换</span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5">整行覆盖，文件中的空值会清空原有数据</span>
+                </button>
+              </div>
+            </div>
+            <label id="import-skip-wrap" class="hidden flex items-start space-x-2 rounded-xl bg-amber-50 border border-amber-100 px-3 py-2.5">
+              <input id="import-skip-errors" type="checkbox" class="mt-0.5 accent-amber-600" onchange="impToggleSkipErrors(this)">
+              <span class="text-[11px] leading-relaxed text-amber-800">跳过错误行，只导入正常行。失败行可在「导入记录」中导出修正后补导。</span>
+            </label>
+          </div>
+
+          <div id="import-result" class="hidden text-xs rounded-xl px-3 py-2.5"></div>
+        </div>
+        <div class="px-5 py-4 border-t border-slate-100 shrink-0 flex gap-2">
+          <button type="button" onclick="closeImport()" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors">取消</button>
+          <button id="import-confirm-btn" type="button" onclick="impConfirm()" disabled class="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm transition-colors opacity-50">确认导入</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 备忘录粘贴导入 -->
+    <div id="memo-import-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeMemoOnBackdrop(event)">
+      <section class="w-full max-w-md sm:max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]" role="dialog" aria-modal="true" aria-labelledby="memo-import-title">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <h2 id="memo-import-title" class="font-bold text-slate-900">从备忘录导入</h2>
+            <p class="text-xs text-slate-400 mt-0.5">粘贴后先预检，确认无误再写入</p>
+          </div>
+          <button onclick="closeMemo()" aria-label="关闭备忘录导入" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500">✕</button>
+        </div>
+        <div class="p-5 space-y-3 overflow-y-auto no-scrollbar">
+          <textarea id="memo-import-text" rows="10" placeholder="例如：&#10;10-01 76.9 78.2 腰78 睡23:30-7:00&#10;10-02 76.8 早上有点累" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-y"></textarea>
+          <div class="flex items-center justify-between">
+            <label for="memo-year-base" class="text-xs font-bold text-slate-600">年份基准</label>
+            <select id="memo-year-base" class="border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500"></select>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed">未写年份时按年份基准推断，晚于今天的日期归到上一年。</p>
+        </div>
+        <div class="px-5 py-4 border-t border-slate-100 shrink-0 flex gap-2">
+          <button type="button" onclick="closeMemo()" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors">取消</button>
+          <button id="memo-preview-btn" type="button" onclick="impPreviewMemo()" class="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">预检</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 导入批次历史 -->
+    <div id="import-batches-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeBatchesOnBackdrop(event)">
+      <section class="w-full max-w-md sm:max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]" role="dialog" aria-modal="true" aria-labelledby="batches-title">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <h2 id="batches-title" class="font-bold text-slate-900">导入记录</h2>
+            <p class="text-xs text-slate-400 mt-0.5">失败批次可重试或导出失败行</p>
+          </div>
+          <button onclick="closeBatches()" aria-label="关闭导入记录" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500">✕</button>
+        </div>
+        <div id="batches-list" class="p-4 space-y-2.5 overflow-y-auto no-scrollbar">
+          <p class="text-xs text-slate-400 text-center py-8">加载中…</p>
+        </div>
+        <div class="px-5 py-4 border-t border-slate-100 shrink-0">
+          <button type="button" onclick="closeBatches()" class="w-full py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors">关闭</button>
         </div>
       </section>
     </div>
@@ -3689,14 +3832,540 @@
       setExportBusy(false);
       const size = (result && result.size != null) ? result.size : pendingExportSize;
       pendingExportSize = null;
+      const modal = document.getElementById('export-modal');
+      const panelVisible = modal && !modal.classList.contains('hidden');
       if (result && result.ok) {
-        showExportResult(true, { filename: result.filename, size, location: result.location || '下载目录 Download/' });
-        showToast('导出成功', true);
+        // 模板 / 失败行下载也会走原生下载回调，此时导出弹窗未打开，只提示不写面板
+        if (panelVisible) showExportResult(true, { filename: result.filename, size, location: result.location || '下载目录 Download/' });
+        showToast(result.filename ? '已保存：' + result.filename : '导出成功', true);
       } else {
-        showExportResult(false, { message: '导出失败：' + ((result && result.message) || '未知错误') });
-        showToast('导出失败', false);
+        if (panelVisible) showExportResult(false, { message: '导出失败：' + ((result && result.message) || '未知错误') });
+        showToast('导出失败：' + ((result && result.message) || '未知错误'), false);
       }
     };
+
+    /* ============================================================
+       批量导入：文件 / 备忘录 → 预检 → 原子写入 → 批次历史
+       ============================================================ */
+    let impState = { token: null, preview: null, mode: 'merge', skipErrors: false, busy: false };
+
+    function impEsc(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function impShow(el, visible) {
+      const node = document.getElementById(el);
+      if (node) node.classList.toggle('hidden', !visible);
+    }
+
+    function impResetState() {
+      impState = { token: null, preview: null, mode: 'merge', skipErrors: false, busy: false };
+      const input = document.getElementById('import-file-input');
+      if (input) input.value = '';
+      impShow('import-step-pick', true);
+      impShow('import-step-preview', false);
+      impShow('import-step-options', false);
+      impShow('import-fatal', false);
+      impShow('import-dup-tip', false);
+      impShow('import-issue-wrap', false);
+      impShow('import-diff-wrap', false);
+      impShow('import-result', false);
+      impShow('import-skip-wrap', false);
+      impShow('import-pick-btn', true);
+      document.getElementById('import-skip-errors').checked = false;
+      document.getElementById('import-result').textContent = '';
+      document.getElementById('import-subtitle').textContent = '预检不写入数据，确认后才会导入';
+      impSetConfirm(false);
+      impSetBusy(false);
+      impSelectMode(document.querySelector('#import-step-options button[data-mode="merge"]'));
+    }
+
+    function impSetBusy(busy) {
+      impState.busy = busy;
+      const btn = document.getElementById('import-pick-btn');
+      if (btn) {
+        btn.disabled = busy;
+        btn.classList.toggle('opacity-50', busy);
+        btn.textContent = busy ? '预检中…' : '选择文件';
+      }
+      const memoBtn = document.getElementById('memo-preview-btn');
+      if (memoBtn) {
+        memoBtn.disabled = busy;
+        memoBtn.classList.toggle('opacity-50', busy);
+        memoBtn.textContent = busy ? '预检中…' : '预检';
+      }
+      const confirm = document.getElementById('import-confirm-btn');
+      if (confirm && busy) {
+        confirm.disabled = true;
+        confirm.classList.add('opacity-50');
+      }
+    }
+
+    function impSetConfirm(enabled, label) {
+      const btn = document.getElementById('import-confirm-btn');
+      if (!btn) return;
+      btn.disabled = !enabled;
+      btn.classList.toggle('opacity-50', !enabled);
+      btn.textContent = label || (impState.preview && impState.preview.errors > 0 && impState.skipErrors ? '跳过错误行并导入' : '确认导入');
+    }
+
+    function openImportFromSheet() {
+      closeDataSheet();
+      impResetState();
+      document.getElementById('import-modal').classList.remove('hidden');
+    }
+
+    function closeImport() {
+      document.getElementById('import-modal').classList.add('hidden');
+    }
+
+    function closeImportOnBackdrop(event) {
+      if (event.target === event.currentTarget) closeImport();
+    }
+
+    function impPickFile() {
+      if (impState.busy) return;
+      document.getElementById('import-file-input').click();
+    }
+
+    function impReselectFile() {
+      impResetState();
+    }
+
+    function impFileSelected(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('文件超过 5 MB，请按年份拆分后导入', false);
+        input.value = '';
+        return;
+      }
+      impSendPreview(file);
+    }
+
+    // 文件预检：multipart 上传，后端只解析不落库。
+    async function impSendPreview(file) {
+      impSetBusy(true);
+      try {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('file_name', file.name || '');
+        const resp = await fetch('/api/v1/import/preview', { method: 'POST', body: form });
+        let json = null;
+        try { json = await resp.json(); } catch (e) { json = null; }
+        if (!json || json.code !== 200 || !json.data) {
+          const msg = (json && json.message) || ('HTTP ' + resp.status);
+          impShowPreviewError('预检失败：' + msg);
+          return;
+        }
+        impRenderPreview(json.data);
+      } catch (e) {
+        impShowPreviewError('预检失败：' + (e.message || '网络错误'));
+      } finally {
+        impSetBusy(false);
+      }
+    }
+
+    function impShowPreviewError(message) {
+      impShow('import-step-pick', true);
+      impShow('import-step-preview', false);
+      impShow('import-result', true);
+      const el = document.getElementById('import-result');
+      el.className = 'text-xs rounded-xl px-3 py-2.5 bg-rose-50 text-rose-600';
+      el.textContent = message;
+    }
+
+    function impRenderPreview(data) {
+      impState.preview = data;
+      impState.token = data.token || null;
+      impState.skipErrors = false;
+
+      impShow('import-step-pick', false);
+      impShow('import-step-preview', true);
+      impShow('import-step-options', true);
+      impShow('import-result', false);
+
+      const sourceLabel = data.source_type === 'json' ? 'JSON 备份' : (data.source_type === 'memo' ? '备忘录粘贴' : 'CSV 文件');
+      const size = data.file_size ? formatBytes(data.file_size) : '';
+      const reselect = data.source_type === 'memo' ? '' :
+        ' · <button type="button" onclick="impReselectFile()" class="text-blue-600 underline underline-offset-2">重新选择</button>';
+      document.getElementById('import-file-meta').innerHTML =
+        `<span class="font-bold text-slate-700">${impEsc(data.file_name || sourceLabel)}</span> · ${sourceLabel}${size ? ' · ' + size : ''} · 编码 ${impEsc(data.encoding || '—')}${reselect}`;
+
+      document.getElementById('imp-stat-total').textContent = data.total_rows || 0;
+      document.getElementById('imp-stat-inserted').textContent = data.inserted || 0;
+      document.getElementById('imp-stat-updated').textContent = data.updated || 0;
+      document.getElementById('imp-stat-warnings').textContent = data.warnings || 0;
+      document.getElementById('imp-stat-errors').textContent = data.errors || 0;
+
+      const dup = document.getElementById('import-dup-tip');
+      if (data.duplicate) {
+        dup.classList.remove('hidden');
+        dup.innerHTML = `这个文件在 ${impEsc((data.duplicate.created_at || '').slice(0, 10))} 已导入过一次（新增 ${data.duplicate.inserted} / 更新 ${data.duplicate.updated}），请确认不是重复操作。`;
+      } else {
+        dup.classList.add('hidden');
+      }
+
+      const fatal = document.getElementById('import-fatal');
+      if (data.fatal) {
+        fatal.classList.remove('hidden');
+        fatal.textContent = data.fatal;
+      } else {
+        fatal.classList.add('hidden');
+      }
+
+      impRenderIssues(data);
+      impRenderDiffs(data);
+
+      const hasErrors = (data.errors || 0) > 0;
+      // 错误行默认阻断写入；用户勾选「跳过错误行」后才允许确认。
+      impShow('import-skip-wrap', hasErrors && !data.fatal);
+      document.getElementById('import-skip-errors').checked = false;
+      impSetConfirm(!!data.token && !data.fatal && (!hasErrors || impState.skipErrors));
+    }
+
+    function impRenderIssues(data) {
+      const wrap = document.getElementById('import-issue-wrap');
+      const list = document.getElementById('import-issue-list');
+      const issues = (data.issues || []).filter(i => i.level === 'error' || i.level === 'warning');
+      if (!issues.length) { wrap.classList.add('hidden'); return; }
+      wrap.classList.remove('hidden');
+      document.getElementById('import-issue-count').textContent =
+        `共 ${data.errors || 0} 条错误 / ${data.warnings || 0} 条警告` + (data.issues_truncated ? '（仅显示前 500 条）' : '');
+      list.innerHTML = issues.slice(0, 50).map(i => {
+        const isErr = i.level === 'error';
+        const chip = isErr ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-700';
+        return `<div class="flex items-start space-x-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${chip}">${isErr ? '错误' : '警告'}</span>
+          <span class="text-[11px] text-slate-600 leading-snug break-all">第 ${i.line} 行${i.date ? ' · ' + impEsc(i.date) : ''}：${impEsc(i.message)}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function impRenderDiffs(data) {
+      const wrap = document.getElementById('import-diff-wrap');
+      const list = document.getElementById('import-diff-list');
+      const diffs = data.row_diffs || [];
+      if (!diffs.length) { wrap.classList.add('hidden'); return; }
+      wrap.classList.remove('hidden');
+      document.getElementById('import-diff-count').textContent =
+        `前 ${diffs.length} 条` + (data.diffs_truncated ? '（还有更多）' : '');
+      list.innerHTML = diffs.slice(0, 30).map(d => {
+        const isInsert = d.action === 'insert';
+        const changes = (d.changes || []).slice(0, 4).map(c => {
+          const oldV = c.old === '' ? '空' : c.old;
+          const newV = c.new === '' ? '空' : c.new;
+          return `${c.label} ${oldV}→${newV}`;
+        }).join('，');
+        return `<div class="rounded-lg bg-white border border-slate-100 px-2.5 py-1.5">
+          <div class="flex items-center justify-between text-[11px]">
+            <span class="font-bold text-slate-700">${impEsc(d.date)}</span>
+            <span class="${isInsert ? 'text-emerald-600' : 'text-blue-600'}">${isInsert ? '新增' : '更新'}</span>
+          </div>
+          ${changes ? `<p class="text-[10px] text-slate-400 mt-0.5 break-all">${impEsc(changes)}</p>` : ''}
+        </div>`;
+      }).join('');
+    }
+
+    function impSelectMode(btn) {
+      if (!btn) return;
+      impState.mode = btn.getAttribute('data-mode');
+      document.querySelectorAll('#import-step-options button[data-mode]').forEach(b => {
+        const active = b === btn;
+        b.className = active
+          ? 'w-full text-left px-3.5 py-2.5 rounded-xl border-2 border-blue-500 bg-blue-50 transition-all'
+          : 'w-full text-left px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white transition-all';
+      });
+    }
+
+    function impToggleSkipErrors(cb) {
+      impState.skipErrors = !!(cb && cb.checked);
+      const p = impState.preview;
+      const hasErrors = !!(p && (p.errors || 0) > 0);
+      impSetConfirm(!!(p && p.token && !p.fatal && (!hasErrors || impState.skipErrors)));
+    }
+
+    async function impConfirm() {
+      if (impState.busy) return;
+      if (!impState.token) {
+        showToast('预检已失效，请重新选择文件', false);
+        return;
+      }
+      const p = impState.preview || {};
+      if ((p.errors || 0) > 0 && !impState.skipErrors) {
+        showToast('存在错误行：请勾选「跳过错误行」，或修正文件后重新导入', false);
+        return;
+      }
+
+      const modeLabel = impState.mode === 'overwrite' ? '替换（空值会清空旧数据）' : '合并（空单元格保留旧值）';
+      const ok = await appConfirm(
+        `将写入 ${p.inserted || 0} 条新增记录、更新 ${p.updated || 0} 条已有记录，冲突处理方式：${modeLabel}${impState.skipErrors ? '，并跳过 ' + (p.errors || 0) + ' 条错误行' : ''}。写入过程为单个事务，失败会整体回滚。`,
+        { title: '确认导入？', confirmText: '开始导入', danger: false }
+      );
+      if (!ok) return;
+
+      impSetBusy(true);
+      const resultEl = document.getElementById('import-result');
+      try {
+        const resp = await fetch('/api/v1/import/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: impState.token,
+            conflict_mode: impState.mode,
+            skip_errors: impState.skipErrors
+          })
+        });
+        let json = null;
+        try { json = await resp.json(); } catch (e) { json = null; }
+        const data = json && json.data ? json.data : null;
+        const okResult = json && json.code === 200 && data;
+        resultEl.classList.remove('hidden');
+        if (!okResult) {
+          const msg = (json && json.message) || ('HTTP ' + resp.status);
+          resultEl.className = 'text-xs rounded-xl px-3 py-2.5 bg-rose-50 text-rose-600';
+          resultEl.textContent = (resp.status === 409 ? '预检已过期，请重新选择文件：' : '导入失败：') + msg;
+          impSetConfirm(false);
+          showToast('导入失败', false);
+          return;
+        }
+        resultEl.className = 'text-xs rounded-xl px-3 py-2.5 bg-emerald-50 text-emerald-700';
+        resultEl.innerHTML = `<span class="font-bold">导入完成</span><br>新增 ${data.inserted || 0} 条 · 更新 ${data.updated || 0} 条${data.skipped ? ' · 跳过 ' + data.skipped + ' 行' : ''}<br>可在「导入记录」中查看本次明细。`;
+        impShow('import-step-options', false);
+        impShow('import-skip-wrap', false);
+        impState.token = null;
+        impSetConfirm(false, '已完成');
+        showToast('导入完成', true);
+        impRefreshData();
+      } catch (e) {
+        resultEl.classList.remove('hidden');
+        resultEl.className = 'text-xs rounded-xl px-3 py-2.5 bg-rose-50 text-rose-600';
+        resultEl.textContent = '导入失败：' + (e.message || '网络错误');
+        showToast('导入失败', false);
+      } finally {
+        impSetBusy(false);
+      }
+    }
+
+    // 导入后刷新当前视图，让看板/趋势/洞察立即反映新数据。
+    function impRefreshData() {
+      if (currentTab === 'log') {
+        loadRecordForDate(document.getElementById('input-date').value);
+      } else {
+        switchTab(currentTab);
+      }
+    }
+
+    /* ---------- 备忘录粘贴导入 ---------- */
+    function openMemoFromSheet() {
+      closeDataSheet();
+      const sel = document.getElementById('memo-year-base');
+      if (sel) {
+        const year = new Date().getFullYear();
+        sel.innerHTML = [year, year - 1, year - 2].map(y => `<option value="${y}">${y} 年</option>`).join('');
+      }
+      document.getElementById('memo-import-modal').classList.remove('hidden');
+    }
+
+    function closeMemo() {
+      document.getElementById('memo-import-modal').classList.add('hidden');
+    }
+
+    function closeMemoOnBackdrop(event) {
+      if (event.target === event.currentTarget) closeMemo();
+    }
+
+    async function impPreviewMemo() {
+      const text = document.getElementById('memo-import-text').value || '';
+      if (!text.trim()) {
+        showToast('请先粘贴备忘录内容', false);
+        return;
+      }
+      const yearBase = Number(document.getElementById('memo-year-base').value) || new Date().getFullYear();
+      closeMemo();
+      impResetState();
+      document.getElementById('import-modal').classList.remove('hidden');
+      impShow('import-step-pick', false);
+      document.getElementById('import-subtitle').textContent = '正在预检粘贴内容…';
+      impSetBusy(true);
+
+      try {
+        const resp = await fetch('/api/v1/import/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ memo: text, year_base: yearBase })
+        });
+        let json = null;
+        try { json = await resp.json(); } catch (e) { json = null; }
+        document.getElementById('import-subtitle').textContent = '预检不写入数据，确认后才会导入';
+        if (!json || json.code !== 200 || !json.data) {
+          const msg = (json && json.message) || ('HTTP ' + resp.status);
+          impShow('import-step-pick', true);
+          document.getElementById('import-pick-btn').textContent = '选择文件';
+          impShowPreviewError('预检失败：' + msg);
+        } else {
+          impRenderPreview(json.data);
+        }
+      } catch (e) {
+        document.getElementById('import-subtitle').textContent = '预检不写入数据，确认后才会导入';
+        impShow('import-step-pick', true);
+        document.getElementById('import-pick-btn').textContent = '选择文件';
+        impShowPreviewError('预检失败：' + (e.message || '网络错误'));
+      } finally {
+        impSetBusy(false);
+      }
+    }
+
+    /* ---------- 导入批次历史 ---------- */
+    const IMP_BATCH_STATUS = {
+      success: { label: '成功', cls: 'bg-emerald-50 text-emerald-600' },
+      partial: { label: '部分成功', cls: 'bg-amber-50 text-amber-700' },
+      failed: { label: '失败', cls: 'bg-rose-50 text-rose-600' },
+      interrupted: { label: '中断', cls: 'bg-rose-50 text-rose-600' },
+      pending: { label: '进行中', cls: 'bg-slate-100 text-slate-500' }
+    };
+
+    function openImportBatchesFromSheet() {
+      closeDataSheet();
+      document.getElementById('import-batches-modal').classList.remove('hidden');
+      impLoadBatches();
+    }
+
+    function closeBatches() {
+      document.getElementById('import-batches-modal').classList.add('hidden');
+    }
+
+    function closeBatchesOnBackdrop(event) {
+      if (event.target === event.currentTarget) closeBatches();
+    }
+
+    async function impLoadBatches() {
+      const box = document.getElementById('batches-list');
+      box.innerHTML = '<p class="text-xs text-slate-400 text-center py-8">加载中…</p>';
+      try {
+        const resp = await fetch('/api/v1/import/batches?limit=20');
+        const json = await resp.json();
+        const list = (json && json.code === 200 && Array.isArray(json.data)) ? json.data : [];
+        impRenderBatches(list);
+      } catch (e) {
+        box.innerHTML = `<p class="text-xs text-rose-500 text-center py-8">加载失败：${impEsc(e.message || '网络错误')}</p>`;
+      }
+    }
+
+    function impRenderBatches(list) {
+      const box = document.getElementById('batches-list');
+      if (!list.length) {
+        box.innerHTML = '<p class="text-xs text-slate-400 text-center py-8">还没有导入记录</p>';
+        return;
+      }
+      box.innerHTML = list.map(b => {
+        const st = IMP_BATCH_STATUS[b.status] || { label: b.status, cls: 'bg-slate-100 text-slate-500' };
+        const source = b.source_type === 'json' ? 'JSON 备份' : (b.source_type === 'memo' ? '备忘录' : 'CSV');
+        const when = String(b.created_at || '').replace('T', ' ').slice(0, 16);
+        const actions = [];
+        actions.push(`<button type="button" onclick="impToggleBatchDetail(${b.id})" class="px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-bold text-slate-600 hover:bg-slate-200">详情</button>`);
+        if (b.has_cache && b.errors > 0) {
+          actions.push(`<button type="button" onclick="downloadFailedRows(${b.id})" class="px-2.5 py-1 rounded-lg bg-amber-100 text-[11px] font-bold text-amber-700 hover:bg-amber-200">失败行</button>`);
+        }
+        if (b.retryable) {
+          actions.push(`<button type="button" onclick="impRetryBatch(${b.id})" class="px-2.5 py-1 rounded-lg bg-blue-600 text-[11px] font-bold text-white hover:bg-blue-700">重试</button>`);
+        }
+        return `<div class="rounded-2xl border border-slate-100 px-3.5 py-3">
+          <div class="flex items-start justify-between gap-2">
+            <p class="text-sm font-bold text-slate-800 truncate">${impEsc(b.file_name || source)}</p>
+            <span class="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${st.cls}">${st.label}</span>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-0.5">${source} · ${impEsc(when)} · 共 ${b.total_rows || 0} 行${b.attempt_no > 1 ? ' · 第 ' + b.attempt_no + ' 次尝试' : ''}</p>
+          <p class="text-[11px] text-slate-500 mt-1">新增 ${b.inserted || 0} · 更新 ${b.updated || 0} · 跳过 ${b.skipped || 0} · 警告 ${b.warnings || 0} · 错误 ${b.errors || 0}</p>
+          ${b.error_message ? `<p class="text-[10px] text-rose-500 mt-1 break-all">${impEsc(b.error_message)}</p>` : ''}
+          <div class="flex flex-wrap gap-1.5 mt-2">${actions.join('')}</div>
+          <div id="batch-issues-${b.id}" class="hidden mt-2 space-y-1"></div>
+        </div>`;
+      }).join('');
+    }
+
+    function impToggleBatchDetail(id) {
+      const box = document.getElementById('batch-issues-' + id);
+      if (!box) return;
+      if (!box.classList.contains('hidden')) {
+        box.classList.add('hidden');
+        return;
+      }
+      box.classList.remove('hidden');
+      if (box.dataset.loaded === '1') return;
+      box.dataset.loaded = '1';
+      box.innerHTML = '<p class="text-[11px] text-slate-400">加载中…</p>';
+      fetch(`/api/v1/import/batches/${id}`).then(r => r.json()).then(json => {
+        const issues = (json && json.code === 200 && json.data && json.data.issues) ? json.data.issues : [];
+        if (!issues.length) {
+          box.innerHTML = '<p class="text-[11px] text-slate-400">没有行级问题</p>';
+          return;
+        }
+        box.innerHTML = issues.slice(0, 50).map(i => {
+          const isErr = i.level === 'error';
+          const chip = isErr ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-700';
+          return `<div class="flex items-start space-x-1.5 rounded-lg bg-slate-50 px-2 py-1">
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${chip}">${isErr ? '错误' : '警告'}</span>
+            <span class="text-[10px] text-slate-600 leading-snug break-all">第 ${i.line} 行${i.date ? ' · ' + impEsc(i.date) : ''}：${impEsc(i.message)}</span>
+          </div>`;
+        }).join('');
+      }).catch(() => {
+        box.innerHTML = '<p class="text-[11px] text-rose-500">明细加载失败</p>';
+      });
+    }
+
+    async function impRetryBatch(id) {
+      try {
+        const resp = await fetch(`/api/v1/import/batches/${id}/retry`, { method: 'POST' });
+        const json = await resp.json();
+        if (!json || json.code !== 200 || !json.data) {
+          showToast((json && json.message) || '重试失败', false);
+          return;
+        }
+        closeBatches();
+        impResetState();
+        document.getElementById('import-modal').classList.remove('hidden');
+        impRenderPreview(json.data);
+        showToast('已重新预检，请确认后写入', true);
+      } catch (e) {
+        showToast('重试失败：' + (e.message || '网络错误'), false);
+      }
+    }
+
+    function downloadFailedRows(id) {
+      closeBatches();
+      downloadFile(`/api/v1/import/batches/${id}/failed-rows`, `HealthTrack_failed_rows_${id}.csv`, '失败行已下载，可修正后重新导入');
+    }
+
+    function downloadImportTemplate() {
+      closeDataSheet();
+      downloadFile('/api/v1/import/template', 'HealthTrack_import_template.csv', '模板已下载');
+    }
+
+    // 统一下载：手机端交给原生 DownloadManager，PC 端 fetch 成 blob 触发下载。
+    async function downloadFile(url, filename, okMessage) {
+      if (window.HealthTrack) {
+        window.location.href = url;
+        showToast('已开始下载', true);
+        return;
+      }
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        const blobUrl = URL.createObjectURL(blob);
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+        showToast(okMessage || '文件已下载', true);
+      } catch (e) {
+        showToast('下载失败：' + (e.message || '网络错误'), false);
+      }
+    }
 
     /* ============================================================
        睡前小结（第 4 个 Tab）：今日填写 + 往期回顾 + 小结洞察
