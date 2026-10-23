@@ -94,11 +94,13 @@ func main() {
 	eveningService := service.NewEveningService(eveningRepo, runtimeConfigs)
 	compareService := service.NewCompareService(recordService)
 	aiService := service.NewAIService(runtimeConfigs, recordRepo)
+	importService := service.NewImportService(recordRepo, importRepo, runtimeConfigs)
 	aiHandler := handler.NewAIHandler(runtimeConfigs, insightService, recordService, compareService, insightRepo, eveningRepo)
 	insightHandler := handler.NewInsightHandler(insightRepo)
 	configHandler := handler.NewConfigHandler(runtimeConfigs)
 	recordHandler := handler.NewRecordHandler(recordService, aiService)
 	eveningHandler := handler.NewEveningHandler(eveningService)
+	importHandler := handler.NewImportHandler(importService)
 
 	// 5. 路由注册
 	mux := http.NewServeMux()
@@ -130,6 +132,7 @@ func main() {
 
 	mux.HandleFunc("/api/v1/export", recordHandler.ExportCSV)
 	mux.HandleFunc("/api/v1/export/json", recordHandler.ExportJSON)
+	mux.HandleFunc("POST /api/v1/import/preview", importHandler.Preview)
 	mux.HandleFunc("/healthz", recordHandler.Healthz)
 	mux.HandleFunc("/api/config", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
