@@ -12,6 +12,13 @@ const (
 	ImportStatusInterrupted = "interrupted"
 )
 
+// 同日冲突处理方式：merge 逐字段合并（缺失字段保留旧值），
+// overwrite 整行替换（缺失字段清空）。显式清空标记（- / null）在两种模式下都生效。
+const (
+	ImportConflictMerge     = "merge"
+	ImportConflictOverwrite = "overwrite"
+)
+
 // ImportRowIssue 行级问题，供预览与失败明细展示。
 // Level 为 warning 时照常写入；为 error 时该行不写入。
 type ImportRowIssue struct {

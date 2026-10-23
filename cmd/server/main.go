@@ -133,6 +133,7 @@ func main() {
 	mux.HandleFunc("/api/v1/export", recordHandler.ExportCSV)
 	mux.HandleFunc("/api/v1/export/json", recordHandler.ExportJSON)
 	mux.HandleFunc("POST /api/v1/import/preview", importHandler.Preview)
+	mux.HandleFunc("POST /api/v1/import/confirm", importHandler.Confirm)
 	mux.HandleFunc("/healthz", recordHandler.Healthz)
 	mux.HandleFunc("/api/config", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

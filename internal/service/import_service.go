@@ -4,7 +4,10 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strconv"
 	"strings"
@@ -422,4 +425,218 @@ func valueOrEmpty(v *string) string {
 		return ""
 	}
 	return *v
+}
+
+// 导入确认阶段的可预期错误，handler 据此选择 HTTP 状态码与提示文案。
+var (
+	// ErrImportPreviewExpired 预览令牌不存在、已过期或已被使用。
+	ErrImportPreviewExpired = errors.New("导入预览已过期，请重新解析文件")
+	// ErrImportConflictModeInvalid 冲突处理方式不在白名单内。
+	ErrImportConflictModeInvalid = errors.New("冲突处理方式只能是 merge 或 overwrite")
+	// ErrImportNoValidRows 全部行都有错误，没有任何可写入的数据。
+	ErrImportNoValidRows = errors.New("没有可写入的有效行，请修正后重试")
+)
+
+// ImportRowsInvalidError 预检存在错误行且用户未显式跳过。
+type ImportRowsInvalidError struct {
+	Rows int
+}
+
+func (e *ImportRowsInvalidError) Error() string {
+	return fmt.Sprintf("存在 %d 行错误，请修正后重试，或确认跳过错误行", e.Rows)
+}
+
+// ImportConfirmInput 确认写入入参。
+type ImportConfirmInput struct {
+	Token        string `json:"token"`
+	ConflictMode string `json:"conflict_mode"` // merge（默认）/ overwrite
+	SkipErrors   bool   `json:"skip_errors"`   // 显式跳过错误行，仅在用户二次确认时置为 true
+}
+
+// ImportConfirmResult 写入终态：success（全部写入）/ partial（跳过错误行后写入）/ failed（0 行写入）。
+type ImportConfirmResult struct {
+	BatchID      int64  `json:"batch_id"`
+	Status       string `json:"status"`
+	TotalRows    int    `json:"total_rows"`
+	Inserted     int    `json:"inserted"`
+	Updated      int    `json:"updated"`
+	Skipped      int    `json:"skipped"`
+	Warnings     int    `json:"warnings"`
+	Errors       int    `json:"errors"`
+	ConflictMode string `json:"conflict_mode"`
+	SkipErrors   bool   `json:"skip_errors"`
+	ErrorMessage string `json:"error_message,omitempty"`
+}
+
+// importBatchDetail 落库的行级明细，供批次历史与失败重试展示。
+type importBatchDetail struct {
+	Issues       []model.ImportRowIssue `json:"issues"`
+	SkippedLines []int                  `json:"skipped_lines,omitempty"`
+}
+
+// Confirm 按预览结果原子写入：单事务全部成功或 0 行写入。
+// 令牌一次性使用，重复确认会返回过期错误，避免重复写入。
+func (s *ImportService) Confirm(userID int64, in ImportConfirmInput) (*ImportConfirmResult, error) {
+	mode := strings.TrimSpace(in.ConflictMode)
+	if mode == "" {
+		mode = model.ImportConflictMerge
+	}
+	if mode != model.ImportConflictMerge && mode != model.ImportConflictOverwrite {
+		return nil, ErrImportConflictModeInvalid
+	}
+
+	now := time.Now()
+	s.cleanupExpired(now)
+
+	s.mu.Lock()
+	cached, ok := s.previews[in.Token]
+	if ok && (cached.userID != userID || now.After(cached.expiresAt)) {
+		delete(s.previews, in.Token)
+		ok = false
+	}
+	s.mu.Unlock()
+	if !ok {
+		return nil, ErrImportPreviewExpired
+	}
+
+	rows := cached.rows
+	errorRows, warnings, errorsTotal := 0, 0, 0
+	issues := make([]model.ImportRowIssue, 0)
+	skippedLines := make([]int, 0)
+	for i := range rows {
+		warnings += len(rows[i].Warnings)
+		issues = append(issues, rows[i].Warnings...)
+		if len(rows[i].Errors) > 0 {
+			errorRows++
+			errorsTotal += len(rows[i].Errors)
+			issues = append(issues, rows[i].Errors...)
+			skippedLines = append(skippedLines, rows[i].Line)
+		}
+	}
+
+	if errorsTotal > 0 && !in.SkipErrors {
+		return nil, &ImportRowsInvalidError{Rows: errorRows}
+	}
+
+	green, yellow := s.sleepThresholds()
+	upserts := make([]repository.ImportUpsertRow, 0, len(rows)-errorRows)
+	for i := range rows {
+		row := &rows[i]
+		if len(row.Errors) > 0 {
+			continue
+		}
+		sleepTag := ""
+		if row.DTO.SleepStartTime != nil {
+			sleepTag = model.CalculateSleepTagWithThresholds(*row.DTO.SleepStartTime, green, yellow)
+		}
+		upserts = append(upserts, repository.ImportUpsertRow{
+			Date:            row.Date,
+			DTO:             row.DTO,
+			ClearFields:     row.ClearFields,
+			ActivityTags:    row.ActivityTags,
+			HasActivityTags: row.HasActivityTags,
+			SleepTag:        sleepTag,
+		})
+	}
+	if len(upserts) == 0 {
+		return nil, ErrImportNoValidRows
+	}
+
+	detailJSON := "{}"
+	if b, err := json.Marshal(importBatchDetail{Issues: capIssues(issues), SkippedLines: skippedLines}); err == nil {
+		detailJSON = string(b)
+	}
+
+	batch := &model.ImportBatch{
+		UserID:       userID,
+		SourceType:   cached.source,
+		FileName:     cached.fileName,
+		FileHash:     cached.fileHash,
+		FileSize:     cached.fileSize,
+		TotalRows:    len(rows),
+		Warnings:     warnings,
+		Errors:       errorsTotal,
+		ConflictMode: mode,
+		SkipErrors:   in.SkipErrors,
+		Status:       model.ImportStatusPending,
+		DetailJSON:   detailJSON,
+	}
+	if err := s.importRepo.Create(batch); err != nil {
+		return nil, err
+	}
+
+	inserted, updated, err := s.recordRepo.ImportUpsertBatch(userID, upserts, mode)
+	if err != nil {
+		// 事务已整体回滚，这里只记录失败批次，不写任何健康数据。
+		batch.Status = model.ImportStatusFailed
+		batch.Skipped = errorRows
+		batch.ErrorMessage = "写入失败（已回滚，未写入任何数据）: " + err.Error()
+		if updateErr := s.importRepo.UpdateResult(batch); updateErr != nil {
+			slog.Error("记录导入失败批次时出错", "batch_id", batch.ID, "err", updateErr)
+		}
+		return &ImportConfirmResult{
+			BatchID:      batch.ID,
+			Status:       batch.Status,
+			TotalRows:    batch.TotalRows,
+			Skipped:      errorRows,
+			Warnings:     warnings,
+			Errors:       errorsTotal,
+			ConflictMode: mode,
+			SkipErrors:   in.SkipErrors,
+			ErrorMessage: batch.ErrorMessage,
+		}, nil
+	}
+
+	status := model.ImportStatusSuccess
+	if errorRows > 0 {
+		status = model.ImportStatusPartial
+	}
+	batch.Status = status
+	batch.Inserted = inserted
+	batch.Updated = updated
+	batch.Skipped = errorRows
+	if err := s.importRepo.UpdateResult(batch); err != nil {
+		return nil, err
+	}
+	// 写入成功后作废令牌，避免重复确认造成重复批次。
+	s.mu.Lock()
+	delete(s.previews, in.Token)
+	s.mu.Unlock()
+
+	return &ImportConfirmResult{
+		BatchID:      batch.ID,
+		Status:       status,
+		TotalRows:    batch.TotalRows,
+		Inserted:     inserted,
+		Updated:      updated,
+		Skipped:      errorRows,
+		Warnings:     warnings,
+		Errors:       errorsTotal,
+		ConflictMode: mode,
+		SkipErrors:   in.SkipErrors,
+	}, nil
+}
+
+// sleepThresholds 读取运行中的熬夜阈值，未配置时回落到默认值。
+func (s *ImportService) sleepThresholds() (string, string) {
+	green, yellow := "23:00", "00:00"
+	if s.configs == nil {
+		return green, yellow
+	}
+	cfg := s.configs.Snapshot()
+	if cfg.Sleep.GreenBefore != "" {
+		green = cfg.Sleep.GreenBefore
+	}
+	if cfg.Sleep.YellowBefore != "" {
+		yellow = cfg.Sleep.YellowBefore
+	}
+	return green, yellow
+}
+
+// capIssues 截断行级明细，避免单条批次记录过大。
+func capIssues(issues []model.ImportRowIssue) []model.ImportRowIssue {
+	if len(issues) > importMaxIssues {
+		return issues[:importMaxIssues]
+	}
+	return issues
 }

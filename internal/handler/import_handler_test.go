@@ -186,3 +186,191 @@ func TestPreviewRejectsOversizeFile(t *testing.T) {
 		t.Fatal("超过 5 MB 应被拒绝")
 	}
 }
+
+// confirmImport 调用确认接口，返回 HTTP 状态码、提示语与业务数据。
+func confirmImport(t *testing.T, h *ImportHandler, token, mode string, skipErrors bool) (int, string, service.ImportConfirmResult) {
+	t.Helper()
+	payload, _ := json.Marshal(map[string]any{
+		"token":         token,
+		"conflict_mode": mode,
+		"skip_errors":   skipErrors,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/import/confirm", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.Confirm(rec, req)
+
+	var resp struct {
+		Code    int                         `json:"code"`
+		Message string                      `json:"message"`
+		Data    service.ImportConfirmResult `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("解析确认响应失败: %v，原文 %s", err, rec.Body.String())
+	}
+	return rec.Code, resp.Message, resp.Data
+}
+
+func TestConfirmMergeWritesAtomically(t *testing.T) {
+	h, recordRepo := newTestImportHandler(t)
+
+	weightAM, weightPM := 76.0, 80.0
+	if _, err := recordRepo.SaveOrMerge(1, &model.SaveRecordDTO{
+		RecordDate: "2026-10-01", WeightAM: &weightAM, WeightPM: &weightPM,
+	}, "GREEN", `["cardio"]`); err != nil {
+		t.Fatalf("预置记录失败: %v", err)
+	}
+
+	content := "记录日期,晨起空腹体重(kg),腰围(cm)\n" +
+		"2026-10-01,76.9,78\n" +
+		"2026-10-02,77.1,80\n"
+	preview := previewCSV(t, h, content)
+	if !preview.CanConfirm {
+		t.Fatalf("预检应可确认: %+v", preview)
+	}
+
+	status, msg, result := confirmImport(t, h, preview.Token, model.ImportConflictMerge, false)
+	if status != http.StatusOK {
+		t.Fatalf("确认接口失败: %d %s", status, msg)
+	}
+	if result.Status != model.ImportStatusSuccess || result.Inserted != 1 || result.Updated != 1 {
+		t.Fatalf("写入统计错误: %+v", result)
+	}
+
+	merged, err := recordRepo.GetByDate(1, "2026-10-01")
+	if err != nil || merged == nil {
+		t.Fatalf("合并后应存在记录: %v", err)
+	}
+	if merged.WeightAM == nil || *merged.WeightAM != 76.9 {
+		t.Fatalf("晨重应更新为 76.9: %+v", merged.WeightAM)
+	}
+	if merged.WeightPM == nil || *merged.WeightPM != 80 {
+		t.Fatal("merge 模式下未提供的睡前体重应保留旧值")
+	}
+	if merged.ActivityTags != `["cardio"]` {
+		t.Fatalf("merge 模式下未提供的运动标签应保留旧值: %q", merged.ActivityTags)
+	}
+
+	inserted, err := recordRepo.GetByDate(1, "2026-10-02")
+	if err != nil || inserted == nil || inserted.WeightAM == nil || *inserted.WeightAM != 77.1 {
+		t.Fatalf("新增行未正确写入: %+v %v", inserted, err)
+	}
+
+	// 令牌一次性使用：重复确认应被拒绝，避免重复写入。
+	if code, _, _ := confirmImport(t, h, preview.Token, model.ImportConflictMerge, false); code != http.StatusConflict {
+		t.Fatalf("重复确认应返回 409，实际 %d", code)
+	}
+}
+
+func TestConfirmRejectsErrorRowsWithoutSkip(t *testing.T) {
+	h, recordRepo := newTestImportHandler(t)
+
+	content := "记录日期,晨起空腹体重(kg)\n" +
+		"2026-10-01,76.9\n" +
+		"2026-13-01,77\n"
+	preview := previewCSV(t, h, content)
+
+	status, msg, _ := confirmImport(t, h, preview.Token, model.ImportConflictMerge, false)
+	if status != http.StatusBadRequest {
+		t.Fatalf("存在错误行时应返回 400，实际 %d %s", status, msg)
+	}
+	if rec, _ := recordRepo.GetByDate(1, "2026-10-01"); rec != nil {
+		t.Fatal("被拒绝时不得写入任何数据")
+	}
+}
+
+func TestConfirmSkipErrorsWritesPartial(t *testing.T) {
+	h, recordRepo := newTestImportHandler(t)
+
+	content := "记录日期,晨起空腹体重(kg)\n" +
+		"2026-10-01,76.9\n" +
+		"2026-13-01,77\n"
+	preview := previewCSV(t, h, content)
+
+	status, msg, result := confirmImport(t, h, preview.Token, model.ImportConflictMerge, true)
+	if status != http.StatusOK {
+		t.Fatalf("跳过错误行后应成功: %d %s", status, msg)
+	}
+	if result.Status != model.ImportStatusPartial || result.Inserted != 1 || result.Skipped != 1 {
+		t.Fatalf("部分写入统计错误: %+v", result)
+	}
+	if rec, _ := recordRepo.GetByDate(1, "2026-10-01"); rec == nil || rec.WeightAM == nil || *rec.WeightAM != 76.9 {
+		t.Fatal("有效行应写入")
+	}
+}
+
+func TestConfirmOverwriteClearsMissingFields(t *testing.T) {
+	h, recordRepo := newTestImportHandler(t)
+
+	weightAM, weightPM := 76.0, 80.0
+	journal := "旧日记"
+	if _, err := recordRepo.SaveOrMerge(1, &model.SaveRecordDTO{
+		RecordDate: "2026-10-01", WeightAM: &weightAM, WeightPM: &weightPM, JournalText: &journal,
+	}, "GREEN", `["cardio"]`); err != nil {
+		t.Fatalf("预置记录失败: %v", err)
+	}
+
+	content := "记录日期,晨起空腹体重(kg)\n2026-10-01,76.9\n"
+	preview := previewCSV(t, h, content)
+	if _, msg, result := confirmImport(t, h, preview.Token, model.ImportConflictOverwrite, false); result.Status != model.ImportStatusSuccess {
+		t.Fatalf("覆盖写入应成功: %s %+v", msg, result)
+	}
+
+	rec, err := recordRepo.GetByDate(1, "2026-10-01")
+	if err != nil || rec == nil {
+		t.Fatalf("覆盖后应存在记录: %v", err)
+	}
+	if rec.WeightAM == nil || *rec.WeightAM != 76.9 {
+		t.Fatalf("晨重应更新: %+v", rec.WeightAM)
+	}
+	if rec.WeightPM != nil || rec.JournalText != "" || rec.ActivityTags != "" {
+		t.Fatalf("overwrite 应清空未提供的字段: 睡前体重 %v 日记 %q 标签 %q", rec.WeightPM, rec.JournalText, rec.ActivityTags)
+	}
+}
+
+func TestConfirmExplicitClearMarker(t *testing.T) {
+	h, recordRepo := newTestImportHandler(t)
+
+	weightAM := 76.0
+	if _, err := recordRepo.SaveOrMerge(1, &model.SaveRecordDTO{
+		RecordDate: "2026-10-01", WeightAM: &weightAM,
+	}, "GREEN", ""); err != nil {
+		t.Fatalf("预置记录失败: %v", err)
+	}
+
+	content := "记录日期,晨起空腹体重(kg)\n2026-10-01,-\n"
+	preview := previewCSV(t, h, content)
+	if _, msg, result := confirmImport(t, h, preview.Token, model.ImportConflictMerge, false); result.Status != model.ImportStatusSuccess {
+		t.Fatalf("显式清空应成功: %s %+v", msg, result)
+	}
+
+	rec, _ := recordRepo.GetByDate(1, "2026-10-01")
+	if rec == nil || rec.WeightAM != nil {
+		t.Fatalf("`-` 应清空晨重: %+v", rec)
+	}
+}
+
+func TestConfirmRecomputesSleepTag(t *testing.T) {
+	h, recordRepo := newTestImportHandler(t)
+
+	weightAM := 76.0
+	if _, err := recordRepo.SaveOrMerge(1, &model.SaveRecordDTO{
+		RecordDate: "2026-10-01", WeightAM: &weightAM,
+	}, "GREEN", ""); err != nil {
+		t.Fatalf("预置记录失败: %v", err)
+	}
+
+	content := "记录日期,就寝时间,起床时间\n2026-10-01,01:00,08:00\n"
+	preview := previewCSV(t, h, content)
+	if _, msg, result := confirmImport(t, h, preview.Token, model.ImportConflictMerge, false); result.Status != model.ImportStatusSuccess {
+		t.Fatalf("导入睡眠时间应成功: %s %+v", msg, result)
+	}
+
+	rec, _ := recordRepo.GetByDate(1, "2026-10-01")
+	if rec == nil || rec.SleepHours == nil || *rec.SleepHours != 7 {
+		t.Fatalf("应由起止时间补算睡眠时长: %+v", rec)
+	}
+	if rec.SleepTag != "RED" {
+		t.Fatalf("01:00 就寝按默认阈值应为 RED，实际 %s", rec.SleepTag)
+	}
+}
