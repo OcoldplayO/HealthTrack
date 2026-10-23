@@ -30,11 +30,23 @@ type ParsedRow struct {
 // ParsedFile 一份导入文件的解析结果。
 // Fatal 非空表示整份文件不可用（找不到日期列、编码无法识别等），此时不产生任何行。
 type ParsedFile struct {
-	SourceType string      `json:"source_type"`
-	Encoding   string      `json:"encoding"`
-	Delimiter  string      `json:"delimiter"`
-	Rows       []ParsedRow `json:"rows"`
-	Fatal      string      `json:"fatal,omitempty"`
+	SourceType string          `json:"source_type"`
+	Encoding   string          `json:"encoding"`
+	Delimiter  string          `json:"delimiter"`
+	Rows       []ParsedRow     `json:"rows"`
+	Summaries  []ParsedSummary `json:"summaries,omitempty"`
+	Fatal      string          `json:"fatal,omitempty"`
+}
+
+// ParsedSummary 睡前小结的解析结果。小结与 health_records 分表，
+// 同一日期唯一，导入时与健康记录一起在单个事务内写入。
+type ParsedSummary struct {
+	Date      string                 `json:"date"`
+	DoneItems []string               `json:"done_items"`
+	NoteText  string                 `json:"note_text"`
+	Score     int                    `json:"score"`
+	Warnings  []model.ImportRowIssue `json:"warnings,omitempty"`
+	Errors    []model.ImportRowIssue `json:"errors,omitempty"`
 }
 
 var clearMarkers = map[string]bool{"-": true, "null": true, "nil": true}

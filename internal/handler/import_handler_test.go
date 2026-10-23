@@ -14,7 +14,7 @@ import (
 	"healthtrack/internal/service"
 )
 
-func newTestImportHandler(t *testing.T) (*ImportHandler, *repository.RecordRepository) {
+func newTestImportHandler(t *testing.T) (*ImportHandler, *repository.RecordRepository, *repository.EveningRepository) {
 	t.Helper()
 	dir := t.TempDir()
 	mgr, err := repository.InitDB(filepath.Join(dir, "health.db"), filepath.Join(dir, "backup"))
@@ -24,15 +24,22 @@ func newTestImportHandler(t *testing.T) (*ImportHandler, *repository.RecordRepos
 	t.Cleanup(func() { _ = mgr.Close() })
 
 	recordRepo := repository.NewRecordRepository(mgr.DB)
+	eveningRepo := repository.NewEveningRepository(mgr.DB)
 	importRepo := repository.NewImportRepository(mgr.DB)
-	return NewImportHandler(service.NewImportService(recordRepo, importRepo, nil)), recordRepo
+	return NewImportHandler(service.NewImportService(recordRepo, eveningRepo, importRepo, nil)), recordRepo, eveningRepo
 }
 
 func previewCSV(t *testing.T, h *ImportHandler, content string) service.ImportPreview {
 	t.Helper()
+	return previewFile(t, h, "test.csv", content)
+}
+
+// previewFile 以 multipart 上传任意文件并返回预检结果。
+func previewFile(t *testing.T, h *ImportHandler, name, content string) service.ImportPreview {
+	t.Helper()
 	body := &bytes.Buffer{}
 	w := multipart.NewWriter(body)
-	fw, err := w.CreateFormFile("file", "test.csv")
+	fw, err := w.CreateFormFile("file", name)
 	if err != nil {
 		t.Fatalf("构造上传内容失败: %v", err)
 	}
@@ -62,7 +69,7 @@ func previewCSV(t *testing.T, h *ImportHandler, content string) service.ImportPr
 }
 
 func TestPreviewCSVCountsInsertAndUpdate(t *testing.T) {
-	h, recordRepo := newTestImportHandler(t)
+	h, recordRepo, _ := newTestImportHandler(t)
 
 	weight := 76.0
 	if _, err := recordRepo.SaveOrMerge(1, &model.SaveRecordDTO{
@@ -110,7 +117,7 @@ func TestPreviewCSVCountsInsertAndUpdate(t *testing.T) {
 }
 
 func TestPreviewCSVBlocksOnError(t *testing.T) {
-	h, _ := newTestImportHandler(t)
+	h, _, _ := newTestImportHandler(t)
 
 	content := "记录日期,晨起空腹体重(kg)\n" +
 		"2026-10-01,76.9\n" +
@@ -135,7 +142,7 @@ func TestPreviewCSVBlocksOnError(t *testing.T) {
 }
 
 func TestPreviewMemoJSONBody(t *testing.T) {
-	h, _ := newTestImportHandler(t)
+	h, _, _ := newTestImportHandler(t)
 
 	body, _ := json.Marshal(map[string]any{
 		"memo":      "10.2：晨起体重 76.9，腰围 78\n10.3：1-810（睡的还行但不足）",
@@ -164,7 +171,7 @@ func TestPreviewMemoJSONBody(t *testing.T) {
 }
 
 func TestPreviewRejectsOversizeFile(t *testing.T) {
-	h, _ := newTestImportHandler(t)
+	h, _, _ := newTestImportHandler(t)
 
 	body := &bytes.Buffer{}
 	w := multipart.NewWriter(body)
@@ -212,7 +219,7 @@ func confirmImport(t *testing.T, h *ImportHandler, token, mode string, skipError
 }
 
 func TestConfirmMergeWritesAtomically(t *testing.T) {
-	h, recordRepo := newTestImportHandler(t)
+	h, recordRepo, _ := newTestImportHandler(t)
 
 	weightAM, weightPM := 76.0, 80.0
 	if _, err := recordRepo.SaveOrMerge(1, &model.SaveRecordDTO{
@@ -263,7 +270,7 @@ func TestConfirmMergeWritesAtomically(t *testing.T) {
 }
 
 func TestConfirmRejectsErrorRowsWithoutSkip(t *testing.T) {
-	h, recordRepo := newTestImportHandler(t)
+	h, recordRepo, _ := newTestImportHandler(t)
 
 	content := "记录日期,晨起空腹体重(kg)\n" +
 		"2026-10-01,76.9\n" +
@@ -280,7 +287,7 @@ func TestConfirmRejectsErrorRowsWithoutSkip(t *testing.T) {
 }
 
 func TestConfirmSkipErrorsWritesPartial(t *testing.T) {
-	h, recordRepo := newTestImportHandler(t)
+	h, recordRepo, _ := newTestImportHandler(t)
 
 	content := "记录日期,晨起空腹体重(kg)\n" +
 		"2026-10-01,76.9\n" +
@@ -300,7 +307,7 @@ func TestConfirmSkipErrorsWritesPartial(t *testing.T) {
 }
 
 func TestConfirmOverwriteClearsMissingFields(t *testing.T) {
-	h, recordRepo := newTestImportHandler(t)
+	h, recordRepo, _ := newTestImportHandler(t)
 
 	weightAM, weightPM := 76.0, 80.0
 	journal := "旧日记"
@@ -329,7 +336,7 @@ func TestConfirmOverwriteClearsMissingFields(t *testing.T) {
 }
 
 func TestConfirmExplicitClearMarker(t *testing.T) {
-	h, recordRepo := newTestImportHandler(t)
+	h, recordRepo, _ := newTestImportHandler(t)
 
 	weightAM := 76.0
 	if _, err := recordRepo.SaveOrMerge(1, &model.SaveRecordDTO{
@@ -351,7 +358,7 @@ func TestConfirmExplicitClearMarker(t *testing.T) {
 }
 
 func TestConfirmRecomputesSleepTag(t *testing.T) {
-	h, recordRepo := newTestImportHandler(t)
+	h, recordRepo, _ := newTestImportHandler(t)
 
 	weightAM := 76.0
 	if _, err := recordRepo.SaveOrMerge(1, &model.SaveRecordDTO{
@@ -372,5 +379,96 @@ func TestConfirmRecomputesSleepTag(t *testing.T) {
 	}
 	if rec.SleepTag != "RED" {
 		t.Fatalf("01:00 就寝按默认阈值应为 RED，实际 %s", rec.SleepTag)
+	}
+}
+
+func float64Ptr(v float64) *float64 { return &v }
+func stringPtr(v string) *string    { return &v }
+
+func TestJSONBackupPreviewAndConfirm(t *testing.T) {
+	h, recordRepo, eveningRepo := newTestImportHandler(t)
+
+	weight := 76.0
+	if _, err := recordRepo.SaveOrMerge(1, &model.SaveRecordDTO{
+		RecordDate: "2026-10-01", WeightAM: &weight,
+	}, "GREEN", ""); err != nil {
+		t.Fatalf("预置记录失败: %v", err)
+	}
+	if _, err := eveningRepo.Upsert(1, &model.SaveEveningDTO{
+		RecordDate: "2026-10-01", DoneItems: []string{"旧事项"}, NoteText: "旧感想", Score: 5,
+	}); err != nil {
+		t.Fatalf("预置小结失败: %v", err)
+	}
+
+	backup := model.BackupFile{
+		SchemaVersion: model.BackupSchemaVersion,
+		HealthRecords: []*model.HealthRecord{
+			{RecordDate: "2026-10-01", WeightAM: float64Ptr(76.9)},
+			{
+				RecordDate:     "2026-10-02",
+				WeightAM:       float64Ptr(77.1),
+				SleepStartTime: stringPtr("01:00"),
+				SleepEndTime:   stringPtr("08:00"),
+			},
+		},
+		EveningSummaries: []*model.EveningSummary{
+			{RecordDate: "2026-10-01", DoneItems: []string{"新事项1", "新事项2"}, NoteText: "新感想", Score: 8},
+			{RecordDate: "2026-10-02", DoneItems: []string{"完成A"}, NoteText: "", Score: 6},
+		},
+	}
+	raw, err := json.Marshal(backup)
+	if err != nil {
+		t.Fatalf("序列化备份失败: %v", err)
+	}
+
+	preview := previewFile(t, h, "backup.json", string(raw))
+	if preview.SourceType != "json" || preview.TotalRows != 2 || preview.SummaryRows != 2 {
+		t.Fatalf("JSON 预检统计错误: %+v", preview)
+	}
+	if preview.SummaryInserted != 1 || preview.SummaryUpdated != 1 || !preview.CanConfirm {
+		t.Fatalf("小结新增/更新统计错误: %+v", preview)
+	}
+
+	status, msg, result := confirmImport(t, h, preview.Token, model.ImportConflictMerge, false)
+	if status != http.StatusOK || result.Status != model.ImportStatusSuccess {
+		t.Fatalf("备份写入失败: %d %s %+v", status, msg, result)
+	}
+	if result.Inserted != 1 || result.Updated != 1 || result.SummaryInserted != 1 || result.SummaryUpdated != 1 {
+		t.Fatalf("写入统计错误: %+v", result)
+	}
+
+	rec, _ := recordRepo.GetByDate(1, "2026-10-02")
+	if rec == nil || rec.SleepTag != "RED" || rec.SleepHours == nil || *rec.SleepHours != 7 {
+		t.Fatalf("备份应还原睡眠并重算熬夜标签: %+v", rec)
+	}
+	summary, _ := eveningRepo.GetByDate(1, "2026-10-01")
+	if summary == nil || summary.Score != 8 || summary.NoteText != "新感想" ||
+		len(summary.DoneItems) < 2 || summary.DoneItems[0] != "新事项1" || summary.DoneItems[1] != "新事项2" {
+		t.Fatalf("merge 应整体替换完成事项: %+v", summary)
+	}
+	if _, err := eveningRepo.GetByDate(1, "2026-10-02"); err != nil {
+		t.Fatalf("新增小结应写入: %v", err)
+	}
+}
+
+func TestJSONLegacyArrayStillPreviewed(t *testing.T) {
+	h, _, _ := newTestImportHandler(t)
+
+	raw := `[{"record_date":"2026-10-03","weight_am":76.5}]`
+	preview := previewFile(t, h, "old.json", raw)
+	if preview.Fatal != "" {
+		t.Fatalf("旧版裸数组应兼容: %s", preview.Fatal)
+	}
+	if preview.TotalRows != 1 || preview.Inserted != 1 {
+		t.Fatalf("旧版备份统计错误: %+v", preview)
+	}
+}
+
+func TestJSONUnknownStructureRejected(t *testing.T) {
+	h, _, _ := newTestImportHandler(t)
+
+	preview := previewFile(t, h, "unknown.json", `{"foo":1}`)
+	if preview.Fatal == "" || preview.CanConfirm {
+		t.Fatalf("未识别的 JSON 结构应整体拒绝: %+v", preview)
 	}
 }

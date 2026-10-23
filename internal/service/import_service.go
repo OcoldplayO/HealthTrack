@@ -75,6 +75,9 @@ type ImportPreview struct {
 	ValidRows       int                    `json:"valid_rows"`
 	Inserted        int                    `json:"inserted"`
 	Updated         int                    `json:"updated"`
+	SummaryRows     int                    `json:"summary_rows"`
+	SummaryInserted int                    `json:"summary_inserted"`
+	SummaryUpdated  int                    `json:"summary_updated"`
 	Warnings        int                    `json:"warnings"`
 	Errors          int                    `json:"errors"`
 	Issues          []model.ImportRowIssue `json:"issues"`
@@ -96,25 +99,28 @@ type cachedPreview struct {
 	encoding  string
 	delimiter string
 	rows      []ParsedRow
+	summaries []ParsedSummary
 	expiresAt time.Time
 }
 
 // ImportService 负责预检、重复检测与后续的原子写入。
 type ImportService struct {
-	recordRepo *repository.RecordRepository
-	importRepo *repository.ImportRepository
-	configs    *config.RuntimeStore
+	recordRepo  *repository.RecordRepository
+	eveningRepo *repository.EveningRepository
+	importRepo  *repository.ImportRepository
+	configs     *config.RuntimeStore
 
 	mu       sync.Mutex
 	previews map[string]*cachedPreview
 }
 
-func NewImportService(recordRepo *repository.RecordRepository, importRepo *repository.ImportRepository, configs *config.RuntimeStore) *ImportService {
+func NewImportService(recordRepo *repository.RecordRepository, eveningRepo *repository.EveningRepository, importRepo *repository.ImportRepository, configs *config.RuntimeStore) *ImportService {
 	return &ImportService{
-		recordRepo: recordRepo,
-		importRepo: importRepo,
-		configs:    configs,
-		previews:   make(map[string]*cachedPreview),
+		recordRepo:  recordRepo,
+		eveningRepo: eveningRepo,
+		importRepo:  importRepo,
+		configs:     configs,
+		previews:    make(map[string]*cachedPreview),
 	}
 }
 
@@ -145,16 +151,21 @@ func (s *ImportService) Preview(userID int64, in ImportPreviewInput) (*ImportPre
 		}
 		trimmed := strings.TrimSpace(string(in.Data))
 		if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+			parsed = ParseJSONBackup(in.Data)
 			preview.SourceType = "json"
 			preview.FileName = in.FileName
-			preview.Fatal = "JSON 备份导入将在备份 v2 完成后启用，当前请使用 CSV 或备忘录文本"
-			return preview, nil
+			if preview.FileName == "" {
+				preview.FileName = "备份文件"
+			}
+			preview.FileSize = int64(len(in.Data))
+			preview.FileHash = hashBytes(in.Data)
+		} else {
+			parsed = ParseCSV(in.Data)
+			preview.SourceType = "csv"
+			preview.FileName = in.FileName
+			preview.FileSize = int64(len(in.Data))
+			preview.FileHash = hashBytes(in.Data)
 		}
-		parsed = ParseCSV(in.Data)
-		preview.SourceType = "csv"
-		preview.FileName = in.FileName
-		preview.FileSize = int64(len(in.Data))
-		preview.FileHash = hashBytes(in.Data)
 	default:
 		preview.Fatal = "请选择要导入的文件，或粘贴备忘录文本"
 		return preview, nil
@@ -167,15 +178,21 @@ func (s *ImportService) Preview(userID int64, in ImportPreviewInput) (*ImportPre
 		preview.Fatal = parsed.Fatal
 		return preview, nil
 	}
-	if len(parsed.Rows) > importMaxRows {
-		preview.Fatal = fmt.Sprintf("共 %d 行，超过单次 %d 行上限，请按年份拆分后导入", len(parsed.Rows), importMaxRows)
+	totalEntries := len(parsed.Rows) + len(parsed.Summaries)
+	if totalEntries > importMaxRows {
+		preview.Fatal = fmt.Sprintf("共 %d 条数据，超过单次 %d 条上限，请按年份拆分后导入", totalEntries, importMaxRows)
 		return preview, nil
 	}
 
 	preview.TotalRows = len(parsed.Rows)
+	preview.SummaryRows = len(parsed.Summaries)
 
 	// 一次性取出日期范围内的现有记录，避免逐行查库。
 	existing, err := s.existingRecords(userID, parsed.Rows)
+	if err != nil {
+		return nil, err
+	}
+	existingSummary, err := s.existingSummaries(userID, parsed.Summaries)
 	if err != nil {
 		return nil, err
 	}
@@ -211,6 +228,23 @@ func (s *ImportService) Preview(userID int64, in ImportPreviewInput) (*ImportPre
 			})
 		} else {
 			preview.DiffsTruncated = true
+		}
+	}
+
+	for i := range parsed.Summaries {
+		summary := &parsed.Summaries[i]
+		preview.Warnings += len(summary.Warnings)
+		issues = append(issues, summary.Warnings...)
+		if len(summary.Errors) > 0 {
+			errorRows++
+			preview.Errors += len(summary.Errors)
+			issues = append(issues, summary.Errors...)
+			continue
+		}
+		if existingSummary[summary.Date] {
+			preview.SummaryUpdated++
+		} else {
+			preview.SummaryInserted++
 		}
 	}
 
@@ -251,6 +285,7 @@ func (s *ImportService) Preview(userID int64, in ImportPreviewInput) (*ImportPre
 		encoding:  parsed.Encoding,
 		delimiter: parsed.Delimiter,
 		rows:      parsed.Rows,
+		summaries: parsed.Summaries,
 		expiresAt: expiresAt,
 	}
 	s.mu.Unlock()
@@ -284,6 +319,28 @@ func (s *ImportService) existingRecords(userID int64, rows []ParsedRow) (map[str
 	}
 	for _, rec := range records {
 		result[rec.RecordDate] = rec
+	}
+	return result, nil
+}
+
+// existingSummaries 返回导入文件中已存在同日期小结的日期集合。
+func (s *ImportService) existingSummaries(userID int64, summaries []ParsedSummary) (map[string]bool, error) {
+	result := make(map[string]bool)
+	if len(summaries) == 0 || s.eveningRepo == nil {
+		return result, nil
+	}
+	all, err := s.eveningRepo.ListAll(userID)
+	if err != nil {
+		return nil, fmt.Errorf("读取现有睡前小结失败: %w", err)
+	}
+	needed := make(map[string]bool, len(summaries))
+	for i := range summaries {
+		needed[summaries[i].Date] = true
+	}
+	for _, item := range all {
+		if needed[item.RecordDate] {
+			result[item.RecordDate] = true
+		}
 	}
 	return result, nil
 }
@@ -455,23 +512,29 @@ type ImportConfirmInput struct {
 
 // ImportConfirmResult 写入终态：success（全部写入）/ partial（跳过错误行后写入）/ failed（0 行写入）。
 type ImportConfirmResult struct {
-	BatchID      int64  `json:"batch_id"`
-	Status       string `json:"status"`
-	TotalRows    int    `json:"total_rows"`
-	Inserted     int    `json:"inserted"`
-	Updated      int    `json:"updated"`
-	Skipped      int    `json:"skipped"`
-	Warnings     int    `json:"warnings"`
-	Errors       int    `json:"errors"`
-	ConflictMode string `json:"conflict_mode"`
-	SkipErrors   bool   `json:"skip_errors"`
-	ErrorMessage string `json:"error_message,omitempty"`
+	BatchID         int64  `json:"batch_id"`
+	Status          string `json:"status"`
+	TotalRows       int    `json:"total_rows"`
+	Inserted        int    `json:"inserted"`
+	Updated         int    `json:"updated"`
+	Skipped         int    `json:"skipped"`
+	SummaryRows     int    `json:"summary_rows"`
+	SummaryInserted int    `json:"summary_inserted"`
+	SummaryUpdated  int    `json:"summary_updated"`
+	Warnings        int    `json:"warnings"`
+	Errors          int    `json:"errors"`
+	ConflictMode    string `json:"conflict_mode"`
+	SkipErrors      bool   `json:"skip_errors"`
+	ErrorMessage    string `json:"error_message,omitempty"`
 }
 
 // importBatchDetail 落库的行级明细，供批次历史与失败重试展示。
 type importBatchDetail struct {
-	Issues       []model.ImportRowIssue `json:"issues"`
-	SkippedLines []int                  `json:"skipped_lines,omitempty"`
+	Issues          []model.ImportRowIssue `json:"issues"`
+	SkippedLines    []int                  `json:"skipped_lines,omitempty"`
+	SummaryRows     int                    `json:"summary_rows"`
+	SummaryInserted int                    `json:"summary_inserted"`
+	SummaryUpdated  int                    `json:"summary_updated"`
 }
 
 // Confirm 按预览结果原子写入：单事务全部成功或 0 行写入。
@@ -500,6 +563,7 @@ func (s *ImportService) Confirm(userID int64, in ImportConfirmInput) (*ImportCon
 	}
 
 	rows := cached.rows
+	summaries := cached.summaries
 	errorRows, warnings, errorsTotal := 0, 0, 0
 	issues := make([]model.ImportRowIssue, 0)
 	skippedLines := make([]int, 0)
@@ -513,13 +577,22 @@ func (s *ImportService) Confirm(userID int64, in ImportConfirmInput) (*ImportCon
 			skippedLines = append(skippedLines, rows[i].Line)
 		}
 	}
+	for i := range summaries {
+		warnings += len(summaries[i].Warnings)
+		issues = append(issues, summaries[i].Warnings...)
+		if len(summaries[i].Errors) > 0 {
+			errorRows++
+			errorsTotal += len(summaries[i].Errors)
+			issues = append(issues, summaries[i].Errors...)
+		}
+	}
 
 	if errorsTotal > 0 && !in.SkipErrors {
 		return nil, &ImportRowsInvalidError{Rows: errorRows}
 	}
 
 	green, yellow := s.sleepThresholds()
-	upserts := make([]repository.ImportUpsertRow, 0, len(rows)-errorRows)
+	upserts := make([]repository.ImportUpsertRow, 0, len(rows))
 	for i := range rows {
 		row := &rows[i]
 		if len(row.Errors) > 0 {
@@ -538,12 +611,30 @@ func (s *ImportService) Confirm(userID int64, in ImportConfirmInput) (*ImportCon
 			SleepTag:        sleepTag,
 		})
 	}
-	if len(upserts) == 0 {
+
+	summaryUpserts := make([]repository.ImportUpsertSummary, 0, len(summaries))
+	for i := range summaries {
+		summary := &summaries[i]
+		if len(summary.Errors) > 0 {
+			continue
+		}
+		summaryUpserts = append(summaryUpserts, repository.ImportUpsertSummary{
+			Date:      summary.Date,
+			DoneItems: summary.DoneItems,
+			NoteText:  summary.NoteText,
+			Score:     summary.Score,
+		})
+	}
+	if len(upserts) == 0 && len(summaryUpserts) == 0 {
 		return nil, ErrImportNoValidRows
 	}
 
 	detailJSON := "{}"
-	if b, err := json.Marshal(importBatchDetail{Issues: capIssues(issues), SkippedLines: skippedLines}); err == nil {
+	if b, err := json.Marshal(importBatchDetail{
+		Issues:       capIssues(issues),
+		SkippedLines: skippedLines,
+		SummaryRows:  len(summaries),
+	}); err == nil {
 		detailJSON = string(b)
 	}
 
@@ -565,7 +656,7 @@ func (s *ImportService) Confirm(userID int64, in ImportConfirmInput) (*ImportCon
 		return nil, err
 	}
 
-	inserted, updated, err := s.recordRepo.ImportUpsertBatch(userID, upserts, mode)
+	counts, err := s.recordRepo.ImportUpsertBatch(userID, upserts, summaryUpserts, mode)
 	if err != nil {
 		// 事务已整体回滚，这里只记录失败批次，不写任何健康数据。
 		batch.Status = model.ImportStatusFailed
@@ -579,6 +670,7 @@ func (s *ImportService) Confirm(userID int64, in ImportConfirmInput) (*ImportCon
 			Status:       batch.Status,
 			TotalRows:    batch.TotalRows,
 			Skipped:      errorRows,
+			SummaryRows:  len(summaries),
 			Warnings:     warnings,
 			Errors:       errorsTotal,
 			ConflictMode: mode,
@@ -592,9 +684,19 @@ func (s *ImportService) Confirm(userID int64, in ImportConfirmInput) (*ImportCon
 		status = model.ImportStatusPartial
 	}
 	batch.Status = status
-	batch.Inserted = inserted
-	batch.Updated = updated
+	batch.Inserted = counts.Inserted
+	batch.Updated = counts.Updated
 	batch.Skipped = errorRows
+	batch.DetailJSON = "{}"
+	if b, err := json.Marshal(importBatchDetail{
+		Issues:          capIssues(issues),
+		SkippedLines:    skippedLines,
+		SummaryRows:     len(summaries),
+		SummaryInserted: counts.SummaryInserted,
+		SummaryUpdated:  counts.SummaryUpdated,
+	}); err == nil {
+		batch.DetailJSON = string(b)
+	}
 	if err := s.importRepo.UpdateResult(batch); err != nil {
 		return nil, err
 	}
@@ -604,16 +706,19 @@ func (s *ImportService) Confirm(userID int64, in ImportConfirmInput) (*ImportCon
 	s.mu.Unlock()
 
 	return &ImportConfirmResult{
-		BatchID:      batch.ID,
-		Status:       status,
-		TotalRows:    batch.TotalRows,
-		Inserted:     inserted,
-		Updated:      updated,
-		Skipped:      errorRows,
-		Warnings:     warnings,
-		Errors:       errorsTotal,
-		ConflictMode: mode,
-		SkipErrors:   in.SkipErrors,
+		BatchID:         batch.ID,
+		Status:          status,
+		TotalRows:       batch.TotalRows,
+		Inserted:        counts.Inserted,
+		Updated:         counts.Updated,
+		Skipped:         errorRows,
+		SummaryRows:     len(summaries),
+		SummaryInserted: counts.SummaryInserted,
+		SummaryUpdated:  counts.SummaryUpdated,
+		Warnings:        warnings,
+		Errors:          errorsTotal,
+		ConflictMode:    mode,
+		SkipErrors:      in.SkipErrors,
 	}, nil
 }
 

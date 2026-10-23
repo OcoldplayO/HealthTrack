@@ -353,81 +353,129 @@ type ImportUpsertRow struct {
 	SleepTag        string
 }
 
-// importExisting 事务内读取的既有记录，只取导入涉及的字段。
-type importExisting struct {
-	recordDate   string
-	weightAM     *float64
-	weightPM     *float64
-	waistSize    *float64
-	sleepStart   *string
-	sleepEnd     *string
-	sleepHours   *float64
-	sleepTag     string
-	journalText  string
-	activityTags string
+// ImportUpsertSummary 睡前小结的写入单元。照片不参与导入，PhotoID 保持为空。
+type ImportUpsertSummary struct {
+	Date      string
+	DoneItems []string
+	NoteText  string
+	Score     int
 }
 
-// ImportUpsertBatch 在单个事务内批量写入导入数据。
+// ImportWriteCounts 批量写入的实际行数。
+type ImportWriteCounts struct {
+	Inserted        int
+	Updated         int
+	SummaryInserted int
+	SummaryUpdated  int
+}
+
+// importExisting 事务内读取的既有记录，只取导入涉及的字段。
+type importExisting struct {
+	recordDate     string
+	weightAM       *float64
+	weightPM       *float64
+	waistSize      *float64
+	sleepStart     *string
+	sleepEnd       *string
+	sleepHours     *float64
+	sleepTag       string
+	journalText    string
+	activityTags   string
+	exerciseJSON   string
+	coldShowerJSON string
+	concertaJSON   string
+}
+
+// importExistingSummary 事务内读取的既有睡前小结。
+type importExistingSummary struct {
+	done  [3]string
+	note  string
+	score int
+}
+
+// ImportUpsertBatch 在单个事务内批量写入导入数据（健康记录 + 睡前小结）。
 // 事务内先读既有记录再写，任何一步失败都会整体回滚（保证 0 行写入）。
 // conflictMode 决定缺失字段的处理：merge 保留旧值，overwrite 清空；
-// 运动 / 冷水澡 / 专注达等结构化扩展字段不参与导入，两种模式下均原样保留。
-func (r *RecordRepository) ImportUpsertBatch(userID int64, rows []ImportUpsertRow, conflictMode string) (int, int, error) {
-	if len(rows) == 0 {
-		return 0, 0, nil
+// 运动 / 冷水澡 / 专注达等结构化扩展字段仅在导入数据中携带时覆盖，不会被清空。
+func (r *RecordRepository) ImportUpsertBatch(userID int64, rows []ImportUpsertRow, summaries []ImportUpsertSummary, conflictMode string) (ImportWriteCounts, error) {
+	var counts ImportWriteCounts
+	if len(rows) == 0 && len(summaries) == 0 {
+		return counts, nil
 	}
 
 	tx, err := r.db.Begin()
 	if err != nil {
-		return 0, 0, fmt.Errorf("开启导入事务失败: %w", err)
+		return counts, fmt.Errorf("开启导入事务失败: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	minDate, maxDate := rows[0].Date, rows[0].Date
+	minDate, maxDate := "", ""
+	extendRange := func(date string) {
+		if date == "" {
+			return
+		}
+		if minDate == "" || date < minDate {
+			minDate = date
+		}
+		if maxDate == "" || date > maxDate {
+			maxDate = date
+		}
+	}
 	for i := range rows {
-		if rows[i].Date < minDate {
-			minDate = rows[i].Date
-		}
-		if rows[i].Date > maxDate {
-			maxDate = rows[i].Date
-		}
+		extendRange(rows[i].Date)
+	}
+	for i := range summaries {
+		extendRange(summaries[i].Date)
 	}
 
 	existing, err := importExistingRecords(tx, userID, minDate, maxDate)
 	if err != nil {
-		return 0, 0, err
+		return counts, err
+	}
+	existingSummaries, err := importExistingSummaries(tx, userID, minDate, maxDate)
+	if err != nil {
+		return counts, err
 	}
 
-	inserted, updated := 0, 0
 	for i := range rows {
 		row := &rows[i]
 		old := existing[row.Date]
 		if old == nil {
 			if err := importInsertRecord(tx, userID, row); err != nil {
-				return 0, 0, err
+				return ImportWriteCounts{}, err
 			}
-			inserted++
+			counts.Inserted++
 			continue
 		}
 		if err := importUpdateRecord(tx, userID, row, old, conflictMode); err != nil {
-			return 0, 0, err
+			return ImportWriteCounts{}, err
 		}
-		updated++
+		counts.Updated++
+	}
+
+	counts.SummaryInserted, counts.SummaryUpdated, err = importWriteSummaries(tx, userID, summaries, existingSummaries, conflictMode)
+	if err != nil {
+		return ImportWriteCounts{}, err
 	}
 
 	if err := tx.Commit(); err != nil {
-		return 0, 0, fmt.Errorf("提交导入事务失败: %w", err)
+		return ImportWriteCounts{}, fmt.Errorf("提交导入事务失败: %w", err)
 	}
-	return inserted, updated, nil
+	return counts, nil
 }
 
 // importExistingRecords 事务内取出日期区间内的既有记录，按日期建索引。
 func importExistingRecords(tx *sql.Tx, userID int64, minDate, maxDate string) (map[string]*importExisting, error) {
+	if minDate == "" {
+		return map[string]*importExisting{}, nil
+	}
 	query := `
 	SELECT record_date, weight_am, weight_pm, waist_size,
 	       COALESCE(NULLIF(sleep_start_time, ''), NULLIF(sleep_bed_time, '')),
 	       COALESCE(NULLIF(sleep_end_time, ''), NULLIF(sleep_wake_time, '')),
 	       sleep_hours, COALESCE(sleep_tag, ''),
-	       COALESCE(journal_text, ''), COALESCE(activity_tags, '')
+	       COALESCE(journal_text, ''), COALESCE(activity_tags, ''),
+	       COALESCE(exercise_json, '{}'), COALESCE(cold_shower_json, '{}'), COALESCE(concerta_json, '{}')
 	FROM health_records
 	WHERE user_id = ? AND record_date >= ? AND record_date <= ?
 	`
@@ -445,6 +493,7 @@ func importExistingRecords(tx *sql.Tx, userID int64, minDate, maxDate string) (m
 			&rec.recordDate, &rec.weightAM, &rec.weightPM, &rec.waistSize,
 			&start, &end, &rec.sleepHours, &rec.sleepTag,
 			&rec.journalText, &rec.activityTags,
+			&rec.exerciseJSON, &rec.coldShowerJSON, &rec.concertaJSON,
 		); err != nil {
 			return nil, fmt.Errorf("扫描导入目标记录失败: %w", err)
 		}
@@ -464,16 +513,107 @@ func importExistingRecords(tx *sql.Tx, userID int64, minDate, maxDate string) (m
 	return result, nil
 }
 
+// importExistingSummaries 事务内取出日期区间内的既有睡前小结。
+func importExistingSummaries(tx *sql.Tx, userID int64, minDate, maxDate string) (map[string]*importExistingSummary, error) {
+	result := make(map[string]*importExistingSummary)
+	if minDate == "" {
+		return result, nil
+	}
+	rows, err := tx.Query(`
+		SELECT record_date, COALESCE(done_1, ''), COALESCE(done_2, ''), COALESCE(done_3, ''),
+		       COALESCE(note_text, ''), COALESCE(score, 0)
+		FROM evening_summaries
+		WHERE user_id = ? AND record_date >= ? AND record_date <= ?
+	`, userID, minDate, maxDate)
+	if err != nil {
+		return nil, fmt.Errorf("读取导入目标小结失败: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		rec := &importExistingSummary{}
+		var date string
+		if err := rows.Scan(&date, &rec.done[0], &rec.done[1], &rec.done[2], &rec.note, &rec.score); err != nil {
+			return nil, fmt.Errorf("扫描导入目标小结失败: %w", err)
+		}
+		result[date] = rec
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("遍历导入目标小结失败: %w", err)
+	}
+	return result, nil
+}
+
+// importWriteSummaries 写入睡前小结，返回新增与更新数量。
+func importWriteSummaries(tx *sql.Tx, userID int64, summaries []ImportUpsertSummary, existing map[string]*importExistingSummary, mode string) (int, int, error) {
+	inserted, updated := 0, 0
+	for i := range summaries {
+		s := &summaries[i]
+		done := summaryDoneItems(s.DoneItems)
+		old := existing[s.Date]
+		if old == nil {
+			if _, err := tx.Exec(`
+				INSERT INTO evening_summaries (user_id, record_date, done_1, done_2, done_3, note_text, score, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+			`, userID, s.Date, done[0], done[1], done[2], s.NoteText, s.Score); err != nil {
+				return 0, 0, fmt.Errorf("导入新增小结 %s 失败: %w", s.Date, err)
+			}
+			inserted++
+			continue
+		}
+
+		finalDone, finalNote, finalScore := old.done, old.note, old.score
+		if mode == model.ImportConflictOverwrite {
+			finalDone, finalNote, finalScore = done, s.NoteText, s.Score
+		} else {
+			if hasDoneItems(done) {
+				finalDone = done
+			}
+			if s.NoteText != "" {
+				finalNote = s.NoteText
+			}
+			if s.Score > 0 {
+				finalScore = s.Score
+			}
+		}
+
+		if _, err := tx.Exec(`
+			UPDATE evening_summaries SET
+				done_1 = ?, done_2 = ?, done_3 = ?, note_text = ?, score = ?,
+				updated_at = CURRENT_TIMESTAMP
+			WHERE user_id = ? AND record_date = ?
+		`, finalDone[0], finalDone[1], finalDone[2], finalNote, finalScore, userID, s.Date); err != nil {
+			return 0, 0, fmt.Errorf("导入更新小结 %s 失败: %w", s.Date, err)
+		}
+		updated++
+	}
+	return inserted, updated, nil
+}
+
+// summaryDoneItems 把完成事项裁剪为固定 3 个槽位。
+func summaryDoneItems(items []string) [3]string {
+	var done [3]string
+	for i := 0; i < len(items) && i < 3; i++ {
+		done[i] = items[i]
+	}
+	return done
+}
+
+func hasDoneItems(done [3]string) bool {
+	return done[0] != "" || done[1] != "" || done[2] != ""
+}
+
 const importInsertSQL = `
 INSERT INTO health_records (
 	user_id, record_date, weight_am, weight_pm, waist_size,
 	sleep_start_time, sleep_end_time, sleep_hours, sleep_tag,
 	journal_text, activity_tags,
-	sleep_bed_time, sleep_wake_time, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	sleep_bed_time, sleep_wake_time, exercise_json, cold_shower_json, concerta_json,
+	updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 `
 
-// importInsertRecord 新增一行；扩展字段保持默认空值，不覆盖任何既有结构化数据。
+// importInsertRecord 新增一行；结构化扩展字段仅在备份携带时写入。
 func importInsertRecord(tx *sql.Tx, userID int64, row *ImportUpsertRow) error {
 	tag := row.SleepTag
 	if tag == "" {
@@ -488,6 +628,9 @@ func importInsertRecord(tx *sql.Tx, userID int64, row *ImportUpsertRow) error {
 		row.DTO.SleepStartTime, row.DTO.SleepEndTime, row.DTO.SleepHours, tag,
 		stringValue(row.DTO.JournalText), activityTags,
 		stringValue(row.DTO.SleepStartTime), stringValue(row.DTO.SleepEndTime),
+		marshalImportExt(row.DTO.Exercise, "{}"),
+		marshalImportExt(row.DTO.ColdShower, "{}"),
+		marshalImportExt(row.DTO.Concerta, "{}"),
 	)
 	if err != nil {
 		return fmt.Errorf("导入新增 %s 失败: %w", row.Date, err)
@@ -501,6 +644,7 @@ UPDATE health_records SET
 	sleep_start_time = ?, sleep_end_time = ?, sleep_hours = ?, sleep_tag = ?,
 	journal_text = ?, activity_tags = ?,
 	sleep_bed_time = ?, sleep_wake_time = ?,
+	exercise_json = ?, cold_shower_json = ?, concerta_json = ?,
 	updated_at = CURRENT_TIMESTAMP
 WHERE user_id = ? AND record_date = ?
 `
@@ -534,12 +678,30 @@ func importUpdateRecord(tx *sql.Tx, userID int64, row *ImportUpsertRow, old *imp
 		sleepStart, sleepEnd, sleepHours, resolveImportSleepTag(mode, row, old, cleared),
 		stringValue(journal), activityTags,
 		stringValue(sleepStart), stringValue(sleepEnd),
+		marshalImportExt(row.DTO.Exercise, old.exerciseJSON),
+		marshalImportExt(row.DTO.ColdShower, old.coldShowerJSON),
+		marshalImportExt(row.DTO.Concerta, old.concertaJSON),
 		userID, row.Date,
 	)
 	if err != nil {
 		return fmt.Errorf("导入更新 %s 失败: %w", row.Date, err)
 	}
 	return nil
+}
+
+// marshalImportExt 序列化结构化扩展字段；导入数据未携带时沿用旧值，避免误清空。
+func marshalImportExt(v any, fallback string) string {
+	if v == nil {
+		if fallback == "" {
+			return "{}"
+		}
+		return fallback
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return fallback
+	}
+	return string(b)
 }
 
 // resolveImportFloat 计算数值字段的最终值：显式清空优先；缺失字段 merge 保留旧值、overwrite 清空。

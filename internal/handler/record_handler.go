@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"healthtrack/internal/model"
+	"healthtrack/internal/repository"
 	"healthtrack/internal/service"
 	"log/slog"
 	"net/http"
@@ -15,12 +16,14 @@ import (
 type RecordHandler struct {
 	recordService *service.RecordService
 	aiService     *service.AIService
+	eveningRepo   *repository.EveningRepository
 }
 
-func NewRecordHandler(recordService *service.RecordService, aiService *service.AIService) *RecordHandler {
+func NewRecordHandler(recordService *service.RecordService, aiService *service.AIService, eveningRepo *repository.EveningRepository) *RecordHandler {
 	return &RecordHandler{
 		recordService: recordService,
 		aiService:     aiService,
+		eveningRepo:   eveningRepo,
 	}
 }
 
@@ -190,8 +193,13 @@ func (h *RecordHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 	w.Write(buf.Bytes())
 }
 
-// ExportJSON 导出全量 JSON 备份
+// ExportJSON 导出全量 JSON 备份（v2）：健康记录 + 睡前小结。
+// 照片与 AI 洞察不进入备份，由 excluded 字段显式声明。
 func (h *RecordHandler) ExportJSON(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, model.Error(http.StatusMethodNotAllowed, "Method Not Allowed"))
+		return
+	}
 	userID := int64(1)
 	records, err := h.recordService.GetAllRecords(userID)
 	if err != nil {
@@ -199,8 +207,33 @@ func (h *RecordHandler) ExportJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=healthtrack_backup_%s.json", time.Now().Format("20060102")))
-	writeJSON(w, http.StatusOK, model.Success(records))
+	summaries, err := h.eveningRepo.ListAll(userID)
+	if err != nil {
+		writeJSON(w, http.StatusOK, model.Error(model.CodeDBError, err.Error()))
+		return
+	}
+	// 小结照片不导出，清空引用避免恢复后指向不存在的图片。
+	for _, item := range summaries {
+		item.PhotoID = nil
+	}
+
+	backup := model.BackupFile{
+		SchemaVersion:    model.BackupSchemaVersion,
+		App:              "HealthTrack",
+		ExportedAt:       time.Now().Format(time.RFC3339),
+		RecordCount:      len(records),
+		SummaryCount:     len(summaries),
+		HealthRecords:    records,
+		EveningSummaries: summaries,
+		Excluded:         model.BackupExcluded,
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=HealthTrack_backup_v2_%s.json", time.Now().Format("20060102")))
+	w.WriteHeader(http.StatusOK)
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(backup)
 }
 
 // Healthz 探针

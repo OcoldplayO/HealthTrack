@@ -94,11 +94,11 @@ func main() {
 	eveningService := service.NewEveningService(eveningRepo, runtimeConfigs)
 	compareService := service.NewCompareService(recordService)
 	aiService := service.NewAIService(runtimeConfigs, recordRepo)
-	importService := service.NewImportService(recordRepo, importRepo, runtimeConfigs)
+	importService := service.NewImportService(recordRepo, eveningRepo, importRepo, runtimeConfigs)
 	aiHandler := handler.NewAIHandler(runtimeConfigs, insightService, recordService, compareService, insightRepo, eveningRepo)
 	insightHandler := handler.NewInsightHandler(insightRepo)
 	configHandler := handler.NewConfigHandler(runtimeConfigs)
-	recordHandler := handler.NewRecordHandler(recordService, aiService)
+	recordHandler := handler.NewRecordHandler(recordService, aiService, eveningRepo)
 	eveningHandler := handler.NewEveningHandler(eveningService)
 	importHandler := handler.NewImportHandler(importService)
 
