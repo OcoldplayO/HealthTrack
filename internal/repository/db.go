@@ -120,6 +120,34 @@ func (m *DBManager) migrate() error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_evening_photos_user_date ON evening_photos(user_id, record_date);
+
+	CREATE TABLE IF NOT EXISTS import_batches (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL DEFAULT 1,
+		source_type TEXT NOT NULL DEFAULT 'csv',
+		file_name TEXT DEFAULT '',
+		file_hash TEXT DEFAULT '',
+		file_size INTEGER NOT NULL DEFAULT 0,
+		total_rows INTEGER NOT NULL DEFAULT 0,
+		inserted INTEGER NOT NULL DEFAULT 0,
+		updated INTEGER NOT NULL DEFAULT 0,
+		skipped INTEGER NOT NULL DEFAULT 0,
+		warnings INTEGER NOT NULL DEFAULT 0,
+		errors INTEGER NOT NULL DEFAULT 0,
+		conflict_mode TEXT NOT NULL DEFAULT 'merge',
+		skip_errors INTEGER NOT NULL DEFAULT 0,
+		status TEXT NOT NULL DEFAULT 'pending',
+		error_message TEXT DEFAULT '',
+		detail_json TEXT DEFAULT '{}',
+		cache_path TEXT DEFAULT '',
+		root_batch_id INTEGER,
+		attempt_no INTEGER NOT NULL DEFAULT 1,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		finished_at DATETIME
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_import_batches_user_id ON import_batches(user_id, id DESC);
+	CREATE INDEX IF NOT EXISTS idx_import_batches_hash ON import_batches(user_id, file_hash);
 	`
 	if _, err := m.DB.Exec(schema); err != nil {
 		return err

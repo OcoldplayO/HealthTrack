@@ -81,6 +81,14 @@ func main() {
 	recordRepo := repository.NewRecordRepository(dbMgr.DB)
 	insightRepo := repository.NewInsightRepository(dbMgr.DB)
 	eveningRepo := repository.NewEveningRepository(dbMgr.DB)
+	importRepo := repository.NewImportRepository(dbMgr.DB)
+
+	// 上次进程退出时仍处于 pending 的批次，其事务已被 SQLite 回滚，统一标记为中断。
+	if n, err := importRepo.MarkPendingInterrupted(1); err != nil {
+		slog.Warn("标记中断的导入批次失败", "err", err)
+	} else if n > 0 {
+		slog.Info("已将中断的导入批次标记为 interrupted", "count", n)
+	}
 	recordService := service.NewRecordService(recordRepo, runtimeConfigs)
 	insightService := service.NewInsightService(recordRepo)
 	eveningService := service.NewEveningService(eveningRepo, runtimeConfigs)
