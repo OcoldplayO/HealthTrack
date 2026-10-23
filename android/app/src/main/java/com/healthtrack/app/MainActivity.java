@@ -322,9 +322,11 @@ public final class MainActivity extends Activity {
             filename = "HealthTrack_export.csv";
         }
         try {
+            // 按扩展名区分 CSV 与 JSON 备份，避免下载管理器把 JSON 当成表格文件。
+            String mimeType = filename.toLowerCase().endsWith(".json") ? "application/json" : "text/csv";
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
             request.setTitle(filename);
-            request.setMimeType("text/csv");
+            request.setMimeType(mimeType);
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
             // Android 10+ 分区存储下无需 WRITE_EXTERNAL_STORAGE 即可写入公共下载目录。
             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);

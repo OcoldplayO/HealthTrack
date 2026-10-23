@@ -10,6 +10,7 @@ import (
 	"healthtrack/internal/service"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -189,14 +190,18 @@ func (h *RecordHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 	fileName := fmt.Sprintf("HealthTrack_export_%s_%s.csv", rangeKey, time.Now().Format("20060102"))
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
+	data := buf.Bytes()
+	// 显式带上 Content-Length，前端才能显示文件大小、下载管理器也能显示进度。
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	w.WriteHeader(http.StatusOK)
-	w.Write(buf.Bytes())
+	w.Write(data)
 }
 
 // ExportJSON 导出全量 JSON 备份（v2）：健康记录 + 睡前小结。
 // 照片与 AI 洞察不进入备份，由 excluded 字段显式声明。
 func (h *RecordHandler) ExportJSON(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	// HEAD 用于前端探测文件大小，与 GET 走同一条路径。
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		writeJSON(w, http.StatusMethodNotAllowed, model.Error(http.StatusMethodNotAllowed, "Method Not Allowed"))
 		return
 	}
@@ -228,12 +233,19 @@ func (h *RecordHandler) ExportJSON(w http.ResponseWriter, r *http.Request) {
 		Excluded:         model.BackupExcluded,
 	}
 
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(backup); err != nil {
+		writeJSON(w, http.StatusOK, model.Error(model.CodeDBError, err.Error()))
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=HealthTrack_backup_v2_%s.json", time.Now().Format("20060102")))
+	w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
 	w.WriteHeader(http.StatusOK)
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	_ = enc.Encode(backup)
+	_, _ = w.Write(buf.Bytes())
 }
 
 // Healthz 探针
