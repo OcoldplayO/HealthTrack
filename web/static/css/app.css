@@ -1,0 +1,655 @@
+/* ============================================================
+   HealthTrack app.css — 从 index.html 提取 + Apple Health UI 2.0
+   v2.0  (Phase 0+1 合并：零回归拆分 + 设计系统 Tokens)
+   ============================================================ */
+
+/* ─── 原始基础样式（原汁原味移植，保持 100% 兼容） ─── */
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* 手机横屏 + 「60天详情」视图：临时解除手机框宽高限制 */
+#app-frame.frame-wide { max-width: none; height: 100vh; margin-top: 0; margin-bottom: 0; border-radius: 0; border: none; }
+#app-frame.frame-wide #td-topbar { display: flex; flex-direction: row; align-items: center; }
+#app-frame.frame-wide #td-topbar > * + * { margin-top: 0; }
+#app-frame.frame-wide #td-header { justify-content: flex-start; }
+#app-frame.frame-wide #td-header-spacer { display: none; }
+#app-frame.frame-wide #td-tabs { flex: 1; margin-left: 12px; }
+#app-frame.frame-wide #td-tabs > button { padding-top: 6px; padding-bottom: 6px; }
+#app-frame.frame-wide #td-card { padding: 8px; }
+#app-frame.frame-wide #td-card > * + * { margin-top: 8px; }
+#app-frame.frame-wide #td-metric-head { display: none; }
+#app-frame.frame-wide #td-detail { display: none; }
+#app-frame.frame-wide #td-legend-card { display: none; }
+
+.fade-in { animation: fadeIn 0.25s ease-out forwards; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.typing-cursor::after { content: '▋'; animation: blink 1s infinite; color: #3b82f6; }
+@keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+/* 胶囊与标签交互样式 */
+.pill-btn {
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: #f1f5f9;
+  color: #475569;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+.pill-btn.active {
+  background-color: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+}
+.pill-sm-btn {
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  background-color: #f1f5f9;
+  color: #64748b;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+.pill-sm-btn.active {
+  background-color: #3b82f6;
+  color: #ffffff;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  background-color: #f1f5f9;
+  color: #475569;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  border: 1px solid #e2e8f0;
+}
+.chip.active {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  font-weight: 600;
+}
+.chip-warn.active {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+  font-weight: 600;
+}
+
+.badge-green {
+  background-color: rgba(52, 199, 89, 0.12);
+  color: #1a7a35;
+  border: 1px solid rgba(52, 199, 89, 0.28);
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.badge-yellow {
+  background-color: rgba(255, 149, 0, 0.12);
+  color: #a05a00;
+  border: 1px solid rgba(255, 149, 0, 0.28);
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.badge-red {
+  background-color: rgba(255, 59, 48, 0.12);
+  color: #c0281e;
+  border: 1px solid rgba(255, 59, 48, 0.28);
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+/* 熬夜徽章在窄卡片里不允许折行，也不参与 flex 收缩 */
+.badge-green, .badge-yellow, .badge-red {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Markdown 渲染排版增强 */
+.markdown-body h1, .markdown-body h2, .markdown-body h3 {
+  font-weight: 700;
+  color: #0f172a;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+.markdown-body h3 {
+  font-size: 0.95rem;
+  color: #1e293b;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 0.25rem;
+}
+.markdown-body ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-top: 0.35rem;
+  margin-bottom: 0.5rem;
+  space-y: 0.25rem;
+}
+.markdown-body li {
+  margin-bottom: 0.35rem;
+  line-height: 1.6;
+}
+.markdown-body p {
+  margin-bottom: 0.6rem;
+  line-height: 1.65;
+}
+.markdown-body strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+  margin: 0.75rem 0;
+}
+
+/* ============================================================
+   睡前小结（第 4 个 Tab）专属样式：靛蓝 → 紫罗兰强调色
+   ============================================================ */
+:root {
+  --evo-accent:      #6366f1;
+  --evo-accent-deep: #8b5cf6;
+}
+@keyframes evRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes evPop  { 0% { transform: scale(1); } 45% { transform: scale(1.16); } 100% { transform: scale(1); } }
+@keyframes evSlideUp { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes evShimmer { 0% { background-position: -420px 0; } 100% { background-position: 420px 0; } }
+@keyframes evSwipeOut { to { opacity: 0; transform: translateX(-26px) scale(.97); } }
+.ev-rise { animation: evRise .42s cubic-bezier(.22,1,.36,1) both; }
+.ev-pop  { animation: evPop .32s cubic-bezier(.34,1.56,.64,1); }
+
+.evo-accent-grad      { background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%); }
+.evo-accent-grad-soft { background-image: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%); }
+.evo-grad-text {
+  background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+.evo-card {
+  background: #fff; border: 1px solid #eef2f7; border-radius: 1.25rem;
+  box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 10px 28px -18px rgba(15,23,42,.18);
+  transition: box-shadow .28s ease, transform .18s ease;
+}
+.evo-card-hero {
+  border-radius: 1.5rem; border: 1px solid #e6e9ff;
+  box-shadow: 0 1px 2px rgba(99,102,241,.05), 0 18px 40px -24px rgba(99,102,241,.45);
+}
+.evo-card-lite { box-shadow: none; border-color: #f1f5f9; }
+
+.evo-eyebrow {
+  font-size: .625rem; font-weight: 800; letter-spacing: .1em;
+  text-transform: uppercase; color: #94a3b8;
+}
+
+.evo-fchip {
+  padding: .3rem .7rem; border-radius: 9999px; font-size: .7rem; font-weight: 700;
+  background: #f8fafc; color: #64748b; border: 1px solid #e8edf5;
+  transition: all .18s cubic-bezier(.22,1,.36,1); white-space: nowrap;
+}
+.evo-fchip:active { transform: scale(.94); }
+.evo-fchip.active {
+  background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
+  color: #fff; border-color: transparent;
+  box-shadow: 0 6px 16px -6px rgba(99,102,241,.75);
+}
+
+/* 深色 AI 卡内的范围选择胶囊 */
+.evo-fchip-dark {
+  padding: .18rem .55rem; border-radius: 9999px; font-size: .62rem; font-weight: 800;
+  background: rgba(255,255,255,.07); color: #94a3b8; border: 1px solid rgba(148,163,184,.28);
+  transition: all .18s cubic-bezier(.22,1,.36,1); white-space: nowrap;
+}
+.evo-fchip-dark:active { transform: scale(.94); }
+.evo-fchip-dark.active {
+  background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
+  color: #fff; border-color: transparent;
+  box-shadow: 0 6px 16px -6px rgba(99,102,241,.75);
+}
+
+.evo-done-row { transition: background-color .2s ease, border-color .2s ease; }
+.evo-done-row:focus-within { background: #f5f6ff; border-color: #c7d2fe; }
+.evo-seq-dot {
+  width: 1.375rem; height: 1.375rem; border-radius: 9999px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .65rem; font-weight: 800; background: #f1f5f9; color: #94a3b8;
+  transition: all .22s cubic-bezier(.34,1.56,.64,1);
+}
+.evo-seq-dot.filled {
+  background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
+  color: #fff; box-shadow: 0 4px 10px -3px rgba(99,102,241,.7);
+}
+
+input[type="range"].evo-score-slider {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 26px; background: transparent; cursor: pointer;
+}
+input[type="range"].evo-score-slider::-webkit-slider-runnable-track {
+  height: 8px; border-radius: 9999px;
+  background: linear-gradient(to right, #6366f1 0%, #8b5cf6 var(--pct, 66%), #e9edf5 var(--pct, 66%), #e9edf5 100%);
+}
+input[type="range"].evo-score-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 26px; height: 26px; margin-top: -9px; border-radius: 9999px;
+  background: #fff; border: 3px solid var(--evo-accent);
+  box-shadow: 0 4px 14px -2px rgba(99,102,241,.65);
+  transition: transform .16s ease;
+}
+input[type="range"].evo-score-slider:active::-webkit-slider-thumb { transform: scale(1.14); }
+input[type="range"].evo-score-slider::-moz-range-track {
+  height: 8px; border-radius: 9999px; background: #e9edf5;
+}
+input[type="range"].evo-score-slider::-moz-range-progress {
+  height: 8px; border-radius: 9999px; background: linear-gradient(90deg, #6366f1, #8b5cf6);
+}
+input[type="range"].evo-score-slider::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 9999px;
+  background: #fff; border: 3px solid var(--evo-accent);
+  box-shadow: 0 4px 14px -2px rgba(99,102,241,.65);
+}
+
+.evo-collapsible { max-height: 0; overflow: hidden; transition: max-height .34s cubic-bezier(.4,0,.2,1); }
+.evo-collapsible.open { max-height: 1200px; }
+
+.evo-tl-item { position: relative; padding-left: 1.75rem; }
+.evo-tl-node {
+  position: absolute; left: 0; top: 1.1rem;
+  width: 10px; height: 10px; border-radius: 9999px;
+  background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
+  box-shadow: 0 0 0 4px #eef2ff;
+}
+.evo-tl-line { position: absolute; left: 4px; top: 1.85rem; bottom: 0; width: 1px; background: #e8edf5; }
+.evo-tl-item:last-child .evo-tl-line { display: none; }
+
+.evo-ai-card { background: #0f172a; border-radius: 1.5rem; box-shadow: 0 20px 44px -26px rgba(15,23,42,.9); }
+.evo-md-dark h3 { color: #e2e8f0; font-weight: 700; font-size: .85rem; margin: .7rem 0 .35rem; padding-bottom: .25rem; border-bottom: 1px solid rgba(148,163,184,.18); }
+.evo-md-dark h3:first-child { margin-top: 0; }
+.evo-md-dark h1, .evo-md-dark h2 { color: #f1f5f9; font-weight: 700; font-size: .9rem; margin: .7rem 0 .35rem; }
+.evo-md-dark p  { color: #cbd5e1; font-size: .78rem; line-height: 1.7; margin-bottom: .55rem; }
+.evo-md-dark ul { list-style: disc; padding-left: 1.15rem; margin-bottom: .5rem; }
+.evo-md-dark li { color: #cbd5e1; font-size: .78rem; line-height: 1.65; margin-bottom: .35rem; }
+.evo-md-dark strong { color: #fff; font-weight: 700; }
+.evo-md-dark code { background: rgba(148,163,184,.16); padding: 0 .25rem; border-radius: .25rem; }
+.evo-md-dark hr { border: 0; border-top: 1px solid rgba(148,163,184,.18); margin: .75rem 0; }
+
+.evo-swipe { position: relative; border-radius: 1.25rem; margin-bottom: .75rem; }
+.evo-swipe-action {
+  position: absolute; inset: 0; border-radius: 1.25rem; overflow: hidden;
+  background-image: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
+  display: flex; justify-content: flex-end; align-items: stretch;
+}
+.evo-swipe-del {
+  width: 84px; flex: none; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 3px;
+  color: #fff; font-size: .68rem; font-weight: 800; letter-spacing: .02em;
+  transition: background-color .16s ease;
+}
+.evo-swipe-del:active { background: rgba(255,255,255,.16); }
+.evo-swipe-panel {
+  position: relative; touch-action: pan-y; transform: translateX(0);
+  transition: transform .3s cubic-bezier(.22,1,.36,1); will-change: transform;
+}
+.evo-swipe.open .evo-swipe-panel { transform: translateX(-84px); }
+.evo-swipe.dragging .evo-swipe-panel { transition: none; }
+.evo-swipe.removing { animation: evSwipeOut .26s cubic-bezier(.4,0,.2,1) forwards; }
+
+
+/* ============================================================
+   Apple Health UI 2.0 设计系统 — Phase 1 Tokens
+   ============================================================ */
+:root {
+  /* 主色板：Apple Health 蓝 */
+  --ah-blue:        #007AFF;
+  --ah-blue-deep:   #0051D3;
+  --ah-blue-soft:   #EBF4FF;
+  --ah-blue-light:  rgba(0, 122, 255, 0.08);
+
+  /* 中性色 */
+  --ah-bg:          #F2F2F7;   /* iOS 系统背景灰 */
+  --ah-surface:     #FFFFFF;
+  --ah-surface2:    #F8F9FB;
+  --ah-border:      rgba(60, 60, 67, 0.13);
+  --ah-border-soft: rgba(60, 60, 67, 0.07);
+
+  /* 文字 */
+  --ah-text-primary:   #1C1C1E;
+  --ah-text-secondary: #48484A;
+  --ah-text-tertiary:  #8E8E93;
+  --ah-text-label:     #636366;
+
+  /* 语义色 */
+  --ah-green:  #34C759;
+  --ah-yellow: #FF9500;
+  --ah-red:    #FF3B30;
+  --ah-purple: #AF52DE;
+  --ah-teal:   #32ADE6;
+
+  /* 阴影层级 */
+  --ah-shadow-xs: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --ah-shadow-sm: 0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+  --ah-shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+  --ah-shadow-lg: 0 8px 28px rgba(0,0,0,0.10), 0 3px 10px rgba(0,0,0,0.05);
+
+  /* 圆角 */
+  --ah-radius-sm: 10px;
+  --ah-radius-md: 14px;
+  --ah-radius-lg: 18px;
+  --ah-radius-xl: 22px;
+}
+
+/* ── Apple Health 卡片 ── */
+.ah-card {
+  background: var(--ah-surface);
+  border-radius: var(--ah-radius-lg);
+  box-shadow: var(--ah-shadow-sm);
+  border: 1px solid var(--ah-border-soft);
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  overflow: hidden;
+}
+.ah-card:active {
+  transform: scale(0.988);
+  box-shadow: var(--ah-shadow-xs);
+}
+
+/* ── Apple 卡片底子（index.html 中 .apple-card 大量复用） ──
+   只补底色 / 描边 / 阴影；圆角继续由 Tailwind 的 rounded-* 控制，
+   因为 Tailwind 运行时注入的样式表在本文档之后，同权重会覆盖这里的 border-radius。 */
+.apple-card {
+  background: var(--ah-surface);
+  border: 1px solid var(--ah-border-soft);
+  box-shadow: var(--ah-shadow-xs);
+  transition: box-shadow 0.2s ease;
+}
+.apple-card-hover:active {
+  box-shadow: var(--ah-shadow-sm);
+}
+
+/* ── 点击涟漪效果 ── */
+.tap-effect {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.tap-effect:active {
+  opacity: 0.75;
+  transform: scale(0.97);
+}
+
+/* ── Apple Health 渐变主按钮 ── */
+.ah-btn-primary {
+  background: linear-gradient(135deg, var(--ah-blue) 0%, var(--ah-blue-deep) 100%);
+  color: #fff;
+  font-weight: 700;
+  border-radius: var(--ah-radius-md);
+  box-shadow: 0 4px 14px rgba(0, 122, 255, 0.30);
+  transition: all 0.18s ease;
+}
+.ah-btn-primary:active {
+  transform: scale(0.975);
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.20);
+}
+
+/* ── KPI 指标磁贴 ── */
+.ah-kpi-tile {
+  background: var(--ah-surface);
+  border-radius: var(--ah-radius-md);
+  padding: 14px 14px 12px;
+  box-shadow: var(--ah-shadow-xs);
+  border: 1px solid var(--ah-border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ah-kpi-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ah-text-tertiary);
+}
+.ah-kpi-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ah-text-primary);
+  line-height: 1;
+}
+.ah-kpi-unit {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ah-text-tertiary);
+  margin-left: 2px;
+}
+
+/* ── 输入卡片（Apple iOS 风格） ── */
+.ah-input-card {
+  background: var(--ah-surface);
+  border-radius: var(--ah-radius-md);
+  border: 1px solid var(--ah-border-soft);
+  box-shadow: var(--ah-shadow-xs);
+  padding: 12px 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.ah-input-card:focus-within {
+  border-color: var(--ah-blue);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12), var(--ah-shadow-xs);
+}
+.ah-input-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ah-text-tertiary);
+  display: block;
+  margin-bottom: 4px;
+}
+.ah-input-field {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ah-text-primary);
+  line-height: 1.2;
+}
+.ah-input-field::placeholder {
+  color: var(--ah-border);
+  font-weight: 400;
+}
+
+/* ── 熬夜徽章（新版，Apple Health 配色） ── */
+.ah-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.ah-badge-green  { background: rgba(52, 199, 89, 0.12);  color: #1a7a35; }
+.ah-badge-yellow { background: rgba(255, 149, 0, 0.12);  color: #a05a00; }
+.ah-badge-red    { background: rgba(255, 59, 48, 0.12);  color: #c0281e; }
+
+/* ── 分区标题条 ── */
+.ah-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+  margin-bottom: 10px;
+}
+.ah-section-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ah-text-primary);
+  letter-spacing: -0.01em;
+}
+
+/* ── 导航底栏 Tab（Apple Health 风格） ── */
+.ah-tab-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  padding: 4px 0;
+  color: var(--ah-text-tertiary);
+  transition: color 0.15s ease;
+}
+.ah-tab-btn.active {
+  color: var(--ah-blue);
+}
+.ah-tab-btn.active svg {
+  filter: drop-shadow(0 2px 4px rgba(0, 122, 255, 0.3));
+}
+
+/* ── Header Logo 徽章 ── */
+.ah-logo-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #007AFF 0%, #0051D3 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 10px rgba(0, 122, 255, 0.35);
+  color: white;
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: -0.03em;
+}
+
+/* ── Shimmer 加载骨架 ── */
+@keyframes ahShimmer {
+  0%   { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+.ah-shimmer {
+  background: linear-gradient(90deg, #f0f0f5 25%, #e8e8ef 50%, #f0f0f5 75%);
+  background-size: 600px 100%;
+  animation: ahShimmer 1.4s ease infinite;
+  border-radius: var(--ah-radius-sm);
+}
+
+/* ── AI 洞察卡片（浅色现代版） ── */
+.ah-insight-card {
+  background: linear-gradient(135deg, #f0f6ff 0%, #f5f0ff 100%);
+  border: 1px solid rgba(0, 122, 255, 0.12);
+  border-radius: var(--ah-radius-lg);
+  box-shadow: var(--ah-shadow-sm);
+}
+
+/* ── 保存按钮主题强化 ── */
+.ah-save-btn {
+  width: 100%;
+  padding: 15px;
+  border-radius: var(--ah-radius-lg);
+  background: linear-gradient(135deg, #007AFF 0%, #0051D3 100%);
+  color: white;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+  box-shadow: 0 6px 20px rgba(0, 122, 255, 0.35);
+  transition: all 0.18s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.ah-save-btn:active {
+  transform: scale(0.975);
+  box-shadow: 0 3px 10px rgba(0, 122, 255, 0.25);
+}
+
+/* ── 背景改为 Apple 系统灰 ── */
+.ah-page-bg {
+  background-color: var(--ah-bg);
+}
+
+/* ── 折叠面板 Apple Health 风格 ── */
+.ah-accordion {
+  background: var(--ah-surface);
+  border-radius: var(--ah-radius-lg);
+  border: 1px solid var(--ah-border-soft);
+  box-shadow: var(--ah-shadow-xs);
+  overflow: hidden;
+}
+.ah-accordion-header {
+  padding: 13px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.12s ease;
+}
+.ah-accordion-header:active {
+  background-color: var(--ah-surface2);
+}
+.ah-accordion-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ah-blue-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease;
+  flex-shrink: 0;
+}
+.ah-accordion-icon.open {
+  transform: rotate(180deg);
+  background: rgba(0, 122, 255, 0.15);
+}
+.ah-accordion-icon svg {
+  width: 11px;
+  height: 11px;
+  color: var(--ah-blue);
+}
+
+/* ── 记一笔 · 日期选择器 ──
+   原生 date 控件宽度随值变化重新测量，偶发把最后一位数字裁掉。
+   这里只给宽度兜底（w-[124px]），保留原生外观与日历图标，
+   因为在 Android WebView 上 appearance:none 会让日段不渲染（只显示 2026/10/）。 */
+#input-date {
+  min-width: 124px;
+}
+
+/* ── 指标卡底部“较昨日”行 ──
+   三列布局下单卡内容宽仅 78px，`↑ 较昨日 +0.6` + `晨测` 正好在临界值附近，
+   字体度量略有差异就会折行。这里禁止折行，并把右侧状态小字压到 8px 且不参与收缩。 */
+#diff-weight-am,
+#diff-weight-pm,
+#diff-waist,
+#diff-sleep {
+  white-space: nowrap;
+}
+#diff-weight-am > span:last-child,
+#diff-weight-pm > span:last-child,
+#diff-waist > span:last-child,
+#diff-sleep > span:last-child {
+  font-size: 8px;
+  flex-shrink: 0;
+}

@@ -8,305 +8,10 @@
   <script src="vendor/tailwind-3.4.17.js"></script>
   <!-- Chart.js：本地内置（锁定 4.5.1），不依赖公网 CDN，断网可用 -->
   <script src="vendor/chart-4.5.1.umd.min.js"></script>
-  <style>
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    /* 手机横屏 + 「60天详情」视图：临时解除手机框宽高限制，让 60 天能整屏铺满 */
-    /* 选择器特异性(1,1,0) 高于 Tailwind 的 .max-w-md/.sm\:h-\[840px\](0,1,0)，可稳定覆盖 */
-    #app-frame.frame-wide { max-width: none; height: 100vh; margin-top: 0; margin-bottom: 0; border-radius: 0; border: none; }
-    /* 横屏高度仅 360px 左右，竖向空间紧张：收紧为「一行头部(返回+标题+指标Tab) + 大图」紧凑布局，
-       避免图表被底部导航裁切（隐藏统计块/提示条/口径说明，压缩内边距） */
-    #app-frame.frame-wide #td-topbar { display: flex; flex-direction: row; align-items: center; }
-    #app-frame.frame-wide #td-topbar > * + * { margin-top: 0; }
-    #app-frame.frame-wide #td-header { justify-content: flex-start; }
-    #app-frame.frame-wide #td-header-spacer { display: none; }
-    #app-frame.frame-wide #td-tabs { flex: 1; margin-left: 12px; }
-    #app-frame.frame-wide #td-tabs > button { padding-top: 6px; padding-bottom: 6px; }
-    #app-frame.frame-wide #td-card { padding: 8px; }
-    #app-frame.frame-wide #td-card > * + * { margin-top: 8px; }
-    #app-frame.frame-wide #td-metric-head { display: none; }
-    #app-frame.frame-wide #td-detail { display: none; }
-    #app-frame.frame-wide #td-legend-card { display: none; }
-    .fade-in { animation: fadeIn 0.25s ease-out forwards; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-    .typing-cursor::after { content: '▋'; animation: blink 1s infinite; color: #3b82f6; }
-    @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
-
-    /* 胶囊与标签交互样式 */
-    .pill-btn {
-      padding: 0.35rem 0.75rem;
-      border-radius: 0.75rem;
-      font-size: 0.75rem;
-      font-weight: 600;
-      background-color: #f1f5f9;
-      color: #475569;
-      transition: all 0.15s ease;
-      border: 1px solid transparent;
-    }
-    .pill-btn.active {
-      background-color: #2563eb;
-      color: #ffffff;
-      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
-    }
-    .pill-sm-btn {
-      padding: 0.25rem 0.6rem;
-      border-radius: 0.5rem;
-      font-size: 0.7rem;
-      font-weight: 500;
-      background-color: #f1f5f9;
-      color: #64748b;
-      transition: all 0.15s ease;
-      border: 1px solid transparent;
-    }
-    .pill-sm-btn.active {
-      background-color: #3b82f6;
-      color: #ffffff;
-    }
-
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.25rem 0.65rem;
-      border-radius: 9999px;
-      font-size: 0.7rem;
-      font-weight: 500;
-      background-color: #f1f5f9;
-      color: #475569;
-      cursor: pointer;
-      user-select: none;
-      transition: all 0.15s ease;
-      border: 1px solid #e2e8f0;
-    }
-    .chip.active {
-      background-color: #dbeafe;
-      color: #1d4ed8;
-      border-color: #93c5fd;
-      font-weight: 600;
-    }
-    .chip-warn.active {
-      background-color: #fee2e2;
-      color: #b91c1c;
-      border-color: #fca5a5;
-      font-weight: 600;
-    }
-
-    .badge-green {
-      background-color: #ecfdf5;
-      color: #059669;
-      border: 1px solid #a7f3d0;
-      padding: 0.15rem 0.5rem;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      font-weight: 700;
-    }
-    .badge-yellow {
-      background-color: #fffbeb;
-      color: #d97706;
-      border: 1px solid #fde68a;
-      padding: 0.15rem 0.5rem;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      font-weight: 700;
-    }
-    .badge-red {
-      background-color: #fef2f2;
-      color: #dc2626;
-      border: 1px solid #fecaca;
-      padding: 0.15rem 0.5rem;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      font-weight: 700;
-    }
-
-    /* Markdown 渲染排版增强 */
-    .markdown-body h1, .markdown-body h2, .markdown-body h3 {
-      font-weight: 700;
-      color: #0f172a;
-      margin-top: 1rem;
-      margin-bottom: 0.5rem;
-    }
-    .markdown-body h3 {
-      font-size: 0.95rem;
-      color: #1e293b;
-      border-bottom: 1px solid #f1f5f9;
-      padding-bottom: 0.25rem;
-    }
-    .markdown-body ul {
-      list-style-type: disc;
-      padding-left: 1.25rem;
-      margin-top: 0.35rem;
-      margin-bottom: 0.5rem;
-      space-y: 0.25rem;
-    }
-    .markdown-body li {
-      margin-bottom: 0.35rem;
-      line-height: 1.6;
-    }
-    .markdown-body p {
-      margin-bottom: 0.6rem;
-      line-height: 1.65;
-    }
-    .markdown-body strong {
-      color: #0f172a;
-      font-weight: 700;
-    }
-    .markdown-body hr {
-      border: 0;
-      border-top: 1px solid #e2e8f0;
-      margin: 0.75rem 0;
-    }
-
-    /* ============================================================
-       睡前小结（第 4 个 Tab）专属样式：靛蓝 → 紫罗兰强调色
-       ============================================================ */
-    :root {
-      --evo-accent:      #6366f1;
-      --evo-accent-deep: #8b5cf6;
-    }
-    @keyframes evRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-    @keyframes evPop  { 0% { transform: scale(1); } 45% { transform: scale(1.16); } 100% { transform: scale(1); } }
-    @keyframes evSlideUp { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
-    @keyframes evShimmer { 0% { background-position: -420px 0; } 100% { background-position: 420px 0; } }
-    @keyframes evSwipeOut { to { opacity: 0; transform: translateX(-26px) scale(.97); } }
-    .ev-rise { animation: evRise .42s cubic-bezier(.22,1,.36,1) both; }
-    .ev-pop  { animation: evPop .32s cubic-bezier(.34,1.56,.64,1); }
-
-    .evo-accent-grad      { background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%); }
-    .evo-accent-grad-soft { background-image: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%); }
-    .evo-grad-text {
-      background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
-      -webkit-background-clip: text; background-clip: text; color: transparent;
-    }
-
-    .evo-card {
-      background: #fff; border: 1px solid #eef2f7; border-radius: 1.25rem;
-      box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 10px 28px -18px rgba(15,23,42,.18);
-      transition: box-shadow .28s ease, transform .18s ease;
-    }
-    .evo-card-hero {
-      border-radius: 1.5rem; border: 1px solid #e6e9ff;
-      box-shadow: 0 1px 2px rgba(99,102,241,.05), 0 18px 40px -24px rgba(99,102,241,.45);
-    }
-    .evo-card-lite { box-shadow: none; border-color: #f1f5f9; }
-
-    .evo-eyebrow {
-      font-size: .625rem; font-weight: 800; letter-spacing: .1em;
-      text-transform: uppercase; color: #94a3b8;
-    }
-
-    .evo-fchip {
-      padding: .3rem .7rem; border-radius: 9999px; font-size: .7rem; font-weight: 700;
-      background: #f8fafc; color: #64748b; border: 1px solid #e8edf5;
-      transition: all .18s cubic-bezier(.22,1,.36,1); white-space: nowrap;
-    }
-    .evo-fchip:active { transform: scale(.94); }
-    .evo-fchip.active {
-      background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
-      color: #fff; border-color: transparent;
-      box-shadow: 0 6px 16px -6px rgba(99,102,241,.75);
-    }
-
-    /* 深色 AI 卡内的范围选择胶囊 */
-    .evo-fchip-dark {
-      padding: .18rem .55rem; border-radius: 9999px; font-size: .62rem; font-weight: 800;
-      background: rgba(255,255,255,.07); color: #94a3b8; border: 1px solid rgba(148,163,184,.28);
-      transition: all .18s cubic-bezier(.22,1,.36,1); white-space: nowrap;
-    }
-    .evo-fchip-dark:active { transform: scale(.94); }
-    .evo-fchip-dark.active {
-      background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
-      color: #fff; border-color: transparent;
-      box-shadow: 0 6px 16px -6px rgba(99,102,241,.75);
-    }
-
-    .evo-done-row { transition: background-color .2s ease, border-color .2s ease; }
-    .evo-done-row:focus-within { background: #f5f6ff; border-color: #c7d2fe; }
-    .evo-seq-dot {
-      width: 1.375rem; height: 1.375rem; border-radius: 9999px; flex: none;
-      display: flex; align-items: center; justify-content: center;
-      font-size: .65rem; font-weight: 800; background: #f1f5f9; color: #94a3b8;
-      transition: all .22s cubic-bezier(.34,1.56,.64,1);
-    }
-    .evo-seq-dot.filled {
-      background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
-      color: #fff; box-shadow: 0 4px 10px -3px rgba(99,102,241,.7);
-    }
-
-    input[type="range"].evo-score-slider {
-      -webkit-appearance: none; appearance: none;
-      width: 100%; height: 26px; background: transparent; cursor: pointer;
-    }
-    input[type="range"].evo-score-slider::-webkit-slider-runnable-track {
-      height: 8px; border-radius: 9999px;
-      background: linear-gradient(to right, #6366f1 0%, #8b5cf6 var(--pct, 66%), #e9edf5 var(--pct, 66%), #e9edf5 100%);
-    }
-    input[type="range"].evo-score-slider::-webkit-slider-thumb {
-      -webkit-appearance: none; appearance: none;
-      width: 26px; height: 26px; margin-top: -9px; border-radius: 9999px;
-      background: #fff; border: 3px solid var(--evo-accent);
-      box-shadow: 0 4px 14px -2px rgba(99,102,241,.65);
-      transition: transform .16s ease;
-    }
-    input[type="range"].evo-score-slider:active::-webkit-slider-thumb { transform: scale(1.14); }
-    input[type="range"].evo-score-slider::-moz-range-track {
-      height: 8px; border-radius: 9999px; background: #e9edf5;
-    }
-    input[type="range"].evo-score-slider::-moz-range-progress {
-      height: 8px; border-radius: 9999px; background: linear-gradient(90deg, #6366f1, #8b5cf6);
-    }
-    input[type="range"].evo-score-slider::-moz-range-thumb {
-      width: 22px; height: 22px; border-radius: 9999px;
-      background: #fff; border: 3px solid var(--evo-accent);
-      box-shadow: 0 4px 14px -2px rgba(99,102,241,.65);
-    }
-
-    .evo-collapsible { max-height: 0; overflow: hidden; transition: max-height .34s cubic-bezier(.4,0,.2,1); }
-    .evo-collapsible.open { max-height: 1200px; }
-
-    .evo-tl-item { position: relative; padding-left: 1.75rem; }
-    .evo-tl-node {
-      position: absolute; left: 0; top: 1.1rem;
-      width: 10px; height: 10px; border-radius: 9999px;
-      background-image: linear-gradient(135deg, var(--evo-accent) 0%, var(--evo-accent-deep) 100%);
-      box-shadow: 0 0 0 4px #eef2ff;
-    }
-    .evo-tl-line { position: absolute; left: 4px; top: 1.85rem; bottom: 0; width: 1px; background: #e8edf5; }
-    .evo-tl-item:last-child .evo-tl-line { display: none; }
-
-    .evo-ai-card { background: #0f172a; border-radius: 1.5rem; box-shadow: 0 20px 44px -26px rgba(15,23,42,.9); }
-    .evo-md-dark h3 { color: #e2e8f0; font-weight: 700; font-size: .85rem; margin: .7rem 0 .35rem; padding-bottom: .25rem; border-bottom: 1px solid rgba(148,163,184,.18); }
-    .evo-md-dark h3:first-child { margin-top: 0; }
-    .evo-md-dark h1, .evo-md-dark h2 { color: #f1f5f9; font-weight: 700; font-size: .9rem; margin: .7rem 0 .35rem; }
-    .evo-md-dark p  { color: #cbd5e1; font-size: .78rem; line-height: 1.7; margin-bottom: .55rem; }
-    .evo-md-dark ul { list-style: disc; padding-left: 1.15rem; margin-bottom: .5rem; }
-    .evo-md-dark li { color: #cbd5e1; font-size: .78rem; line-height: 1.65; margin-bottom: .35rem; }
-    .evo-md-dark strong { color: #fff; font-weight: 700; }
-    .evo-md-dark code { background: rgba(148,163,184,.16); padding: 0 .25rem; border-radius: .25rem; }
-    .evo-md-dark hr { border: 0; border-top: 1px solid rgba(148,163,184,.18); margin: .75rem 0; }
-
-    .evo-swipe { position: relative; border-radius: 1.25rem; margin-bottom: .75rem; }
-    .evo-swipe-action {
-      position: absolute; inset: 0; border-radius: 1.25rem; overflow: hidden;
-      background-image: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
-      display: flex; justify-content: flex-end; align-items: stretch;
-    }
-    .evo-swipe-del {
-      width: 84px; flex: none; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 3px;
-      color: #fff; font-size: .68rem; font-weight: 800; letter-spacing: .02em;
-      transition: background-color .16s ease;
-    }
-    .evo-swipe-del:active { background: rgba(255,255,255,.16); }
-    .evo-swipe-panel {
-      position: relative; touch-action: pan-y; transform: translateX(0);
-      transition: transform .3s cubic-bezier(.22,1,.36,1); will-change: transform;
-    }
-    .evo-swipe.open .evo-swipe-panel { transform: translateX(-84px); }
-    .evo-swipe.dragging .evo-swipe-panel { transition: none; }
-    .evo-swipe.removing { animation: evSwipeOut .26s cubic-bezier(.4,0,.2,1) forwards; }
-  </style>
+  <!-- 应用样式：本地 CSS（v2.0 Apple Health UI 改版），不依赖公网 CDN，断网可用 -->
+  <link rel="stylesheet" href="css/app.css?v=2.0">
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between select-none">
+<body class="bg-slate-100 text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between select-none">
 
   <!-- 顶部 Toast 提示框 -->
   <div id="toast" class="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 transition-all duration-300 opacity-0 pointer-events-none -translate-y-4">
@@ -316,23 +21,23 @@
     </div>
   </div>
 
-  <!-- 主容器 (移动端居中适配) -->
-  <div id="app-frame" class="max-w-md w-full mx-auto h-screen flex flex-col bg-white sm:shadow-2xl sm:my-4 sm:rounded-3xl sm:h-[840px] overflow-hidden relative border border-slate-100">
+  <!-- 主容器 (移动端居中适配，Apple Health 干净卡片背景与精细圆角阴影) -->
+  <div id="app-frame" class="max-w-md w-full mx-auto h-screen flex flex-col bg-slate-50 sm:shadow-2xl sm:my-4 sm:rounded-3xl sm:h-[840px] overflow-hidden relative border border-slate-200/80">
 
     <!-- 顶部状态栏 -->
-    <header class="pt-6 pb-3 px-6 bg-white border-b border-slate-100 flex justify-between items-center shrink-0 z-10">
-      <div class="flex items-center space-x-2">
-        <div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-500/20">HT</div>
+    <header class="pt-5 pb-3 px-6 bg-white/95 backdrop-blur-md border-b border-slate-100 flex justify-between items-center shrink-0 z-10">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-500/25">HT</div>
         <div>
-          <h1 class="text-base font-bold text-slate-900 leading-none">HealthTrack</h1>
-          <p class="text-[10px] text-slate-400 mt-0.5">智能健康洞察系统</p>
+          <h1 class="text-base font-extrabold text-slate-900 leading-none">HealthTrack</h1>
+          <p class="text-[10px] font-semibold text-slate-400 mt-0.5">智能健康洞察系统</p>
         </div>
       </div>
       <div class="flex items-center space-x-2">
-        <button onclick="openSettings()" title="AI 设置" aria-label="AI 设置" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 transition-colors flex items-center justify-center text-base">
+        <button onclick="openSettings()" title="AI 设置" aria-label="AI 设置" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-600 transition-all flex items-center justify-center text-sm">
           ⚙️
         </button>
-        <button onclick="openDataSheet()" title="数据管理：导入与导出" class="h-8 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors flex items-center justify-center space-x-1 text-[13px] font-semibold">
+        <button onclick="openDataSheet()" title="数据管理：导入与导出" class="h-8 px-3 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 rounded-xl transition-all flex items-center justify-center space-x-1 text-xs font-bold">
           <span>📦 数据</span>
         </button>
       </div>
@@ -624,69 +329,110 @@
     <main class="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 no-scrollbar bg-slate-50/50 relative" id="main-content">
       
       <!-- 1. 记一笔 (Log View) -->
-      <section id="view-log" class="fade-in space-y-4">
+      <section id="view-log" class="fade-in space-y-3.5">
         <div class="flex justify-between items-center">
           <div class="flex items-center space-x-2">
-            <input type="date" id="input-date" class="bg-white border border-slate-200 text-slate-800 text-sm font-semibold rounded-xl px-3 py-1.5 outline-none focus:border-blue-500 shadow-sm" onchange="loadRecordForDate(this.value)">
+            <input type="date" id="input-date" class="bg-white border border-slate-200/90 text-slate-800 text-xs font-bold rounded-xl px-3 py-1.5 w-[124px] outline-none focus:border-blue-500 shadow-sm" onchange="loadRecordForDate(this.value)">
           </div>
-          <button onclick="setTodayDate()" class="text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors">今日</button>
+          <button onclick="setTodayDate()" class="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3.5 py-1.5 rounded-full transition-all border border-blue-100/80 active:scale-95">今日</button>
         </div>
 
-        <!-- 3 核心形态指标输入卡片 (体重与腰围) -->
+        <!-- Bento Grid: 三张体重/腰围小卡并排 + 睡眠卡通栏独占一行 -->
         <div class="grid grid-cols-3 gap-2.5">
-          <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
-            <label class="text-[9px] uppercase font-bold tracking-wider text-slate-400">睡前体重(kg)</label>
-            <input type="number" step="0.1" id="input-weight-pm" placeholder="如 77.7" class="w-full bg-transparent text-lg font-bold text-slate-800 outline-none mt-1">
+          <!-- 1. 晨起空腹体重 -->
+          <div class="apple-card apple-card-hover p-2.5 rounded-2xl flex flex-col justify-between min-w-0">
+            <div>
+              <div class="flex justify-between items-center gap-1">
+                <span class="text-[10px] font-bold text-slate-400 truncate">晨起空腹</span>
+                <span class="text-xs shrink-0">🌅</span>
+              </div>
+              <div class="mt-1.5 flex items-baseline space-x-0.5">
+                <input type="number" step="0.1" id="input-weight-am" placeholder="--" class="text-xl font-black text-slate-900 w-full min-w-0 outline-none bg-transparent placeholder-slate-300" oninput="updateDiffDisplay()">
+                <span class="text-[9px] font-bold text-slate-400 shrink-0">kg</span>
+              </div>
+            </div>
+            <div id="diff-weight-am" class="mt-2 pt-1.5 border-t border-slate-100/80 flex items-center justify-between text-[9px] text-slate-400 font-medium">
+              <span>较昨日 --</span>
+              <span class="text-slate-300">晨测</span>
+            </div>
           </div>
-          <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
-            <label class="text-[9px] uppercase font-bold tracking-wider text-slate-400">晨起空腹(kg)</label>
-            <input type="number" step="0.1" id="input-weight-am" placeholder="如 76.5" class="w-full bg-transparent text-lg font-bold text-slate-800 outline-none mt-1">
-          </div>
-          <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
-            <label class="text-[9px] uppercase font-bold tracking-wider text-slate-400">腰围(cm)</label>
-            <input type="number" step="0.1" id="input-waist" placeholder="如 78.0" class="w-full bg-transparent text-lg font-bold text-slate-800 outline-none mt-1">
-          </div>
-        </div>
 
-        <!-- 睡眠双时间联动计算卡片 -->
-        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
-              <span>🌙</span>
-              <span>睡眠节律与自动核算</span>
-            </span>
-            <span id="sleepTagBadge" class="badge-green">🟢 未熬夜</span>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div class="space-y-1">
-              <label class="text-[10px] font-semibold text-slate-500">昨晚就寝时间</label>
-              <input type="time" id="sleepBedTime" value="00:30" class="w-full border border-slate-200 rounded-xl px-2.5 py-1.5 text-sm font-bold text-slate-800 outline-none focus:border-blue-500 bg-slate-50/50" oninput="handleSleepCalculation()">
+          <!-- 2. 睡前体重 -->
+          <div class="apple-card apple-card-hover p-2.5 rounded-2xl flex flex-col justify-between min-w-0">
+            <div>
+              <div class="flex justify-between items-center gap-1">
+                <span class="text-[10px] font-bold text-slate-400 truncate">睡前体重</span>
+                <span class="text-xs shrink-0">🌙</span>
+              </div>
+              <div class="mt-1.5 flex items-baseline space-x-0.5">
+                <input type="number" step="0.1" id="input-weight-pm" placeholder="--" class="text-xl font-black text-slate-900 w-full min-w-0 outline-none bg-transparent placeholder-slate-300" oninput="updateDiffDisplay()">
+                <span class="text-[9px] font-bold text-slate-400 shrink-0">kg</span>
+              </div>
             </div>
-            <div class="space-y-1">
-              <label class="text-[10px] font-semibold text-slate-500">今晨起床时间</label>
-              <input type="time" id="sleepWakeTime" value="07:15" class="w-full border border-slate-200 rounded-xl px-2.5 py-1.5 text-sm font-bold text-slate-800 outline-none focus:border-blue-500 bg-slate-50/50" oninput="handleSleepCalculation()">
+            <div id="diff-weight-pm" class="mt-2 pt-1.5 border-t border-slate-100/80 flex items-center justify-between text-[9px] text-slate-400 font-medium">
+              <span>等待今晚称重</span>
+              <span class="text-slate-300">--:--</span>
             </div>
           </div>
-          <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-xs text-slate-500">
-            <span>自动推算时长 (可微调):</span>
-            <div class="flex items-center space-x-1 font-bold text-slate-800">
-              <input type="number" step="0.1" id="sleepDuration" class="w-14 bg-slate-100 px-2 py-0.5 rounded-lg text-center font-bold text-blue-600 outline-none focus:ring-1 focus:ring-blue-500" value="6.8">
-              <span class="text-xs text-slate-400">小时</span>
+
+          <!-- 3. 晨起腰围 -->
+          <div class="apple-card apple-card-hover p-2.5 rounded-2xl flex flex-col justify-between min-w-0">
+            <div>
+              <div class="flex justify-between items-center gap-1">
+                <span class="text-[10px] font-bold text-slate-400 truncate">晨起腰围</span>
+                <span class="text-xs shrink-0">📏</span>
+              </div>
+              <div class="mt-1.5 flex items-baseline space-x-0.5">
+                <input type="number" step="0.1" id="input-waist" placeholder="--" class="text-xl font-black text-slate-900 w-full min-w-0 outline-none bg-transparent placeholder-slate-300" oninput="updateDiffDisplay()">
+                <span class="text-[9px] font-bold text-slate-400 shrink-0">cm</span>
+              </div>
+            </div>
+            <div id="diff-waist" class="mt-2 pt-1.5 border-t border-slate-100/80 flex items-center justify-between text-[9px] text-slate-400 font-medium">
+              <span>较昨日 --</span>
+              <span class="text-slate-300">标准</span>
+            </div>
+          </div>
+
+          <!-- 4. 昨晚睡眠（通栏：时长直接微调 + 入睡/起床时间） -->
+          <div class="apple-card apple-card-hover p-3.5 rounded-2xl col-span-3">
+            <div class="flex justify-between items-center gap-2">
+              <span class="text-[11px] font-bold text-slate-400 shrink-0">昨晚睡眠</span>
+              <span id="sleepTagBadge" class="badge-green text-[9px] px-1.5 py-0.5">● 未熬夜</span>
+            </div>
+            <div class="mt-1.5 flex items-center gap-3.5">
+              <div class="flex items-baseline space-x-1 shrink-0">
+                <input type="number" step="0.1" id="sleepDuration" value="6.8" class="text-[22px] font-black text-slate-900 w-[64px] outline-none bg-transparent" oninput="updateDiffDisplay()">
+                <span class="text-xs font-bold text-slate-400">h</span>
+              </div>
+              <div class="flex-1 min-w-0 flex flex-col gap-1">
+                <label class="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
+                  <span class="shrink-0">入睡</span>
+                  <input type="time" id="sleepBedTime" value="00:30" class="flex-1 min-w-0 w-0 border border-slate-200/80 bg-slate-50 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500" oninput="handleSleepCalculation()">
+                </label>
+                <label class="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
+                  <span class="shrink-0">起床</span>
+                  <input type="time" id="sleepWakeTime" value="07:15" class="flex-1 min-w-0 w-0 border border-slate-200/80 bg-slate-50 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500" oninput="handleSleepCalculation()">
+                </label>
+              </div>
+            </div>
+            <div id="diff-sleep" class="mt-2 pt-2 border-t border-slate-100/80 flex items-center justify-between text-[10px] text-slate-400 font-medium">
+              <span>较昨日 --</span>
+              <span class="text-slate-300">节律</span>
             </div>
           </div>
         </div>
 
         <!-- 自由文本区域 (饮食、身体感受) -->
         <div class="space-y-1.5">
-          <label class="text-xs font-bold text-slate-700 flex justify-between items-center">
-            <span>饮食日记与身体感受</span>
-            <span class="text-[10px] font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">自由文本 · 抓大放小</span>
-          </label>
-          <textarea id="input-journal" rows="3" class="w-full bg-white text-slate-800 border border-slate-200 shadow-sm rounded-2xl p-3.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all resize-none leading-relaxed" placeholder="如：早上一杯纯黑咖啡+鸡蛋2个。午餐牛肉原生米饭。晚上轻微高钠炒菜..."></textarea>
+          <div class="flex justify-between items-center text-xs">
+            <span class="font-bold text-slate-700">饮食日记与身体感受</span>
+            <span class="text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-100/80 px-2 py-0.5 rounded-md">自由文本 · 抓大放小</span>
+          </div>
+          <textarea id="input-journal" rows="3" class="w-full apple-card rounded-2xl p-3.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 transition-all resize-none leading-relaxed" placeholder="如：早上一杯纯黑咖啡+鸡蛋2个。午餐牛肉原生米饭。晚上轻微高钠炒菜..."></textarea>
         </div>
 
         <!-- 🧬 专项生理与习惯打卡折叠面板 -->
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden transition-all">
+        <div class="apple-card rounded-2xl overflow-hidden transition-all">
           <div class="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 transition-colors" onclick="toggleBiohackPanel()">
             <span class="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
               <span>🧬</span>
@@ -720,8 +466,8 @@
                   </div>
                 </div>
                 <div class="flex space-x-2 text-xs">
-                  <input type="number" id="exerciseDuration" placeholder="时长(分)" class="w-24 border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-blue-500" value="40">
-                  <input type="text" id="exerciseItems" placeholder="备注，如 骑行3km / 腿部深蹲" class="flex-1 border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-blue-500">
+                  <input type="number" id="exerciseDuration" placeholder="时长(分)" class="w-24 border border-slate-200 bg-slate-50/50 rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 font-bold" value="40">
+                  <input type="text" id="exerciseItems" placeholder="备注，如 骑行3km / 腿部深蹲" class="flex-1 border border-slate-200 bg-slate-50/50 rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500">
                 </div>
               </div>
             </div>
@@ -742,11 +488,11 @@
                 <div class="grid grid-cols-2 gap-2 text-xs">
                   <div class="flex items-center space-x-1.5">
                     <span class="text-slate-500">时间:</span>
-                    <input type="time" id="concertaTime" value="08:00" class="border border-slate-200 rounded-lg px-2 py-0.5 outline-none font-semibold focus:border-blue-500">
+                    <input type="time" id="concertaTime" value="08:00" class="border border-slate-200 bg-slate-50/50 rounded-xl px-2 py-1 outline-none font-bold focus:border-blue-500">
                   </div>
                   <div class="flex items-center space-x-1.5">
                     <span class="text-slate-500">剂量:</span>
-                    <select id="concertaDose" class="border border-slate-200 rounded-lg px-2 py-0.5 outline-none font-semibold focus:border-blue-500 bg-white">
+                    <select id="concertaDose" class="border border-slate-200 rounded-xl px-2 py-1 outline-none font-bold focus:border-blue-500 bg-white">
                       <option value="18">18mg</option>
                       <option value="36" selected>36mg</option>
                       <option value="54">54mg</option>
@@ -802,14 +548,14 @@
                 <div class="flex items-center justify-between text-xs text-slate-500">
                   <span>时长:</span>
                   <div class="flex items-center space-x-1">
-                    <input type="number" id="coldShowerDuration" value="2" class="w-14 border border-slate-200 rounded-lg px-2 py-0.5 text-center font-bold text-blue-600 outline-none">
+                    <input type="number" id="coldShowerDuration" value="2" class="w-14 border border-slate-200 bg-slate-50/50 rounded-xl px-2 py-1 text-center font-bold text-blue-600 outline-none">
                     <span>分钟</span>
                   </div>
                 </div>
                 <div class="flex items-center justify-between text-xs text-slate-500">
                   <span>水温(估):</span>
                   <div class="flex items-center space-x-1">
-                    <input type="number" id="coldShowerWaterTemp" step="0.5" min="0" max="40" placeholder="--" class="w-14 border border-slate-200 rounded-lg px-2 py-0.5 text-center font-bold text-blue-600 outline-none">
+                    <input type="number" id="coldShowerWaterTemp" step="0.5" min="0" max="40" placeholder="--" class="w-14 border border-slate-200 bg-slate-50/50 rounded-xl px-2 py-1 text-center font-bold text-blue-600 outline-none">
                     <span>℃</span>
                   </div>
                 </div>
@@ -827,18 +573,18 @@
           </div>
         </div>
 
-        <!-- 保存按钮 -->
-        <button onclick="saveCurrentRecord()" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white py-3.5 rounded-2xl font-bold shadow-lg shadow-blue-500/25 transition-all flex justify-center items-center space-x-2">
+        <!-- 保存按钮 (Apple Health 现代渐变饱满按钮) -->
+        <button onclick="saveCurrentRecord()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.985] text-white py-3.5 rounded-2xl font-bold shadow-lg shadow-blue-500/25 transition-all flex justify-center items-center space-x-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
           <span>保存今日记录</span>
         </button>
       </section>
 
       <!-- 2. 看板页 (Dashboard View) -->
-      <section id="view-dash" class="fade-in space-y-5 hidden">
+      <section id="view-dash" class="fade-in space-y-4 hidden">
         <div class="flex justify-between items-center">
           <h2 class="text-base font-bold text-slate-900">数据趋势看板</h2>
-          <div class="flex bg-slate-200/80 p-0.5 rounded-xl text-xs font-semibold">
+          <div class="flex bg-slate-200/70 p-0.5 rounded-xl text-xs font-semibold">
             <button onclick="switchDashRange(7)" id="btn-range-7" class="px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all">近7天</button>
             <button onclick="switchDashRange(30)" id="btn-range-30" class="px-3 py-1 rounded-lg text-slate-600 transition-all">近30天</button>
             <button onclick="switchDashRange(60)" id="btn-range-60" class="px-3 py-1 rounded-lg text-slate-600 transition-all">近60天</button>
@@ -846,72 +592,72 @@
         </div>
 
         <!-- 60天详情入口（独立视图，逐日；与周平均趋势互补） -->
-        <button onclick="openTrendDetailView()" class="w-full flex items-center justify-between bg-white border border-slate-200 hover:border-blue-300 rounded-2xl px-4 py-3 shadow-sm transition-colors">
-          <span class="flex items-center space-x-2 min-w-0">
+        <button onclick="openTrendDetailView()" class="w-full flex items-center justify-between apple-card hover:border-blue-300 rounded-2xl px-4 py-3 transition-all active:scale-[0.99]">
+          <span class="flex items-center space-x-2.5 min-w-0">
             <span class="text-lg">📊</span>
-            <span class="text-xs font-bold text-slate-700 shrink-0">60 天详情</span>
-            <span class="text-[10px] text-slate-400 truncate">三指标 · 逐日</span>
+            <span class="text-xs font-bold text-slate-800 shrink-0">60 天详情</span>
+            <span class="text-[10px] text-slate-400 truncate">三指标 · 逐日全量跟踪</span>
           </span>
           <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         </button>
 
         <!-- 周平均趋势分析入口（独立视图，不占用底部导航） -->
-        <button onclick="openTrendView()" class="w-full flex items-center justify-between bg-white border border-slate-200 hover:border-emerald-300 rounded-2xl px-4 py-3 shadow-sm transition-colors">
-          <span class="flex items-center space-x-2 min-w-0">
+        <button onclick="openTrendView()" class="w-full flex items-center justify-between apple-card hover:border-emerald-300 rounded-2xl px-4 py-3 transition-all active:scale-[0.99]">
+          <span class="flex items-center space-x-2.5 min-w-0">
             <span class="text-lg">📈</span>
-            <span class="text-xs font-bold text-slate-700 shrink-0">周平均趋势分析</span>
+            <span class="text-xs font-bold text-slate-800 shrink-0">周平均趋势分析</span>
             <span class="text-[10px] text-slate-400 truncate">近 12 周 · 周均值 + 区间带</span>
           </span>
           <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         </button>
 
         <!-- 体重趋势图卡片 -->
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <div class="apple-card p-4 rounded-2xl space-y-3">
           <div class="flex justify-between items-center">
             <div>
               <p class="text-[10px] uppercase font-bold text-slate-400">体重变化趋势 (kg)</p>
-              <p id="dash-weight-stat" class="text-xl font-black text-slate-900">--</p>
+              <p id="dash-weight-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
             </div>
-            <div class="flex items-center space-x-3 text-[10px] text-slate-500">
-              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-blue-600 mr-1"></span>晨起空腹</span>
-              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-amber-500 mr-1"></span>睡前</span>
+            <div class="flex items-center space-x-3 text-[10px] text-slate-500 font-medium">
+              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-blue-600 mr-1.5 shadow-sm shadow-blue-500/50"></span>晨起空腹</span>
+              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-amber-500 mr-1.5 shadow-sm shadow-amber-500/50"></span>睡前</span>
             </div>
           </div>
           <div class="h-44 w-full">
             <canvas id="chart-weight"></canvas>
           </div>
-          <p id="dash-weight-detail" class="text-[11px] text-slate-500 flex items-start space-x-1">
+          <p id="dash-weight-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
             <span>👆</span><span>点击折线查看当日晨重 / 睡前重</span>
           </p>
         </div>
 
         <!-- 腰围趋势图卡片（模板同体重折线图） -->
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <div class="apple-card p-4 rounded-2xl space-y-3">
           <div class="flex justify-between items-center">
             <div>
               <p class="text-[10px] uppercase font-bold text-slate-400">腰围变化趋势 (cm)</p>
-              <p id="dash-waist-stat" class="text-xl font-black text-slate-900">--</p>
+              <p id="dash-waist-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
             </div>
-            <div class="flex items-center space-x-3 text-[10px] text-slate-500">
-              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-purple-500 mr-1"></span>腰围</span>
+            <div class="flex items-center space-x-3 text-[10px] text-slate-500 font-medium">
+              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-purple-500 mr-1.5 shadow-sm shadow-purple-500/50"></span>腰围</span>
             </div>
           </div>
           <div class="h-44 w-full">
             <canvas id="chart-waist"></canvas>
           </div>
-          <p id="dash-waist-detail" class="text-[11px] text-slate-500 flex items-start space-x-1">
+          <p id="dash-waist-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
             <span>👆</span><span>点击折线查看当日腰围</span>
           </p>
         </div>
 
         <!-- 睡眠时长与熬夜分级柱状图 -->
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <div class="apple-card p-4 rounded-2xl space-y-3">
           <div class="flex justify-between items-center">
             <div>
               <p class="text-[10px] uppercase font-bold text-slate-400">睡眠作息与质量 (小时)</p>
-              <p id="dash-sleep-stat" class="text-xl font-black text-slate-900">--</p>
+              <p id="dash-sleep-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
             </div>
-            <div class="flex items-center space-x-2 text-[10px] text-slate-500">
+            <div class="flex items-center space-x-2 text-[10px] text-slate-500 font-medium">
               <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-emerald-500 mr-1"></span>正常</span>
               <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-amber-400 mr-1"></span>轻度</span>
               <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-rose-500 mr-1"></span>熬夜</span>
@@ -920,14 +666,14 @@
           <div class="h-36 w-full">
             <canvas id="chart-sleep"></canvas>
           </div>
-          <p id="dash-sleep-detail" class="text-[11px] text-slate-500 flex items-start space-x-1">
+          <p id="dash-sleep-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
             <span>👆</span><span>点击柱状图查看当日就寝 / 起床时间</span>
           </p>
         </div>
 
         <!-- 历史流水与运动标签列表 -->
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-          <p class="text-xs font-bold text-slate-700">近期活动打卡流水</p>
+        <div class="apple-card p-4 rounded-2xl space-y-3">
+          <p class="text-xs font-bold text-slate-800">近期活动打卡流水</p>
           <div id="dash-activities-list" class="space-y-2 text-xs max-h-48 overflow-y-auto no-scrollbar">
             <!-- 动态注入 -->
           </div>
@@ -953,24 +699,24 @@
         </div>
 
         <!-- 周均值折线 + 周内 min/max 区间带 -->
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <div class="apple-card p-4 rounded-2xl space-y-3">
           <div class="flex justify-between items-start">
             <div>
               <p id="trend-metric-label" class="text-[10px] uppercase font-bold text-slate-400">体重周均值 (kg)</p>
-              <p id="trend-metric-stat" class="text-xl font-black text-slate-900">--</p>
+              <p id="trend-metric-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
             </div>
             <div id="trend-metric-note" class="text-[10px] text-slate-500 text-right leading-relaxed">近 12 周</div>
           </div>
           <div class="h-56 w-full">
             <canvas id="chart-trend"></canvas>
           </div>
-          <p id="trend-detail" class="text-[11px] text-slate-500 flex items-start space-x-1">
+          <p id="trend-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
             <span>👆</span><span>点击节点查看该周均值与区间</span>
           </p>
         </div>
 
         <!-- 图例与口径说明 -->
-        <div class="bg-slate-100/70 rounded-2xl p-3 text-[11px] text-slate-500 leading-relaxed space-y-1.5">
+        <div class="apple-card p-3.5 text-[11px] text-slate-500 leading-relaxed space-y-1.5">
           <p><span class="inline-block w-4 h-2.5 rounded bg-slate-300/70 align-middle mr-1.5"></span>区间带 = 该周内所有日值的 min ~ max（非标准差）</p>
           <p><span class="inline-block w-2.5 h-2.5 rounded-full border-2 border-slate-400 bg-white align-middle mr-1.5"></span>空心节点 + 虚线 = 该周仅 1~3 天数据，均值置信偏低</p>
           <p><span class="inline-block w-4 h-0.5 bg-slate-300 align-middle mr-1.5"></span>某周 0 天数据时折线断开、区间带留空（不按 0 计）</p>
@@ -998,11 +744,11 @@
         </div>
 
         <!-- 逐日折线：竖屏固定日宽横向滚动 / 横屏自适应压进一屏 -->
-        <div id="td-card" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <div id="td-card" class="apple-card p-4 rounded-2xl space-y-3">
           <div id="td-metric-head" class="flex justify-between items-start">
             <div>
               <p id="td-metric-label" class="text-[10px] uppercase font-bold text-slate-400">体重逐日 (kg)</p>
-              <p id="td-metric-stat" class="text-xl font-black text-slate-900">--</p>
+              <p id="td-metric-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
             </div>
             <div id="td-metric-note" class="text-[10px] text-slate-500 text-right leading-relaxed">近 60 天逐日</div>
           </div>
@@ -1011,13 +757,13 @@
               <canvas id="chart-trend-detail"></canvas>
             </div>
           </div>
-          <p id="td-detail" class="text-[11px] text-slate-500 flex items-start space-x-1">
+          <p id="td-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
             <span>👆</span><span>横向拖动看全 60 天 · 点击节点看当日详情</span>
           </p>
         </div>
 
         <!-- 口径说明 -->
-        <div id="td-legend-card" class="bg-slate-100/70 rounded-2xl p-3 text-[11px] text-slate-500 leading-relaxed space-y-1.5">
+        <div id="td-legend-card" class="apple-card p-3.5 text-[11px] text-slate-500 leading-relaxed space-y-1.5">
           <p><span class="inline-block w-4 h-0.5 bg-slate-300 align-middle mr-1.5"></span>缺失日折线断开（不按 0 计），可横向拖动逐日查看</p>
           <p><span class="inline-block w-4 h-2 bg-slate-200 align-middle mr-1.5"></span>横屏时图表自动压进一屏，x 轴约每 3 天一个刻度</p>
         </div>
@@ -1060,11 +806,12 @@
           <span>🚀 生成阶段深度洞察</span>
         </button>
 
-        <!-- 洞察渲染卡片 (SSE 流式输出) -->
-        <div class="bg-white border border-indigo-100 rounded-2xl p-5 shadow-sm space-y-3 min-h-[300px]">
+        <!-- 洞察渲染卡片 (SSE 流式输出，Apple Health 浅蓝微渐变柔和卡片) -->
+        <div class="apple-card p-5 space-y-3 min-h-[300px]">
           <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-            <span class="text-xs font-bold text-indigo-600 flex items-center space-x-1">
-              <span>💡 关联分析与归因结论</span>
+            <span class="text-xs font-bold text-blue-600 flex items-center space-x-1.5">
+              <span>💡</span>
+              <span>关联分析与归因结论</span>
             </span>
             <span id="insight-status-tag" class="text-[10px] text-slate-400">点击上方按钮开始</span>
           </div>
@@ -1089,7 +836,7 @@
         <!-- 关键词搜索 -->
         <div class="relative">
           <input id="history-search" oninput="onHistorySearchInput()" type="text" placeholder="搜索洞察内容关键词…"
-            class="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all">
+            class="w-full bg-white border border-slate-200/90 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm transition-all">
           <svg class="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path></svg>
         </div>
 
@@ -1106,7 +853,7 @@
         <div id="history-list" class="space-y-2.5"></div>
 
         <!-- 加载更多（游标分页，每批 10 条） -->
-        <button onclick="loadHistory(false)" id="history-loadmore" class="hidden w-full py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all">加载更多</button>
+        <button onclick="loadHistory(false)" id="history-loadmore" class="hidden w-full py-2.5 rounded-xl apple-card text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all">加载更多</button>
 
         <!-- 管理模式底部操作条 -->
         <div id="history-delete-bar" class="hidden sticky bottom-2 z-10 flex items-center justify-between bg-slate-900/95 backdrop-blur-md text-white rounded-2xl px-4 py-2.5 shadow-xl">
@@ -1129,7 +876,7 @@
         </div>
 
         <!-- 两月选择器 -->
-        <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <div class="apple-card p-3 rounded-2xl space-y-3">
           <div class="flex items-center justify-between">
             <div class="flex-1 min-w-0 flex items-center justify-center space-x-0.5">
               <button onclick="cmpStepMonth('a',-1)" id="cmp-a-prev" class="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 text-base font-bold leading-none transition-colors">‹</button>
@@ -1161,7 +908,7 @@
         </button>
 
         <!-- 指标对比表 -->
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <div class="apple-card p-4 rounded-2xl space-y-3">
           <div class="flex items-center justify-between pb-2 border-b border-slate-100">
             <span class="text-xs font-bold text-slate-700">📊 指标对比</span>
             <span id="cmp-table-meta" class="text-[10px] text-slate-400"></span>
@@ -1180,7 +927,7 @@
         </div>
 
         <!-- AI 阶段对比综述卡片 -->
-        <div class="bg-white border border-indigo-100 rounded-2xl p-5 shadow-sm space-y-3 min-h-[300px]">
+        <div class="apple-card p-5 space-y-3 min-h-[300px]">
           <div class="flex items-center justify-between pb-2 border-b border-slate-100">
             <span class="text-xs font-bold text-indigo-600 flex items-center space-x-1">
               <span>💡 阶段对比综述</span>
@@ -1417,22 +1164,22 @@
 
     </main>
 
-    <!-- 底部 Tab 导航 -->
-    <nav class="shrink-0 flex border-t border-slate-100 bg-white/95 backdrop-blur-md pb-6 pt-2 px-3 justify-between z-10">
-      <button onclick="switchTab('log')" id="tab-log" class="flex flex-col items-center flex-1 text-blue-600 font-bold transition-colors">
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+    <!-- 底部 Tab 导航 (Apple Health 风格底栏) -->
+    <nav class="shrink-0 flex border-t border-slate-100 bg-white/95 backdrop-blur-md pb-5 pt-2 px-3 justify-between z-10">
+      <button onclick="switchTab('log')" id="tab-log" class="flex flex-col items-center flex-1 text-blue-600 font-bold transition-all active:scale-95">
+        <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
         <span class="text-[10px]">记一笔</span>
       </button>
-      <button onclick="switchTab('dash')" id="tab-dash" class="flex flex-col items-center flex-1 text-slate-400 hover:text-slate-700 transition-colors">
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+      <button onclick="switchTab('dash')" id="tab-dash" class="flex flex-col items-center flex-1 text-slate-400 hover:text-slate-700 transition-all active:scale-95">
+        <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
         <span class="text-[10px]">看板</span>
       </button>
-      <button onclick="switchTab('insight')" id="tab-insight" class="flex flex-col items-center flex-1 text-slate-400 hover:text-slate-700 transition-colors relative">
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+      <button onclick="switchTab('insight')" id="tab-insight" class="flex flex-col items-center flex-1 text-slate-400 hover:text-slate-700 transition-all active:scale-95 relative">
+        <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
         <span class="text-[10px]">洞察</span>
       </button>
-      <button onclick="switchTab('evening')" id="tab-evening" class="flex flex-col items-center flex-1 text-slate-400 hover:text-slate-700 transition-colors">
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+      <button onclick="switchTab('evening')" id="tab-evening" class="flex flex-col items-center flex-1 text-slate-400 hover:text-slate-700 transition-all active:scale-95">
+        <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
         <span class="text-[10px]">睡前小结</span>
       </button>
     </nav>
@@ -1782,17 +1529,24 @@
       document.getElementById('sleepDuration').value = hours;
 
       // 熬夜分级评定：按自定义阈值实时计算
+      // 只增删颜色类，保留 text-[9px] / px-1.5 等紧凑样式（整串覆盖 className 会把字号打回 0.7rem）
       const badge = document.getElementById('sleepTagBadge');
       const tag = calcSleepTag(bedTime, sleepThresholds.green, sleepThresholds.yellow);
+      badge.classList.remove('badge-green', 'badge-yellow', 'badge-red');
       if (tag === 'YELLOW') {
-        badge.className = 'badge-yellow';
-        badge.innerText = '🟡 轻度熬夜';
+        badge.classList.add('badge-yellow');
+        badge.innerText = '● 轻度熬夜';
       } else if (tag === 'RED') {
-        badge.className = 'badge-red';
-        badge.innerText = '🔴 重度熬夜';
+        badge.classList.add('badge-red');
+        badge.innerText = '● 重度熬夜';
       } else {
-        badge.className = 'badge-green';
-        badge.innerText = '🟢 未熬夜';
+        badge.classList.add('badge-green');
+        badge.innerText = '● 未熬夜';
+      }
+
+      // 同步刷新睡眠时长较昨日变化显示
+      if (typeof updateDiffDisplay === 'function') {
+        updateDiffDisplay();
       }
     }
 
@@ -1912,10 +1666,110 @@
       });
     }
 
+    // 缓存前一日数据，用于 2x2 Bento 卡片底部的较昨日变化（Δ）计算
+    let yesterdayRecord = null;
+
+    function getPrevDateStr(dateStr) {
+      const parts = dateStr.split('-').map(Number);
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      d.setDate(d.getDate() - 1);
+      return localDateStr(d);
+    }
+
+    function updateDiffDisplay() {
+      // 1. 晨起体重
+      const amVal = parseFloat(document.getElementById('input-weight-am').value);
+      const diffAmEl = document.getElementById('diff-weight-am');
+      if (diffAmEl) {
+        if (!isNaN(amVal) && yesterdayRecord && yesterdayRecord.weight_am !== null && yesterdayRecord.weight_am !== undefined) {
+          const diff = Math.round((amVal - yesterdayRecord.weight_am) * 10) / 10;
+          if (diff < 0) {
+            diffAmEl.innerHTML = `<span class="text-emerald-600 font-bold">↓ 较昨日 ${diff.toFixed(1)}</span><span class="text-slate-300">晨测</span>`;
+          } else if (diff > 0) {
+            diffAmEl.innerHTML = `<span class="text-rose-500 font-bold">↑ 较昨日 +${diff.toFixed(1)}</span><span class="text-slate-300">晨测</span>`;
+          } else {
+            diffAmEl.innerHTML = `<span class="text-blue-600 font-bold">较昨日 持平</span><span class="text-slate-300">晨测</span>`;
+          }
+        } else {
+          diffAmEl.innerHTML = `<span>较昨日 --</span><span class="text-slate-300">晨测</span>`;
+        }
+      }
+
+      // 2. 睡前体重
+      const pmVal = parseFloat(document.getElementById('input-weight-pm').value);
+      const diffPmEl = document.getElementById('diff-weight-pm');
+      if (diffPmEl) {
+        if (!isNaN(pmVal)) {
+          if (yesterdayRecord && yesterdayRecord.weight_pm !== null && yesterdayRecord.weight_pm !== undefined) {
+            const diff = Math.round((pmVal - yesterdayRecord.weight_pm) * 10) / 10;
+            if (diff < 0) {
+              diffPmEl.innerHTML = `<span class="text-emerald-600 font-bold">↓ 较昨日 ${diff.toFixed(1)}</span><span class="text-slate-300">晚测</span>`;
+            } else if (diff > 0) {
+              diffPmEl.innerHTML = `<span class="text-rose-500 font-bold">↑ 较昨日 +${diff.toFixed(1)}</span><span class="text-slate-300">晚测</span>`;
+            } else {
+              diffPmEl.innerHTML = `<span class="text-blue-600 font-bold">较昨日 持平</span><span class="text-slate-300">晚测</span>`;
+            }
+          } else {
+            diffPmEl.innerHTML = `<span>今晚已记录</span><span class="text-slate-300">晚测</span>`;
+          }
+        } else {
+          diffPmEl.innerHTML = `<span>等待今晚称重</span><span class="text-slate-300">--:--</span>`;
+        }
+      }
+
+      // 3. 晨起腰围
+      const waistVal = parseFloat(document.getElementById('input-waist').value);
+      const diffWaistEl = document.getElementById('diff-waist');
+      if (diffWaistEl) {
+        if (!isNaN(waistVal) && yesterdayRecord && yesterdayRecord.waist_size !== null && yesterdayRecord.waist_size !== undefined) {
+          const diff = Math.round((waistVal - yesterdayRecord.waist_size) * 10) / 10;
+          if (diff < 0) {
+            diffWaistEl.innerHTML = `<span class="text-indigo-600 font-bold">较昨日 ${diff.toFixed(1)}</span><span class="text-slate-300">紧实</span>`;
+          } else if (diff > 0) {
+            diffWaistEl.innerHTML = `<span class="text-amber-600 font-bold">较昨日 +${diff.toFixed(1)}</span><span class="text-slate-300">略增</span>`;
+          } else {
+            diffWaistEl.innerHTML = `<span class="text-blue-600 font-bold">较昨日 持平</span><span class="text-slate-300">稳定</span>`;
+          }
+        } else {
+          diffWaistEl.innerHTML = `<span>平稳区间</span><span class="text-slate-300">标准</span>`;
+        }
+      }
+
+      // 4. 睡眠时长
+      const sleepVal = parseFloat(document.getElementById('sleepDuration').value);
+      const diffSleepEl = document.getElementById('diff-sleep');
+      if (diffSleepEl) {
+        if (!isNaN(sleepVal) && yesterdayRecord && yesterdayRecord.sleep_hours !== null && yesterdayRecord.sleep_hours !== undefined) {
+          const diff = Math.round((sleepVal - yesterdayRecord.sleep_hours) * 10) / 10;
+          if (diff < 0) {
+            diffSleepEl.innerHTML = `<span class="text-amber-600 font-bold">较前日 ${diff.toFixed(1)}h</span><span class="text-slate-300">偏短</span>`;
+          } else if (diff > 0) {
+            diffSleepEl.innerHTML = `<span class="text-emerald-600 font-bold">较前日 +${diff.toFixed(1)}h</span><span class="text-slate-300">充足</span>`;
+          } else {
+            diffSleepEl.innerHTML = `<span class="text-blue-600 font-bold">较前日 持平</span><span class="text-slate-300">规律</span>`;
+          }
+        } else {
+          diffSleepEl.innerHTML = `<span>较昨日 --</span><span class="text-slate-300">节律</span>`;
+        }
+      }
+    }
+
     async function loadRecordForDate(dateStr) {
       try {
-        const res = await fetch(`/api/v1/records/history?start_date=${dateStr}&end_date=${dateStr}`);
-        const json = await res.json();
+        // 并行获取当前日期和前一日的记录，供 2x2 Bento 卡片计算较昨日变化
+        const prevDate = getPrevDateStr(dateStr);
+        const [resToday, resPrev] = await Promise.all([
+          fetch(`/api/v1/records/history?start_date=${dateStr}&end_date=${dateStr}`),
+          fetch(`/api/v1/records/history?start_date=${prevDate}&end_date=${prevDate}`)
+        ]);
+
+        const [jsonToday, jsonPrev] = await Promise.all([
+          resToday.json(),
+          resPrev.json()
+        ]);
+
+        yesterdayRecord = (jsonPrev.code === 200 && jsonPrev.data && jsonPrev.data.length > 0) ? jsonPrev.data[0] : null;
+        const json = jsonToday;
         if (json.code === 200 && json.data && json.data.length > 0) {
           const rec = json.data[0];
           document.getElementById('input-weight-am').value = rec.weight_am || '';
@@ -2021,6 +1875,9 @@
           toggleColdShower(false);
           document.getElementById('coldShowerWaterTemp').value = '';
         }
+
+        // 刷新 2x2 Bento 卡片底部的较昨日变化（Δ）展示
+        updateDiffDisplay();
       } catch (err) {
         console.error("加载单日记录失败", err);
       }
@@ -2175,6 +2032,16 @@
       weightDetailEl.innerHTML = '<span>👆</span><span>点击折线查看当日晨重 / 睡前重</span>';
       const ctxWeight = document.getElementById('chart-weight').getContext('2d');
       if (weightChart) weightChart.destroy();
+
+      // 创建柔和 Apple Health 渐变填充
+      const weightGradAm = ctxWeight.createLinearGradient(0, 0, 0, 160);
+      weightGradAm.addColorStop(0, 'rgba(37, 99, 235, 0.18)');
+      weightGradAm.addColorStop(1, 'rgba(37, 99, 235, 0.00)');
+
+      const weightGradPm = ctxWeight.createLinearGradient(0, 0, 0, 160);
+      weightGradPm.addColorStop(0, 'rgba(245, 158, 11, 0.12)');
+      weightGradPm.addColorStop(1, 'rgba(245, 158, 11, 0.00)');
+
       weightChart = new Chart(ctxWeight, {
         type: 'line',
         data: {
@@ -2184,26 +2051,39 @@
               label: '晨起体重',
               data: weightAmData,
               borderColor: '#2563eb',
-              backgroundColor: '#2563eb',
-              tension: 0.3,
+              borderWidth: 2.2,
+              backgroundColor: weightGradAm,
+              fill: true,
+              tension: 0.35,
               spanGaps: true,
-              pointHitRadius: 12
+              pointBackgroundColor: '#ffffff',
+              pointBorderColor: '#2563eb',
+              pointBorderWidth: 2,
+              pointRadius: 3.5,
+              pointHoverRadius: 5.5,
+              pointHitRadius: 16
             },
             {
               label: '睡前体重',
               data: weightPmData,
               borderColor: '#f59e0b',
-              backgroundColor: '#f59e0b',
-              tension: 0.3,
+              borderWidth: 2.0,
+              backgroundColor: weightGradPm,
+              fill: true,
+              tension: 0.35,
               spanGaps: true,
-              pointHitRadius: 12
+              pointBackgroundColor: '#ffffff',
+              pointBorderColor: '#f59e0b',
+              pointBorderWidth: 2,
+              pointRadius: 3.5,
+              pointHoverRadius: 5.5,
+              pointHitRadius: 16
             }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          // 移动端：手指落在该日期对应的 x 轴列任意高度即可命中最近一天，无需精确戳中数据点
           interaction: { mode: 'index', intersect: false },
           plugins: { legend: { display: false } },
           onClick: (evt, elements) => {
@@ -2225,8 +2105,8 @@
             weightDetailEl.innerHTML = `<span>⚖️</span><span><b class="text-slate-700">${r.record_date}</b>　晨起 ${fmtW(am)} · 睡前 ${fmtW(pm)}${diffHtml}</span>`;
           },
           scales: {
-            y: { beginAtZero: false, ticks: { font: { size: 10 } } },
-            x: { ticks: { font: { size: 10 } } }
+            y: { beginAtZero: false, grid: { color: 'rgba(241, 245, 249, 0.8)' }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } }
           }
         }
       });
@@ -2242,6 +2122,11 @@
       waistDetailEl.innerHTML = '<span>👆</span><span>点击折线查看当日腰围</span>';
       const ctxWaist = document.getElementById('chart-waist').getContext('2d');
       if (waistChart) waistChart.destroy();
+
+      const waistGrad = ctxWaist.createLinearGradient(0, 0, 0, 160);
+      waistGrad.addColorStop(0, 'rgba(168, 85, 247, 0.18)');
+      waistGrad.addColorStop(1, 'rgba(168, 85, 247, 0.00)');
+
       waistChart = new Chart(ctxWaist, {
         type: 'line',
         data: {
@@ -2250,16 +2135,22 @@
             label: '腰围',
             data: waistData,
             borderColor: '#a855f7',
-            backgroundColor: '#a855f7',
-            tension: 0.3,
+            borderWidth: 2.2,
+            backgroundColor: waistGrad,
+            fill: true,
+            tension: 0.35,
             spanGaps: true,
-            pointHitRadius: 12
+            pointBackgroundColor: '#ffffff',
+            pointBorderColor: '#a855f7',
+            pointBorderWidth: 2,
+            pointRadius: 3.5,
+            pointHoverRadius: 5.5,
+            pointHitRadius: 16
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          // 移动端：手指落在该日期对应的 x 轴列任意高度即可命中最近一天，无需精确戳中数据点
           interaction: { mode: 'index', intersect: false },
           plugins: { legend: { display: false } },
           onClick: (evt, elements) => {
@@ -2270,8 +2161,8 @@
             waistDetailEl.innerHTML = `<span>📏</span><span><b class="text-slate-700">${r.record_date}</b>　腰围 ${waistText}</span>`;
           },
           scales: {
-            y: { beginAtZero: false, ticks: { font: { size: 10 } } },
-            x: { ticks: { font: { size: 10 } } }
+            y: { beginAtZero: false, grid: { color: 'rgba(241, 245, 249, 0.8)' }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } }
           }
         }
       });
@@ -2288,7 +2179,8 @@
           datasets: [{
             data: sleepHoursData,
             backgroundColor: sleepColors,
-            borderRadius: 6
+            borderRadius: 8,
+            borderSkipped: false
           }]
         },
         options: {
@@ -2307,8 +2199,8 @@
             sleepDetailEl.innerHTML = `<span>🛏</span><span><b class="text-slate-700">${r.record_date}</b>　就寝 ${r.sleep_start_time || '--'} · 起床 ${r.sleep_end_time || '--'} · ${hours} · ${tagText}</span>`;
           },
           scales: {
-            y: { beginAtZero: true, max: 12, ticks: { font: { size: 10 } } },
-            x: { ticks: { font: { size: 10 } } }
+            y: { beginAtZero: true, max: 12, grid: { color: 'rgba(241, 245, 249, 0.8)' }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } }
           }
         }
       });
