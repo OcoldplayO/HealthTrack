@@ -2,10 +2,12 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"healthtrack/internal/model"
 	"healthtrack/internal/service"
@@ -99,7 +101,7 @@ func (h *EveningHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, (9<<20))
+	r.Body = http.MaxBytesReader(w, r.Body, (9 << 20))
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		writeJSON(w, http.StatusOK, model.Error(model.CodeParamError, "读取图片失败: "+err.Error()))
@@ -163,4 +165,33 @@ func (h *EveningHandler) DeletePhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, model.SuccessWithMsg("图片已删除", nil))
+}
+
+// ExportArchive 导出图文归档 ZIP：GET /api/v1/export/summaries.zip?range=7|30|all
+func (h *EveningHandler) ExportArchive(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		writeJSON(w, http.StatusMethodNotAllowed, model.Error(http.StatusMethodNotAllowed, "Method Not Allowed"))
+		return
+	}
+
+	days, rangeKey := 0, "all"
+	switch r.URL.Query().Get("range") {
+	case "7":
+		days, rangeKey = 7, "7d"
+	case "30":
+		days, rangeKey = 30, "30d"
+	}
+
+	fileName := fmt.Sprintf("HealthTrack_summaries_%s_%s.zip", rangeKey, time.Now().Format("20060102"))
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
+	w.WriteHeader(http.StatusOK)
+	if r.Method == http.MethodHead {
+		return
+	}
+
+	if err := h.svc.WriteArchive(w, 1, days); err != nil {
+		// 流式输出已开始，无法再改状态码；记录日志便于排查截断的归档。
+		slog.Error("导出图文归档失败", "err", err)
+	}
 }

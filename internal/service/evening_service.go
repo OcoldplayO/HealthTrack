@@ -1,7 +1,12 @@
 package service
 
 import (
+	"archive/zip"
+	"encoding/csv"
+	"encoding/json"
 	"fmt"
+	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -95,6 +100,132 @@ func (s *EveningService) GetPhoto(userID, id int64) (string, []byte, error) {
 // DeletePhoto 删除图片。
 func (s *EveningService) DeletePhoto(userID, id int64) (int64, error) {
 	return s.repo.DeletePhoto(userID, id)
+}
+
+// archiveManifest 图文归档的清单文件，便于用户/工具识别导出范围与数量。
+type archiveManifest struct {
+	App           string `json:"app"`
+	SchemaVersion int    `json:"schema_version"`
+	ExportedAt    string `json:"exported_at"`
+	RangeDays     int    `json:"range_days,omitempty"`
+	StartDate     string `json:"start_date,omitempty"`
+	EndDate       string `json:"end_date"`
+	SummaryCount  int    `json:"summary_count"`
+	PhotoCount    int    `json:"photo_count"`
+}
+
+// WriteArchive 将小结与照片打包为 ZIP 流式写入 w；days<=0 表示全量。
+// 目录结构：photos/YYYY-MM-DD.jpg + summaries.csv + manifest.json。
+func (s *EveningService) WriteArchive(w io.Writer, userID int64, days int) error {
+	endDate := s.Today()
+	startDate := ""
+	if days > 0 {
+		startDate = time.Now().AddDate(0, 0, -(days - 1)).Format("2006-01-02")
+	}
+
+	summaries, err := s.repo.ListAll(userID)
+	if err != nil {
+		return err
+	}
+	// ListAll 为倒序，这里反转为升序，导出文件按时间顺序更易阅读。
+	items := make([]*model.EveningSummary, 0, len(summaries))
+	for i := len(summaries) - 1; i >= 0; i-- {
+		item := summaries[i]
+		if startDate != "" && (item.RecordDate < startDate || item.RecordDate > endDate) {
+			continue
+		}
+		items = append(items, item)
+	}
+
+	zw := zip.NewWriter(w)
+	photoCount := 0
+
+	// 图片已在前端压缩过，用 Store 直接存储，避免重复压缩消耗 CPU。
+	err = s.repo.IteratePhotos(userID, startDate, endDate, func(p repository.PhotoRecord) error {
+		entry, err := zw.CreateHeader(&zip.FileHeader{
+			Name:   "photos/" + p.Date + photoExt(p.Mime),
+			Method: zip.Store,
+		})
+		if err != nil {
+			return err
+		}
+		if _, err := entry.Write(p.Data); err != nil {
+			return err
+		}
+		photoCount++
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// summaries.csv 带 UTF-8 BOM，Excel / WPS 直接打开中文不乱码。
+	csvEntry, err := zw.CreateHeader(&zip.FileHeader{Name: "summaries.csv", Method: zip.Deflate})
+	if err != nil {
+		return err
+	}
+	if _, err := csvEntry.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
+		return err
+	}
+	cw := csv.NewWriter(csvEntry)
+	if err := cw.Write([]string{"记录日期", "自评分", "完成事项1", "完成事项2", "完成事项3", "感想", "含图片"}); err != nil {
+		return err
+	}
+	for _, item := range items {
+		done := [3]string{}
+		for i := 0; i < 3 && i < len(item.DoneItems); i++ {
+			done[i] = item.DoneItems[i]
+		}
+		hasPhoto := "否"
+		if item.PhotoID != nil {
+			hasPhoto = "是"
+		}
+		if err := cw.Write([]string{
+			item.RecordDate, strconv.Itoa(item.Score), done[0], done[1], done[2], item.NoteText, hasPhoto,
+		}); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	if err := cw.Error(); err != nil {
+		return err
+	}
+
+	manifest := archiveManifest{
+		App:           "HealthTrack",
+		SchemaVersion: 1,
+		ExportedAt:    time.Now().Format(time.RFC3339),
+		RangeDays:     days,
+		StartDate:     startDate,
+		EndDate:       endDate,
+		SummaryCount:  len(items),
+		PhotoCount:    photoCount,
+	}
+	body, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return err
+	}
+	manifestEntry, err := zw.CreateHeader(&zip.FileHeader{Name: "manifest.json", Method: zip.Deflate})
+	if err != nil {
+		return err
+	}
+	if _, err := manifestEntry.Write(body); err != nil {
+		return err
+	}
+
+	return zw.Close()
+}
+
+// photoExt 按 MIME 推断归档内图片扩展名。
+func photoExt(mime string) string {
+	switch mime {
+	case "image/png":
+		return ".png"
+	case "image/webp":
+		return ".webp"
+	default:
+		return ".jpg"
+	}
 }
 
 // normalizeImageMime 归一化图片 MIME；Content-Type 不可信时按魔数嗅探。

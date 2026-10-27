@@ -165,11 +165,12 @@
           <button onclick="closeExport()" aria-label="关闭导出" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500">✕</button>
         </div>
         <div class="p-5 space-y-4">
-          <div class="grid grid-cols-2 gap-2" id="export-type-pills">
-            <button type="button" data-type="excel" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm transition-all">📊 Excel 表格</button>
-            <button type="button" data-type="json" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">💾 JSON 备份</button>
+          <div class="grid grid-cols-3 gap-2" id="export-type-pills">
+            <button type="button" data-type="excel" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm transition-all">📊 Excel</button>
+            <button type="button" data-type="json" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">💾 JSON</button>
+            <button type="button" data-type="archive" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">🖼 图文归档</button>
           </div>
-          <div id="export-excel-panel">
+          <div id="export-range-panel">
             <label class="block text-xs font-bold text-slate-600 mb-2">导出范围</label>
             <div class="grid grid-cols-3 gap-2" id="export-range-pills">
               <button data-range="7" onclick="selectExportRange(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">最近7天</button>
@@ -187,9 +188,20 @@
               </ul>
             </div>
           </div>
+          <div id="export-archive-panel" class="hidden">
+            <div class="rounded-2xl bg-indigo-50 border border-indigo-100 px-3.5 py-3 text-[11px] leading-relaxed text-indigo-800">
+              <p class="font-bold text-xs mb-1.5">图文小结归档（ZIP）</p>
+              <ul class="space-y-1 list-disc list-inside">
+                <li>包含所选范围内的小结表格与全部难忘图片</li>
+                <li>解压后：summaries.csv + photos/ 日期.jpg + manifest.json</li>
+                <li>图片为应用内保存的压缩版，不包含手机相册原文件</li>
+              </ul>
+            </div>
+          </div>
           <div id="export-result" class="hidden text-xs rounded-xl px-3 py-2.5"></div>
           <button id="export-start-btn" type="button" onclick="exportCurrent()" class="w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">开始导出</button>
           <button id="export-json-btn" type="button" onclick="exportCurrent()" class="hidden w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">导出 JSON 备份</button>
+          <button id="export-archive-btn" type="button" onclick="exportCurrent()" class="hidden w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">导出图文归档</button>
         </div>
       </section>
     </div>
@@ -325,6 +337,13 @@
     <!-- 轻量错误提示条（替代原生 alert） -->
     <div id="app-toast" class="hidden fixed left-1/2 -translate-x-1/2 bottom-24 z-[80] max-w-[90%] px-4 py-2.5 rounded-2xl bg-slate-900/95 text-white text-xs shadow-xl"></div>
 
+    <!-- 小结图片全屏查看 -->
+    <div id="ev-photo-viewer" class="hidden fixed inset-0 z-[85] bg-slate-950/95 flex items-center justify-center" onclick="evoClosePhoto()" role="dialog" aria-modal="true" aria-label="查看小结图片">
+      <img id="ev-photo-viewer-img" src="" alt="" class="w-full h-full object-contain p-4 select-none">
+      <button type="button" onclick="event.stopPropagation(); evoClosePhoto()" aria-label="关闭图片" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/15 text-white text-lg leading-none flex items-center justify-center backdrop-blur active:scale-95 transition-transform">✕</button>
+      <p class="absolute bottom-6 inset-x-0 text-center text-[11px] text-white/60">点击任意处关闭</p>
+    </div>
+
     <!-- 核心内容切换区 -->
     <main class="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 no-scrollbar bg-slate-50/50 relative" id="main-content">
       
@@ -339,25 +358,7 @@
 
         <!-- Bento Grid: 三张体重/腰围小卡并排 + 睡眠卡通栏独占一行 -->
         <div class="grid grid-cols-3 gap-2.5">
-          <!-- 1. 晨起空腹体重 -->
-          <div class="apple-card apple-card-hover p-2.5 rounded-2xl flex flex-col justify-between min-w-0">
-            <div>
-              <div class="flex justify-between items-center gap-1">
-                <span class="text-[10px] font-bold text-slate-400 truncate">晨起空腹</span>
-                <span class="text-xs shrink-0">🌅</span>
-              </div>
-              <div class="mt-1.5 flex items-baseline space-x-0.5">
-                <input type="number" step="0.1" id="input-weight-am" placeholder="--" class="text-xl font-black text-slate-900 w-full min-w-0 outline-none bg-transparent placeholder-slate-300" oninput="updateDiffDisplay()">
-                <span class="text-[9px] font-bold text-slate-400 shrink-0">kg</span>
-              </div>
-            </div>
-            <div id="diff-weight-am" class="mt-2 pt-1.5 border-t border-slate-100/80 flex items-center justify-between text-[9px] text-slate-400 font-medium">
-              <span>较昨日 --</span>
-              <span class="text-slate-300">晨测</span>
-            </div>
-          </div>
-
-          <!-- 2. 睡前体重 -->
+          <!-- 1. 睡前体重 -->
           <div class="apple-card apple-card-hover p-2.5 rounded-2xl flex flex-col justify-between min-w-0">
             <div>
               <div class="flex justify-between items-center gap-1">
@@ -372,6 +373,24 @@
             <div id="diff-weight-pm" class="mt-2 pt-1.5 border-t border-slate-100/80 flex items-center justify-between text-[9px] text-slate-400 font-medium">
               <span>等待今晚称重</span>
               <span class="text-slate-300">--:--</span>
+            </div>
+          </div>
+
+          <!-- 2. 晨起空腹体重 -->
+          <div class="apple-card apple-card-hover p-2.5 rounded-2xl flex flex-col justify-between min-w-0">
+            <div>
+              <div class="flex justify-between items-center gap-1">
+                <span class="text-[10px] font-bold text-slate-400 truncate">晨起空腹</span>
+                <span class="text-xs shrink-0">🌅</span>
+              </div>
+              <div class="mt-1.5 flex items-baseline space-x-0.5">
+                <input type="number" step="0.1" id="input-weight-am" placeholder="--" class="text-xl font-black text-slate-900 w-full min-w-0 outline-none bg-transparent placeholder-slate-300" oninput="updateDiffDisplay()">
+                <span class="text-[9px] font-bold text-slate-400 shrink-0">kg</span>
+              </div>
+            </div>
+            <div id="diff-weight-am" class="mt-2 pt-1.5 border-t border-slate-100/80 flex items-center justify-between text-[9px] text-slate-400 font-medium">
+              <span>较昨日 --</span>
+              <span class="text-slate-300">晨测</span>
             </div>
           </div>
 
@@ -988,7 +1007,7 @@
             <!-- 已选 -->
             <div id="photo-filled" class="hidden">
               <div class="relative mx-4 rounded-2xl overflow-hidden bg-slate-100 shadow-sm">
-                <img id="photo-preview" src="" alt="今日图片" class="w-full h-52 object-cover">
+                <img id="photo-preview" src="" alt="今日图片" onclick="evoOpenPhoto(this.src, '今日图片')" class="w-full h-52 object-cover cursor-zoom-in">
                 <div class="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-slate-900/55 to-transparent"></div>
                 <span class="absolute top-2.5 left-2.5 text-[10px] font-bold text-white bg-slate-900/45 backdrop-blur px-2 py-0.5 rounded-full">今日一张</span>
                 <div class="absolute bottom-2.5 right-2.5 flex space-x-1.5">
@@ -1006,7 +1025,7 @@
                 <span class="text-[11px] font-bold text-slate-500">那一刻的感想</span>
                 <span class="text-[10px] text-slate-400"><span id="note-len">0</span> 字</span>
               </div>
-              <textarea id="note-text" rows="3" oninput="document.getElementById('note-len').innerText=this.value.length" class="w-full bg-slate-50 text-slate-700 border border-transparent rounded-xl p-3 text-[13px] outline-none focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all resize-none leading-relaxed placeholder:text-slate-400" placeholder="为什么这张图值得被记住…"></textarea>
+              <textarea id="note-text" rows="3" oninput="document.getElementById('note-len').innerText=this.value.length" class="evo-selectable w-full bg-slate-50 text-slate-700 border border-transparent rounded-xl p-3 text-[13px] outline-none focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all resize-none leading-relaxed placeholder:text-slate-400" placeholder="为什么这张图值得被记住…"></textarea>
             </div>
           </div>
 
@@ -1019,15 +1038,15 @@
             <div class="space-y-2">
               <div class="evo-done-row flex items-center space-x-2.5 bg-slate-50/80 border border-transparent rounded-xl px-2.5 py-2">
                 <span class="evo-seq-dot" id="seq-1">1</span>
-                <input type="text" id="done-1" maxlength="200" oninput="evUpdateDoneCount()" placeholder="最有成就感的那件事" class="flex-1 bg-transparent text-[13px] text-slate-700 outline-none placeholder:text-slate-400">
+                <input type="text" id="done-1" maxlength="200" oninput="evUpdateDoneCount()" placeholder="最有成就感的那件事" class="evo-selectable flex-1 bg-transparent text-[13px] text-slate-700 outline-none placeholder:text-slate-400">
               </div>
               <div class="evo-done-row flex items-center space-x-2.5 bg-slate-50/80 border border-transparent rounded-xl px-2.5 py-2">
                 <span class="evo-seq-dot" id="seq-2">2</span>
-                <input type="text" id="done-2" maxlength="200" oninput="evUpdateDoneCount()" placeholder="其次推进的一件事" class="flex-1 bg-transparent text-[13px] text-slate-700 outline-none placeholder:text-slate-400">
+                <input type="text" id="done-2" maxlength="200" oninput="evUpdateDoneCount()" placeholder="其次推进的一件事" class="evo-selectable flex-1 bg-transparent text-[13px] text-slate-700 outline-none placeholder:text-slate-400">
               </div>
               <div class="evo-done-row flex items-center space-x-2.5 bg-slate-50/80 border border-transparent rounded-xl px-2.5 py-2">
                 <span class="evo-seq-dot" id="seq-3">3</span>
-                <input type="text" id="done-3" maxlength="200" oninput="evUpdateDoneCount()" placeholder="哪怕很小，也算（可留空）" class="flex-1 bg-transparent text-[13px] text-slate-700 outline-none placeholder:text-slate-400">
+                <input type="text" id="done-3" maxlength="200" oninput="evUpdateDoneCount()" placeholder="哪怕很小，也算（可留空）" class="evo-selectable flex-1 bg-transparent text-[13px] text-slate-700 outline-none placeholder:text-slate-400">
               </div>
             </div>
           </div>
@@ -3336,6 +3355,38 @@
       });
     }
 
+    // 复制文本：安卓端优先走原生剪贴板桥，其次 Clipboard API，最后 textarea + execCommand。
+    async function appCopyText(text) {
+      if (window.HealthTrack && typeof window.HealthTrack.copyText === 'function') {
+        try {
+          window.HealthTrack.copyText(text);
+          return true;
+        } catch (e) { /* 继续走 Web API */ }
+      }
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (e) { /* 回退到 execCommand */ }
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-2000px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, text.length);
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) {
+        return false;
+      }
+    }
+
     // 轻量提示条：替代原生 alert()，避免安卓端静默无提示。
     let appToastTimer = null;
     function appToast(message) {
@@ -3531,7 +3582,7 @@
       selectExportRange(document.querySelector('#export-range-pills button[data-range="all"]'));
     }
 
-    // 导出方式切换：Excel 表格沿用原有范围选择，JSON 固定全量备份。
+    // 导出方式切换：Excel 与图文归档共用范围选择，JSON 固定全量备份。
     function selectExportType(btn) {
       exportType = btn.getAttribute('data-type');
       document.querySelectorAll('#export-type-pills button').forEach(p => {
@@ -3541,18 +3592,25 @@
           : 'py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
       });
       const isJSON = exportType === 'json';
-      document.getElementById('export-excel-panel').classList.toggle('hidden', isJSON);
+      const isArchive = exportType === 'archive';
+      document.getElementById('export-range-panel').classList.toggle('hidden', isJSON);
       document.getElementById('export-json-panel').classList.toggle('hidden', !isJSON);
-      document.getElementById('export-start-btn').classList.toggle('hidden', isJSON);
+      document.getElementById('export-archive-panel').classList.toggle('hidden', !isArchive);
+      document.getElementById('export-start-btn').classList.toggle('hidden', isJSON || isArchive);
       document.getElementById('export-json-btn').classList.toggle('hidden', !isJSON);
+      document.getElementById('export-archive-btn').classList.toggle('hidden', !isArchive);
       document.getElementById('export-subtitle').textContent = isJSON
         ? '全量备份，包含健康记录与睡前小结'
-        : '导出为 CSV，可用 Excel / WPS 打开';
+        : isArchive
+          ? '小结表格 + 难忘图片，打包为 ZIP'
+          : '导出为 CSV，可用 Excel / WPS 打开';
       resetExportResult();
     }
 
     function exportCurrent() {
-      return exportType === 'json' ? startJSONExport() : startExport();
+      if (exportType === 'json') return startJSONExport();
+      if (exportType === 'archive') return startArchiveExport();
+      return startExport();
     }
 
     function closeExport() {
@@ -3676,13 +3734,62 @@
       }
     }
 
+    function buildArchiveFilename(range) {
+      const key = range === '7' ? '7d' : range === '30' ? '30d' : 'all';
+      const d = new Date();
+      const ymd = '' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+      return `HealthTrack_summaries_${key}_${ymd}.zip`;
+    }
+
+    // 图文归档：所选范围内的小结表格 + 全部难忘图片，服务端流式打包为 ZIP。
+    async function startArchiveExport() {
+      const url = '/api/v1/export/summaries.zip' + (exportRange === 'all' ? '' : `?range=${exportRange}`);
+
+      // 手机 App：交给原生 DownloadListener → DownloadManager 下载
+      if (window.HealthTrack) {
+        pendingExportSize = await probeContentLength(url);
+        setExportBusy(true);
+        window.location.href = url;
+        return;
+      }
+
+      setExportBusy(true);
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const blob = await res.blob();
+        const filename = buildArchiveFilename(exportRange);
+
+        const a = document.createElement('a');
+        const blobUrl = URL.createObjectURL(blob);
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+
+        showExportResult(true, { filename, size: blob.size, location: '浏览器默认下载目录' });
+        showToast('导出成功', true);
+      } catch (e) {
+        showExportResult(false, { message: '导出失败：' + (e.message || '网络错误') });
+        showToast('导出失败', false);
+      } finally {
+        setExportBusy(false);
+      }
+    }
+
     function setExportBusy(busy) {
-      const isJSON = exportType === 'json';
-      const btn = document.getElementById(isJSON ? 'export-json-btn' : 'export-start-btn');
+      const btnID = exportType === 'json'
+        ? 'export-json-btn'
+        : exportType === 'archive' ? 'export-archive-btn' : 'export-start-btn';
+      const btn = document.getElementById(btnID);
       if (!btn) return;
       btn.disabled = busy;
       btn.classList.toggle('opacity-50', busy);
-      btn.textContent = busy ? '导出中…' : (isJSON ? '导出 JSON 备份' : '开始导出');
+      btn.textContent = busy
+        ? '导出中…'
+        : exportType === 'json' ? '导出 JSON 备份' : exportType === 'archive' ? '导出图文归档' : '开始导出';
     }
 
     function showExportResult(ok, info) {
@@ -4427,6 +4534,42 @@
       document.getElementById('photo-empty').classList.remove('hidden');
       document.getElementById('photo-meta').innerText = '';
     }
+
+    // 全屏查看图片：点击缩略图或今日图片放大到整屏，点击任意处/返回键关闭
+    let evPhotoHistoryPushed = false;
+    function evoOpenPhoto(src, alt) {
+      if (!src) return;
+      const viewer = document.getElementById('ev-photo-viewer');
+      const img = document.getElementById('ev-photo-viewer-img');
+      if (!viewer || !img) return;
+      img.src = src;
+      img.alt = alt || '小结图片';
+      if (viewer.classList.contains('hidden')) {
+        viewer.classList.remove('hidden');
+        // 让手机返回键关闭大图，而不是直接退出 App
+        if (!evPhotoHistoryPushed) {
+          history.pushState({ evPhoto: 1 }, '');
+          evPhotoHistoryPushed = true;
+        }
+      }
+    }
+    function evoClosePhoto(fromPop) {
+      const viewer = document.getElementById('ev-photo-viewer');
+      const img = document.getElementById('ev-photo-viewer-img');
+      if (!viewer || viewer.classList.contains('hidden')) return;
+      viewer.classList.add('hidden');
+      img.removeAttribute('src');
+      if (evPhotoHistoryPushed && !fromPop) {
+        evPhotoHistoryPushed = false;
+        history.back();
+      }
+    }
+    window.addEventListener('popstate', () => {
+      if (!evPhotoHistoryPushed) return;
+      evPhotoHistoryPushed = false;
+      evoClosePhoto(true);
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') evoClosePhoto(); });
     async function evOnPhotoPick(event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
@@ -4821,10 +4964,27 @@
       });
     }
 
+    // 一键复制某天小结（日期 + 评分 + 三件事 + 感想）
+    function evoEntryCopyText(r) {
+      const items = (r.done_items || []).filter(d => d && d.trim());
+      const lines = [`${r.record_date} ${evoWeekday(r.record_date)} · ${r.score} 分`, '', '【完成事项】'];
+      if (items.length) items.forEach((d, i) => lines.push(`${i + 1}. ${d}`));
+      else lines.push('（未填写）');
+      lines.push('', '【当时的感想】', (r.note_text && r.note_text.trim()) ? r.note_text : '（未填写）');
+      return lines.join('\n');
+    }
+    async function evCopyEntry(date, ev) {
+      if (ev) ev.stopPropagation();
+      const r = (evoState.summaries || []).find(x => x.record_date === date);
+      if (!r) return;
+      const ok = await appCopyText(evoEntryCopyText(r));
+      appToast(ok ? '已复制 ' + evoMmdd(date) + ' 的小结' : '复制失败，请长按文字手动复制');
+    }
+
     function evoEntryHTML(r, idx) {
       const tone = evoTone(evoBandOf(r.score || 0).tone);
       const thumb = r.photo_id
-        ? `<img src="/api/v1/evening/photo/${r.photo_id}" alt="${evoMmdd(r.record_date)}" class="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-100 bg-slate-50">`
+        ? `<img src="/api/v1/evening/photo/${r.photo_id}" alt="${evoMmdd(r.record_date)}" onclick="event.stopPropagation(); evoOpenPhoto(this.src, '${evoMmdd(r.record_date)} 小结图片')" class="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-100 bg-slate-50 cursor-zoom-in">`
         : `<span class="w-14 h-14 rounded-xl shrink-0 border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-[10px] text-slate-300 font-bold">无图</span>`;
       const items = (r.done_items || []).filter(d => d && d.trim());
       const preview = items.length ? items[0] : '（未填完成事项）';
@@ -4861,12 +5021,18 @@
               <div class="evo-collapsible">
                 <div class="px-3 pb-3 pt-2.5 border-t border-slate-100 space-y-2.5">
                   <div>
-                    <p class="evo-eyebrow mb-1.5">完成事项</p>
-                    <ol class="space-y-1">${doneHtml}</ol>
+                    <div class="flex items-center justify-between mb-1.5">
+                      <p class="evo-eyebrow">完成事项</p>
+                      <button type="button" class="evo-copy-btn" onclick="evCopyEntry('${r.record_date}', event)" aria-label="复制这天的记录">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                        <span>复制</span>
+                      </button>
+                    </div>
+                    <ol class="space-y-1 evo-selectable">${doneHtml}</ol>
                   </div>
                   <div class="bg-slate-50 rounded-xl p-2.5">
                     <p class="evo-eyebrow mb-1">当时的感想</p>
-                    <p class="text-[11px] text-slate-500 leading-relaxed">${r.note_text ? escapeHtml(r.note_text) : '（未填写）'}</p>
+                    <p class="text-[11px] text-slate-500 leading-relaxed evo-selectable">${r.note_text ? escapeHtml(r.note_text) : '（未填写）'}</p>
                   </div>
                 </div>
               </div>
@@ -4965,6 +5131,9 @@
       const swipe = panel.closest('.evo-swipe');
       if (!swipe || swipe.classList.contains('removing')) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      // 已选中文字时不启动左滑，避免打断长按复制
+      const sel = window.getSelection && window.getSelection();
+      if (sel && !sel.isCollapsed && sel.anchorNode && panel.contains(sel.anchorNode)) return;
       evoCloseAllSwipe(swipe);
       evoSwipe.drag = {
         panel: panel, swipe: swipe, id: e.pointerId,

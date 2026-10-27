@@ -132,6 +132,7 @@ func main() {
 
 	mux.HandleFunc("/api/v1/export", recordHandler.ExportCSV)
 	mux.HandleFunc("/api/v1/export/json", recordHandler.ExportJSON)
+	mux.HandleFunc("GET /api/v1/export/summaries.zip", eveningHandler.ExportArchive)
 	mux.HandleFunc("POST /api/v1/import/preview", importHandler.Preview)
 	mux.HandleFunc("POST /api/v1/import/confirm", importHandler.Confirm)
 	mux.HandleFunc("GET /api/v1/import/template", importHandler.Template)

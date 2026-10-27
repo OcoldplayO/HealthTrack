@@ -5,6 +5,8 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.Intent;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
@@ -322,8 +324,11 @@ public final class MainActivity extends Activity {
             filename = "HealthTrack_export.csv";
         }
         try {
-            // 按扩展名区分 CSV 与 JSON 备份，避免下载管理器把 JSON 当成表格文件。
-            String mimeType = filename.toLowerCase().endsWith(".json") ? "application/json" : "text/csv";
+            // 按扩展名区分 CSV / JSON / ZIP 归档，避免下载管理器认错文件类型。
+            String lowerName = filename.toLowerCase();
+            String mimeType = lowerName.endsWith(".json")
+                    ? "application/json"
+                    : lowerName.endsWith(".zip") ? "application/zip" : "text/csv";
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
             request.setTitle(filename);
             request.setMimeType(mimeType);
@@ -384,6 +389,14 @@ public final class MainActivity extends Activity {
             } catch (Exception ignored) {
                 Toast.makeText(MainActivity.this, "未找到系统下载管理器", Toast.LENGTH_SHORT).show();
             }
+        }
+
+        // 原生剪贴板：WebView 的 navigator.clipboard 在部分机型/失焦场景下不可用，这里兜底。
+        @android.webkit.JavascriptInterface
+        public void copyText(String text) {
+            ClipboardManager manager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (manager == null || text == null) return;
+            manager.setPrimaryClip(ClipData.newPlainText("HealthTrack", text));
         }
     }
 

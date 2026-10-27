@@ -87,6 +87,44 @@ func (r *EveningRepository) ListAll(userID int64) ([]*model.EveningSummary, erro
 	return items, nil
 }
 
+// PhotoRecord 单张小结图片（按日期归档导出用）。
+type PhotoRecord struct {
+	Date string
+	Mime string
+	Data []byte
+}
+
+// IteratePhotos 按日期升序遍历图片；startDate 为空表示不限范围（endDate 仅在有起始日时生效）。
+func (r *EveningRepository) IteratePhotos(userID int64, startDate, endDate string, fn func(PhotoRecord) error) error {
+	query := `SELECT record_date, mime, data FROM evening_photos WHERE user_id = ?`
+	args := []any{userID}
+	if startDate != "" {
+		query += ` AND record_date >= ? AND record_date <= ?`
+		args = append(args, startDate, endDate)
+	}
+	query += ` ORDER BY record_date`
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return fmt.Errorf("查询小结图片失败: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var item PhotoRecord
+		if err := rows.Scan(&item.Date, &item.Mime, &item.Data); err != nil {
+			return fmt.Errorf("扫描小结图片失败: %w", err)
+		}
+		if err := fn(item); err != nil {
+			return err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("遍历小结图片失败: %w", err)
+	}
+	return nil
+}
+
 // Upsert 按日期插入或整体覆盖更新一篇小结。
 func (r *EveningRepository) Upsert(userID int64, dto *model.SaveEveningDTO) (*model.EveningSummary, error) {
 	done := func(i int) any {
