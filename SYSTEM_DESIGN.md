@@ -150,6 +150,14 @@
   晨起冷水澡促发去甲肾上腺素与多巴胺平缓释放，缩短专注达起效潜伏期；睡前冷水澡激活交感神经，关联分析其对入睡潜伏期及深睡时长的负面干扰。
 * **预估体感水温 `water_temp`（已实现）**：单位 ℃，可空，录入范围 `0~40`。10 月天气转凉、持续降雨，水温较夏季大幅下降，冷刺激强度显著提升（主观上接近短效专注达）。记录水温后，AI 可建立"水温变化 → 唤醒强度 → 时长需求"的量化关联，据此给出冷水澡时长调整建议；`BuildPromptContext` 输出的冷水澡明细形如 `morning(16.0℃/2分钟/refreshed)`。
 
+### 2.9 低负担行为三项（晨光 / 步数 / 午餐，2026-10-28 实施）
+
+* **设计目标**：ADHD 场景下把每日摩擦降到最低——单项 ≤ 2 次点击，允许“今天没记”，缺项不产生补录压力。
+* **晨光 `morning_light`**：布尔三态（`true` 已见 / `false` 未见 / `NULL` 未记录），默认不打卡。语义 = 起床后 1 小时内接触自然光，用于关联当天情绪与当晚入睡时间。
+* **步数 `steps`**：整数，**`NULL` = 当天未记录（断点），严禁以 0 填充**。录入范围 `0 ~ 20000`（500 一档，便于单手定位）；卡片显示前一天值与近 7 天日均。
+* **午餐 `lunch_detail`**：结构化 JSON，**只记午饭、不记全天**。字段：`eaten`（`eaten` / `skipped`）、`protein`（多选：`chicken` / `egg` / `fish` / `beef` / `soy` / `yogurt` / `other`）、`protein_g`（15 / 25 / 35）、`staple`（`rice` / `noodle` / `grains` / `potato` / `none`）、`carb_g`（`lt20` / `20_35` / `35_50` / `gt50`）、`cooking`（`steam` / `stir_fry` / `fry` / `raw` / `takeout`）。点「跳过」时只落 `eaten=skipped`，其余字段留空。
+* **分析口径**：三项都是“观察 13:00–15:00 状态”的辅助变量，不做热量推算（延续 §2.5 的 NOVA / 8:2 原则）；午餐结构化字段仅用于与午后困倦、夜间睡眠做关联，不替代自由日记。
+
 ---
 
 ## 三、 数据模型与持久层规范
@@ -204,6 +212,16 @@ type ConcertaDetail struct {
 	Compensations  []string `json:"compensations"`// ["monster_energy", "sugar_craving"]
 }
 
+// LunchDetail 午餐结构化记录（只记午饭，NULL 表示当天未记录）
+type LunchDetail struct {
+	Eaten    string   `json:"eaten"`               // eaten / skipped
+	Protein  []string `json:"protein,omitempty"`   // 多选：chicken / egg / fish / beef / soy / yogurt / other
+	ProteinG int      `json:"protein_g,omitempty"` // 15 / 25 / 35
+	Staple   string   `json:"staple,omitempty"`    // rice / noodle / grains / potato / none
+	CarbG    string   `json:"carb_g,omitempty"`    // lt20 / 20_35 / 35_50 / gt50
+	Cooking  string   `json:"cooking,omitempty"`   // steam / stir_fry / fry / raw / takeout
+}
+
 // HealthRecord 核心健康记录实体（对齐 SQLite health_records 表）
 type HealthRecord struct {
 	ID             int64    `json:"id"`
@@ -223,6 +241,11 @@ type HealthRecord struct {
 	Exercise   *ExerciseDetail   `json:"exercise,omitempty"`
 	ColdShower *ColdShowerDetail `json:"cold_shower,omitempty"`
 	Concerta   *ConcertaDetail   `json:"concerta,omitempty"`
+
+	// 低负担行为三项（2026-10-28）
+	MorningLight *bool       `json:"morning_light,omitempty"` // true 已见 / false 未见 / nil 未记录
+	Steps        *int        `json:"steps,omitempty"`         // 每日步数；nil = 未记录（图表断点）
+	Lunch        *LunchDetail `json:"lunch,omitempty"`        // 午餐结构化；nil = 未记录
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -244,6 +267,9 @@ type SaveRecordDTO struct {
 	Exercise       *ExerciseDetail   `json:"exercise"`
 	ColdShower     *ColdShowerDetail `json:"cold_shower"`
 	Concerta       *ConcertaDetail   `json:"concerta"`
+	MorningLight   *bool             `json:"morning_light"`
+	Steps          *int              `json:"steps"`
+	Lunch          *LunchDetail      `json:"lunch"`
 }
 ```
 
@@ -252,6 +278,7 @@ type SaveRecordDTO struct {
 * `weight_am` / `weight_pm` ∈ `[30.0, 250.0]` kg；
 * `waist_size` ∈ `[30.0, 200.0]` cm；
 * `sleep_hours` ∈ `[0.0, 24.0]` h；
+* `steps` 为空或 ∈ `[0, 20000]`（**空 = 当天未记录，不写 0**）；
 * `journal_text` ≤ 2000 字符。
 
 ### 3.2 数据库表结构与平滑升级（`internal/repository/db.go`）
@@ -341,6 +368,10 @@ func (m *DBManager) migrate() error {
 		`ALTER TABLE health_records ADD COLUMN exercise_json TEXT DEFAULT '{}';`,
 		`ALTER TABLE health_records ADD COLUMN cold_shower_json TEXT DEFAULT '{}';`,
 		`ALTER TABLE health_records ADD COLUMN concerta_json TEXT DEFAULT '{}';`,
+		// 2026-10-28 低负担行为三项：晨光 / 步数 / 午餐（仅增列，历史行保持 NULL = 未记录）
+		`ALTER TABLE health_records ADD COLUMN morning_light INTEGER;`,
+		`ALTER TABLE health_records ADD COLUMN steps INTEGER;`,
+		`ALTER TABLE health_records ADD COLUMN lunch_json TEXT;`,
 		// scope 区分洞察归属：health（生理周期洞察）/ evening（睡前小结洞察）
 		`ALTER TABLE ai_insights ADD COLUMN scope TEXT NOT NULL DEFAULT 'health';`,
 	}
@@ -352,7 +383,8 @@ func (m *DBManager) migrate() error {
 
 * **多用户预留**：所有读写均带 `user_id` 条件，当前单机版固定 `userID = 1`；唯一键为 `UNIQUE(user_id, record_date)`。
 * **历史遗留列**：`sleep_start_time` / `sleep_end_time` 为主用字段；`sleep_bed_time` / `sleep_wake_time` 为兼容早期前端而保留的冗余列，写入时二者同步维护，读取时若主用字段为空则回退读取遗留列。
-* **结构化对象 JSON 列**：`exercise_json` / `cold_shower_json` / `concerta_json` 存 `TEXT`，空值约定为 `"{}"`，读取时忽略空对象。
+* **结构化对象 JSON 列**：`exercise_json` / `cold_shower_json` / `concerta_json` / `lunch_json` 存 `TEXT`，空值约定为 `"{}"`，读取时忽略空对象。`lunch_json` 为**空串/NULL 均表示未记录**（与 `"{}"` 的空对象等价处理），不做默认值填充。
+* **三态与断点列**：`morning_light` 为 `INTEGER`，读取时映射为 `*bool`（`1`/`0`/`NULL`）；`steps` 为 `INTEGER`，`NULL` = 当天未记录，**图表侧必须断点、严禁补 0**（见 §2.9 与 §4.4）。两列均**无默认值**，避免历史数据被误填。
 * **AI 洞察存档表 `ai_insights`**：独立于 `health_records`，持久化每次生成的洞察。`content` 存正文 Markdown、`thinking` 存思维链原文，`range_days` 记录档位（7/30/60），`start_date` / `end_date` 为**分析窗口边界**（`start_date = end_date - (range_days - 1)`）。窗口身份 = 「档位 + 截止日」，存在性判定同时校验 `scope` + `range_days` + `start_date` + `end_date`，取 `id DESC` 最新一条；游标分页按 `id DESC`。
   * **`scope` 列区分归属**：`health`（生理周期洞察，默认值）与 `evening`（睡前小结洞察）。列表查询默认只取 `health`，两类洞察互不串页；`evening` 洞察按 `record_date` 唯一，重新生成时先删除同日旧条。
   * **【规划】阶段对比扩展（v3.3.0 定稿，未实现）**：需求 3（§10.1 ⑧）计划 `scope` 增加取值 `compare`；并追加列 `ALTER TABLE ai_insights ADD COLUMN meta_json TEXT DEFAULT '{}'`——**仅增列、不删列、不改既有列**（严格遵守本文档"只允许 ADD COLUMN"红线）。`meta_json` 保存两个对比自然月的边界（月 A / 月 B 的起止日）与七项聚合指标快照，供「阶段对比」独立视图（§4.4.3）与历史页卡片回显"对比的是哪两个月"。`compare` 记录的 `range_days` 固定写 `0`（不参与 7/30/60 档位筛选），其时间边界以 `meta_json` 为准而非 `start_date`/`end_date`。
@@ -549,20 +581,20 @@ function handleSleepCalculation() {
 > 2026-10-14 追加评审：与 ⑦ 周平均趋势**互补**（周平均看长周期趋势、60 天详情看逐日细节），故采用**方案 A —— 单一总入口 + 独立视图**，与 ⑦「📈 周平均趋势」同一交互范式。
 
 * **档位扩展**：看板档位胶囊扩展为 `近7天 / 近30天 / 近60天`（默认仍为近 7 天）；第三档 = 近 60 天**逐日**。
-* **入口形态（方案 A）**：在**看板页标题下方**新增**一个**总入口「📊 60天详情」→ 进入**独立视图** `view-trend-detail`。**卡片本身不加任何入口**，三张卡片布局不变，**底部导航维持 4 个 Tab 不变**（该视图 nav 高亮 `dash`）。
-* **视图结构**：顶部「‹ 返回 + 📊 60天详情」→ 三指标 Tab `体重 / 腰围 / 睡眠时长`（默认体重）→ 图表卡 → 下方「👆 横向拖动 · 点击节点看当日详情」文字条。
+* **入口形态（方案 A）**：在**看板页标题下方**新增**一个**总入口「📊 60天详情」→ 进入**独立视图** `view-trend-detail`。**卡片本身不加任何入口**，四张卡片（体重 / 腰围 / 睡眠 / 步数）布局保持不变，**底部导航维持 4 个 Tab 不变**（该视图 nav 高亮 `dash`）。
+* **视图结构**：顶部「‹ 返回 + 📊 60天详情」→ 四指标 Tab `体重 / 腰围 / 睡眠时长 / 步数`（默认体重）→ 图表卡 → 下方「👆 横向拖动 · 点击节点看当日详情」文字条。
 * **竖屏 / 横屏两态（按容器实测宽度自适应）**：
   * **竖屏 / 桌面窄列**：固定日宽（每点 ≈ 26px，60 天图宽 ≈ 1560px），容器 `overflow-x:auto` **横向滚动**，不压缩数据点。
   * **手机横屏**：手机框 `#app-frame` 临时解除 `max-w-md`（`frame-wide` 类）→ 整屏铺满，容器宽 ≥ 560px 时 60 点压进一屏，x 轴约**每 3 天一个刻度**；同时切为**紧凑布局**（返回 + 标题 + 指标 Tab 挤成一行、隐藏统计块/提示条/口径说明、图高 220→150px），以适配横屏仅约 360px 的高度、避免被底部导航裁切。
   * **判定信号**：不用裸 `(orientation: landscape)`——**桌面宽窗口也是 landscape**，会误触发。改用**容器实测宽度**（`#td-chart-scroll.clientWidth ≥ 560` 判定"够宽"）配合 `(orientation: landscape) and (max-height: 600px)`（判定"手机真的转屏了"）。
   * **切换机制**：`matchMedia('(orientation: landscape) and (max-height: 600px)')`（带 `addListener` 兜底）+ `resize` 监听 → 先同步手机框宽度、再 `chart.resize()`。**转屏不重载页面**（`AndroidManifest.xml` 已 `configChanges="orientation|screenSize|keyboardHidden"`、未锁方向、`MainActivity` 无 `setRequestedOrientation`；真机验证转屏前后 PID 不变），靠用户自然转屏。
 * **数据与聚合**：复用 `GET /api/v1/records/history?start_date=&end_date=`，**前端聚合 / 渲染，不新增后端接口、不改 DB**（与 ⑦ 同一策略）。
-* **缺失与详情**：缺失日 = **断点**（`spanGaps:false`，**严禁以 0 填充**）；点击节点显示当日详情——体重 → 晨重 / 睡前 / 夜间排水；腰围 → 当日腰围；睡眠 → 就寝 / 起床 / 时长 / 档位。
+* **缺失与详情**：缺失日 = **断点**（`spanGaps:false`，**严禁以 0 填充**）；点击节点显示当日详情——体重 → 晨重 / 睡前 / 夜间排水；腰围 → 当日腰围；睡眠 → 就寝 / 起床 / 时长 / 档位；步数 → 当日步数（附当日晨光状态）。步数纵轴固定 `0 ~ 20000`、`stepSize 5000`（刻度 0 / 0.5万 / 1万 / 1.5万 / 2万），与录入上限一致。
 * **明确不做**：**不做真·强制横屏**（`MainActivity.setRequestedOrientation`）——仅对手机有意义、电脑端无此概念，且 WebView 旋转会整页重绘、体验割裂；**不做逐日数值表格**（详情即"折线图 + 点节点看值"）。
 
 #### 4.4.2 趋势分析页 · 周平均（§10.1 ⑦，已实施）
 
-* **形态（方案 Y）**：**独立视图**（不在看板卡片内切换），内含 `体重 / 腰围 / 睡眠时长` **三个 Tab**，各自一条周平均曲线。入口建议置于看板页标题栏（「📈 趋势分析」按钮 → 独立视图），与洞察页「🕘 历史」同一交互范式，**底部导航维持 4 个 Tab 不变**。
+* **形态（方案 Y）**：**独立视图**（不在看板卡片内切换），内含 `体重 / 腰围 / 睡眠时长 / 步数` **四个 Tab**，各自一条周平均曲线；步数取整并以千分位展示（不显示小数），纵轴口径与 §4.4.1 一致。入口置于看板「📈 周平均趋势」卡片，与洞察页「🕘 历史」同一交互范式，**底部导航维持 4 个 Tab 不变**。看板页另有一张「步数趋势」折线卡（逐日，与体重/腰围/睡眠三张卡并列），同样缺失日断点。
 * **分桶口径**：**自然周（周一 ~ 周日）**，共 **12 周**（含当前未满周）。
 * **曲线形态**：**周均值折线 + 周内 min/max 区间带**（区间带 = 该周内所有**日值**的 min/max，**非**标准差）。
 * **缺失与置信规则（必须严格遵守）**：
@@ -587,6 +619,29 @@ function handleSleepCalculation() {
   * **允许选择当前未过完的月**，但必须在 UI 与 AI 报告中明确标注「数据不足 / 不足月」。
 * **对比方式（方案 C）**：**以两月的聚合数据为主，叠加引用已生成洞察的结论**——不单独比对历史洞察正文（洞察为用户手动按需生成、时间上不连续，仅靠它做"每 30 天一次"会经常缺档）。
 * **产出与展示**：生成结果落 `ai_insights`（`scope='compare'`，窗口边界与指标快照落 `meta_json`，见 §3.2），以「指标对比表 + AI 综述」两段式呈现；对比表由接口回传的聚合快照直接渲染，前端不重算（见 §5.2 / §6.5）。
+
+### 4.5 低负担打卡卡与保存交互（2026-10-28 实施）
+
+**卡片形态（`view-log`）**
+
+* **晨光 / 步数**：各为一张**独立卡片**（不合并），位于日期行下方、体重三连卡上方。
+  * 晨光：一键 `是 / 否`，三态（未点 = 未记录），默认不打卡。
+  * 步数：滑动条 `0 ~ 20000`、`step 500`，右侧大字显示当前值；滑块下方刻度 `0 / 5,000 / 1万 / 1.5万 / 2万`；点「留空」清空为未记录（图表断点）；卡片副标题显示「前一天 · 近7天日均」。
+* **午餐**：独立**折叠卡**，默认收起。收起态标题栏显示摘要（如「鸡胸 · 约25g · 杂粮 · 20–35g · 蒸煮」）+「沿用昨天」按钮 + 旋转箭头；展开 6 行结构化点选（吃了吗 / 蛋白来源多选 / 蛋白量 / 主食 / 碳水 / 烹饪），点「跳过」时摘要显示「今天跳过午餐」，其余行隐藏。
+  * 选项组统一 `flex-1` 撑满剩余宽度并**左对齐**、`flex-wrap` 换行后与首行同起点；`.chip` / `.pill-sm-btn` 加 `white-space: nowrap`，避免窄屏下气泡内文字被压成两行。
+* **专项打卡折叠标题**：保持 `🧬 专项生理与习惯打卡 (运动 / 专注达 / 冷水澡)`，**不显示数值徽标**（360px 宽度下会与文案挤成两行）。
+* **日期行**：右侧显示「已记 X/6」，六项 = 体重 / 腰围 / 睡眠 / 晨光 / 步数 / 午餐。
+* **日记区**：标题改为「身体感受与自由记录」，右侧标签「饮食已结构化」（饮食走午餐结构化卡，日记不再承担记账）。
+
+**吸底保存条（一期定稿，不做自动保存）**
+
+* 固定在底部 Tab 栏**上方**，高度固定不跳动：
+  * **无改动**：绿色「✓ 今日已保存 HH:MM · 无改动」；
+  * **有改动**：蓝色「保存今日记录」+ 副文案「未保存 · 草稿已存」。
+* 任一点击 / 拖动 / 沿用昨天 / 填表都重置为脏状态；保存成功（`POST /api/v1/records` 全量 upsert）后切回绿色并刷新时间。
+* **草稿**：按 `record_date` 写 `localStorage`；重进该日期若检测到草稿则自动回填并提示「已恢复上次未保存的草稿」；保存成功后清除。
+* **离开守卫**：切换日期 / 切到看板等离开动作时，若 `logDirty` 为真则用**应用内确认框**（`#app-confirm-modal`）拦截，**禁用原生 `confirm`**。
+* **明确不做**：自动保存（用户明确"先按一期效果，观察后再定"）；启动困难专项打卡（本期仅以 `Concerta.FocusWork` 作为代理指标，见 §10.2）。
 
 ---
 
@@ -1009,6 +1064,7 @@ scripts/build-android.ps1
 | 1 | 批量导入历史数据功能                         | 后端导入接口 + 前端上传         | 用户有大量手工录入的历史数据需要一次性导入               |
 | 2 | 统一 CI 与本地 `versionCode` 基线（方案 A：改用仓库提交数） | `.github/workflows/build-apk.yml` + `scripts/build-android.ps1` | 解决 CI 包落后于本地包、无法覆盖安装（`INSTALL_FAILED_VERSION_DOWNGRADE`）问题，详见 §8.2「版本号基线差异说明」 |
 | 3 | 睡前小结支持手写签名                         | 前端画板 + 后端存储             | 用户已提出、**暂缓**；方案待研究（关联 §10.1 ✅③）        |
+| 4 | 启动困难专项打卡（任务启动阻滞量表）         | 前端卡片 + 模型字段 + AI 提示词 | 2026-10-28 评审**本期不实现**；暂以 `Concerta.FocusWork`（工作启动力 1-5）作代理指标，观察一段时间后再决定是否单独建模（关联 §4.5） |
 
 ---
 

@@ -50,3 +50,6 @@ scripts/build-android.ps1
 
 # 设计原型预览（临时稿，不进入版本库）
 .preview/
+
+# 预览分享功能自动生成的打包产物
+.trae-html-share-packages/
