@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"healthtrack/internal/model"
-	"time"
 )
 
 type RecordRepository struct {
@@ -23,6 +22,7 @@ func (r *RecordRepository) GetByDate(userID int64, dateStr string) (*model.Healt
 	       sleep_start_time, sleep_end_time, sleep_hours, sleep_tag,
 	       journal_text, activity_tags,
 	       sleep_bed_time, sleep_wake_time, exercise_json, cold_shower_json, concerta_json,
+	       morning_light, steps, lunch_json,
 	       created_at, updated_at
 	FROM health_records
 	WHERE user_id = ? AND record_date = ?
@@ -33,6 +33,8 @@ func (r *RecordRepository) GetByDate(userID int64, dateStr string) (*model.Healt
 	rec := &model.HealthRecord{}
 	var journalText, activityTags sql.NullString
 	var sleepBedTime, sleepWakeTime, exerciseJSON, coldShowerJSON, concertaJSON sql.NullString
+	var morningLight, steps sql.NullInt64
+	var lunchJSON sql.NullString
 	var createdAt, updatedAt string
 
 	err := row.Scan(
@@ -41,6 +43,7 @@ func (r *RecordRepository) GetByDate(userID int64, dateStr string) (*model.Healt
 		&rec.SleepStartTime, &rec.SleepEndTime, &rec.SleepHours,
 		&rec.SleepTag, &journalText, &activityTags,
 		&sleepBedTime, &sleepWakeTime, &exerciseJSON, &coldShowerJSON, &concertaJSON,
+		&morningLight, &steps, &lunchJSON,
 		&createdAt, &updatedAt,
 	)
 
@@ -87,9 +90,23 @@ func (r *RecordRepository) GetByDate(userID int64, dateStr string) (*model.Healt
 			rec.Concerta = &con
 		}
 	}
+	if morningLight.Valid {
+		v := morningLight.Int64 != 0
+		rec.MorningLight = &v
+	}
+	if steps.Valid {
+		v := int(steps.Int64)
+		rec.Steps = &v
+	}
+	if lunchJSON.Valid && lunchJSON.String != "" && lunchJSON.String != "{}" {
+		var lunch model.LunchDetail
+		if err := json.Unmarshal([]byte(lunchJSON.String), &lunch); err == nil {
+			rec.Lunch = &lunch
+		}
+	}
 
-	rec.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
-	rec.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
+	rec.CreatedAt = parseSQLiteTime(createdAt)
+	rec.UpdatedAt = parseSQLiteTime(updatedAt)
 
 	return rec, nil
 }
@@ -125,6 +142,13 @@ func (r *RecordRepository) SaveOrMerge(userID int64, dto *model.SaveRecordDTO, s
 		}
 	}
 
+	lunchJSONStr := "{}"
+	if dto.Lunch != nil {
+		if b, err := json.Marshal(dto.Lunch); err == nil {
+			lunchJSONStr = string(b)
+		}
+	}
+
 	bedTimeStr := ""
 	if dto.SleepStartTime != nil {
 		bedTimeStr = *dto.SleepStartTime
@@ -142,8 +166,9 @@ func (r *RecordRepository) SaveOrMerge(userID int64, dto *model.SaveRecordDTO, s
 			sleep_start_time, sleep_end_time, sleep_hours, sleep_tag,
 			journal_text, activity_tags,
 			sleep_bed_time, sleep_wake_time, exercise_json, cold_shower_json, concerta_json,
+			morning_light, steps, lunch_json,
 			updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		`
 		var journal string
 		if dto.JournalText != nil {
@@ -155,6 +180,7 @@ func (r *RecordRepository) SaveOrMerge(userID int64, dto *model.SaveRecordDTO, s
 			dto.SleepStartTime, dto.SleepEndTime, dto.SleepHours, sleepTag,
 			journal, activityTags,
 			bedTimeStr, wakeTimeStr, exerciseJSONStr, coldShowerJSONStr, concertaJSONStr,
+			dto.MorningLight, dto.Steps, lunchJSONStr,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("新增记录失败: %w", err)
@@ -240,14 +266,18 @@ func (r *RecordRepository) SaveOrMerge(userID int64, dto *model.SaveRecordDTO, s
 			sleep_start_time = ?, sleep_end_time = ?, sleep_hours = ?, sleep_tag = ?,
 			journal_text = ?, activity_tags = ?,
 			sleep_bed_time = ?, sleep_wake_time = ?, exercise_json = ?, cold_shower_json = ?, concerta_json = ?,
+			morning_light = ?, steps = ?, lunch_json = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = ? AND record_date = ?
 		`
+		// 晨光 / 步数 / 午餐以本次提交的整份表单为准：nil 即写 NULL（当天未记录 / 断点），
+		// 这样「留空」才能真正清除历史值，不会被 merge 逻辑保留。
 		_, err := r.db.Exec(updateSQL,
 			weightAM, weightPM, waistSize,
 			sleepStart, sleepEnd, sleepHours, tag,
 			journal, actTags,
 			bedTimeStr, wakeTimeStr, exerciseJSONStr, coldShowerJSONStr, concertaJSONStr,
+			dto.MorningLight, dto.Steps, lunchJSONStr,
 			userID, dto.RecordDate,
 		)
 		if err != nil {
@@ -265,6 +295,7 @@ func (r *RecordRepository) GetRange(userID int64, startDate, endDate string) ([]
 	       sleep_start_time, sleep_end_time, sleep_hours, sleep_tag,
 	       journal_text, activity_tags,
 	       sleep_bed_time, sleep_wake_time, exercise_json, cold_shower_json, concerta_json,
+	       morning_light, steps, lunch_json,
 	       created_at, updated_at
 	FROM health_records
 	WHERE user_id = ? AND record_date >= ? AND record_date <= ?
@@ -281,6 +312,8 @@ func (r *RecordRepository) GetRange(userID int64, startDate, endDate string) ([]
 		rec := &model.HealthRecord{}
 		var journalText, activityTags sql.NullString
 		var sleepBedTime, sleepWakeTime, exerciseJSON, coldShowerJSON, concertaJSON sql.NullString
+		var morningLight, steps sql.NullInt64
+		var lunchJSON sql.NullString
 		var createdAt, updatedAt string
 
 		if err := rows.Scan(
@@ -289,6 +322,7 @@ func (r *RecordRepository) GetRange(userID int64, startDate, endDate string) ([]
 			&rec.SleepStartTime, &rec.SleepEndTime, &rec.SleepHours,
 			&rec.SleepTag, &journalText, &activityTags,
 			&sleepBedTime, &sleepWakeTime, &exerciseJSON, &coldShowerJSON, &concertaJSON,
+			&morningLight, &steps, &lunchJSON,
 			&createdAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("扫描记录数据失败: %w", err)
@@ -328,9 +362,23 @@ func (r *RecordRepository) GetRange(userID int64, startDate, endDate string) ([]
 				rec.Concerta = &con
 			}
 		}
+		if morningLight.Valid {
+			v := morningLight.Int64 != 0
+			rec.MorningLight = &v
+		}
+		if steps.Valid {
+			v := int(steps.Int64)
+			rec.Steps = &v
+		}
+		if lunchJSON.Valid && lunchJSON.String != "" && lunchJSON.String != "{}" {
+			var lunch model.LunchDetail
+			if err := json.Unmarshal([]byte(lunchJSON.String), &lunch); err == nil {
+				rec.Lunch = &lunch
+			}
+		}
 
-		rec.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
-		rec.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
+		rec.CreatedAt = parseSQLiteTime(createdAt)
+		rec.UpdatedAt = parseSQLiteTime(updatedAt)
 		records = append(records, rec)
 	}
 
@@ -384,6 +432,9 @@ type importExisting struct {
 	exerciseJSON   string
 	coldShowerJSON string
 	concertaJSON   string
+	morningLight   *bool
+	steps          *int
+	lunchJSON      string
 }
 
 // importExistingSummary 事务内读取的既有睡前小结。
@@ -475,7 +526,8 @@ func importExistingRecords(tx *sql.Tx, userID int64, minDate, maxDate string) (m
 	       COALESCE(NULLIF(sleep_end_time, ''), NULLIF(sleep_wake_time, '')),
 	       sleep_hours, COALESCE(sleep_tag, ''),
 	       COALESCE(journal_text, ''), COALESCE(activity_tags, ''),
-	       COALESCE(exercise_json, '{}'), COALESCE(cold_shower_json, '{}'), COALESCE(concerta_json, '{}')
+	       COALESCE(exercise_json, '{}'), COALESCE(cold_shower_json, '{}'), COALESCE(concerta_json, '{}'),
+	       morning_light, steps, COALESCE(lunch_json, '{}')
 	FROM health_records
 	WHERE user_id = ? AND record_date >= ? AND record_date <= ?
 	`
@@ -489,11 +541,13 @@ func importExistingRecords(tx *sql.Tx, userID int64, minDate, maxDate string) (m
 	for rows.Next() {
 		rec := &importExisting{}
 		var start, end sql.NullString
+		var morningLight, steps sql.NullInt64
 		if err := rows.Scan(
 			&rec.recordDate, &rec.weightAM, &rec.weightPM, &rec.waistSize,
 			&start, &end, &rec.sleepHours, &rec.sleepTag,
 			&rec.journalText, &rec.activityTags,
 			&rec.exerciseJSON, &rec.coldShowerJSON, &rec.concertaJSON,
+			&morningLight, &steps, &rec.lunchJSON,
 		); err != nil {
 			return nil, fmt.Errorf("扫描导入目标记录失败: %w", err)
 		}
@@ -504,6 +558,14 @@ func importExistingRecords(tx *sql.Tx, userID int64, minDate, maxDate string) (m
 		if end.Valid {
 			v := end.String
 			rec.sleepEnd = &v
+		}
+		if morningLight.Valid {
+			v := morningLight.Int64 != 0
+			rec.morningLight = &v
+		}
+		if steps.Valid {
+			v := int(steps.Int64)
+			rec.steps = &v
 		}
 		result[rec.recordDate] = rec
 	}
@@ -609,8 +671,9 @@ INSERT INTO health_records (
 	sleep_start_time, sleep_end_time, sleep_hours, sleep_tag,
 	journal_text, activity_tags,
 	sleep_bed_time, sleep_wake_time, exercise_json, cold_shower_json, concerta_json,
+	morning_light, steps, lunch_json,
 	updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 `
 
 // importInsertRecord 新增一行；结构化扩展字段仅在备份携带时写入。
@@ -631,6 +694,7 @@ func importInsertRecord(tx *sql.Tx, userID int64, row *ImportUpsertRow) error {
 		marshalImportExt(row.DTO.Exercise, "{}"),
 		marshalImportExt(row.DTO.ColdShower, "{}"),
 		marshalImportExt(row.DTO.Concerta, "{}"),
+		row.DTO.MorningLight, row.DTO.Steps, marshalImportExt(row.DTO.Lunch, "{}"),
 	)
 	if err != nil {
 		return fmt.Errorf("导入新增 %s 失败: %w", row.Date, err)
@@ -645,6 +709,7 @@ UPDATE health_records SET
 	journal_text = ?, activity_tags = ?,
 	sleep_bed_time = ?, sleep_wake_time = ?,
 	exercise_json = ?, cold_shower_json = ?, concerta_json = ?,
+	morning_light = ?, steps = ?, lunch_json = ?,
 	updated_at = CURRENT_TIMESTAMP
 WHERE user_id = ? AND record_date = ?
 `
@@ -681,6 +746,9 @@ func importUpdateRecord(tx *sql.Tx, userID int64, row *ImportUpsertRow, old *imp
 		marshalImportExt(row.DTO.Exercise, old.exerciseJSON),
 		marshalImportExt(row.DTO.ColdShower, old.coldShowerJSON),
 		marshalImportExt(row.DTO.Concerta, old.concertaJSON),
+		resolveImportBool(mode, row.DTO.MorningLight, old.morningLight),
+		resolveImportInt(mode, row.DTO.Steps, old.steps),
+		marshalImportExt(row.DTO.Lunch, old.lunchJSON),
 		userID, row.Date,
 	)
 	if err != nil {
@@ -718,11 +786,32 @@ func resolveImportFloat(mode string, newVal, oldVal *float64, cleared bool) *flo
 	return oldVal
 }
 
-// resolveImportString 同 resolveImportFloat，用于文本与时间字段。
 func resolveImportString(mode string, newVal, oldVal *string, cleared bool) *string {
 	if cleared {
 		return nil
 	}
+	if newVal != nil {
+		return newVal
+	}
+	if mode == model.ImportConflictOverwrite {
+		return nil
+	}
+	return oldVal
+}
+
+// resolveImportBool 晨光等布尔字段：导入未携带时 merge 保留旧值、overwrite 清空。
+func resolveImportBool(mode string, newVal, oldVal *bool) *bool {
+	if newVal != nil {
+		return newVal
+	}
+	if mode == model.ImportConflictOverwrite {
+		return nil
+	}
+	return oldVal
+}
+
+// resolveImportInt 步数等数值字段：导入未携带时 merge 保留旧值、overwrite 清空。
+func resolveImportInt(mode string, newVal, oldVal *int) *int {
 	if newVal != nil {
 		return newVal
 	}

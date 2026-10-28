@@ -81,6 +81,17 @@ type ConcertaDetail struct {
 	Compensations  []string `json:"compensations"`   // ["monster_energy", "sugar_craving"]
 }
 
+// LunchDetail 午餐结构化记录（只记午饭，不记全天饮食）
+// 各字段存英文枚举值，展示文案由前端映射，便于后续统计。
+type LunchDetail struct {
+	Eaten    string   `json:"eaten"`     // eaten / skipped
+	Protein  []string `json:"protein"`   // 蛋白来源多选：chicken/egg/fish/beef/soy/yogurt/other
+	ProteinG int      `json:"protein_g"` // 蛋白量档位 (克)：15 / 25 / 35
+	Staple   string   `json:"staple"`    // rice/noodle/grains/potato/none
+	CarbG    string   `json:"carb_g"`    // <20 / 20_35 / 35_50 / >50
+	Cooking  string   `json:"cooking"`   // steam/stir_fry/fry/raw/takeout
+}
+
 // HealthRecord 核心健康记录实体（对齐 SQLite 数据库实体）
 type HealthRecord struct {
 	ID             int64      `json:"id"`
@@ -100,6 +111,11 @@ type HealthRecord struct {
 	Exercise   *ExerciseDetail   `json:"exercise,omitempty"`
 	ColdShower *ColdShowerDetail `json:"cold_shower,omitempty"`
 	Concerta   *ConcertaDetail   `json:"concerta,omitempty"`
+
+	// 晨光 / 步数 / 午餐：nil 表示当天未记录（断点），严禁补 0 或伪造默认值
+	MorningLight *bool        `json:"morning_light"`
+	Steps        *int         `json:"steps"`
+	Lunch        *LunchDetail `json:"lunch,omitempty"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -121,6 +137,9 @@ type SaveRecordDTO struct {
 	Exercise       *ExerciseDetail   `json:"exercise"`
 	ColdShower     *ColdShowerDetail `json:"cold_shower"`
 	Concerta       *ConcertaDetail   `json:"concerta"`
+	MorningLight   *bool             `json:"morning_light"` // nil = 未记录
+	Steps          *int              `json:"steps"`         // nil = 未记录（断点）
+	Lunch          *LunchDetail      `json:"lunch"`         // nil = 未记录
 }
 
 // CalculateSleepTagWithThresholds 根据入睡时间与自定义阈值计算熬夜等级。
@@ -202,6 +221,9 @@ func (dto *SaveRecordDTO) Validate() error {
 		if *dto.ColdShower.WaterTemp < 0.0 || *dto.ColdShower.WaterTemp > 40.0 {
 			return fmt.Errorf("冷水澡水温需在 0.0 ~ 40.0 ℃ 之间")
 		}
+	}
+	if dto.Steps != nil && (*dto.Steps < 0 || *dto.Steps > 30000) {
+		return fmt.Errorf("步数需在 0 ~ 30000 步之间")
 	}
 	return nil
 }

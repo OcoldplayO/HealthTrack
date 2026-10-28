@@ -160,6 +160,10 @@ func (m *DBManager) migrate() error {
 		`ALTER TABLE health_records ADD COLUMN exercise_json TEXT DEFAULT '{}';`,
 		`ALTER TABLE health_records ADD COLUMN cold_shower_json TEXT DEFAULT '{}';`,
 		`ALTER TABLE health_records ADD COLUMN concerta_json TEXT DEFAULT '{}';`,
+		// 晨光 / 步数 / 午餐：晨光与步数允许 NULL，NULL 即「当天未记录」（图表断点，不按 0 计）
+		`ALTER TABLE health_records ADD COLUMN morning_light INTEGER;`,
+		`ALTER TABLE health_records ADD COLUMN steps INTEGER;`,
+		`ALTER TABLE health_records ADD COLUMN lunch_json TEXT DEFAULT '{}';`,
 		// scope 区分洞察归属：health（生理周期洞察）/ evening（睡前小结洞察）/ compare（阶段对比）
 		`ALTER TABLE ai_insights ADD COLUMN scope TEXT NOT NULL DEFAULT 'health';`,
 		// meta_json 保存阶段对比（scope=compare）的两月边界与七项聚合指标快照

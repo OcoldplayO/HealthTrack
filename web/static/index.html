@@ -351,9 +351,50 @@
       <section id="view-log" class="fade-in space-y-3.5">
         <div class="flex justify-between items-center">
           <div class="flex items-center space-x-2">
-            <input type="date" id="input-date" class="bg-white border border-slate-200/90 text-slate-800 text-xs font-bold rounded-xl px-3 py-1.5 w-[124px] outline-none focus:border-blue-500 shadow-sm" onchange="loadRecordForDate(this.value)">
+            <input type="date" id="input-date" class="bg-white border border-slate-200/90 text-slate-800 text-xs font-bold rounded-xl px-3 py-1.5 w-[124px] outline-none focus:border-blue-500 shadow-sm" onchange="handleDateChange(this)">
+            <span class="text-[10px] font-bold text-slate-400">已记 <span id="log-count" class="text-slate-600">0/6</span></span>
           </div>
           <button onclick="setTodayDate()" class="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3.5 py-1.5 rounded-full transition-all border border-blue-100/80 active:scale-95">今日</button>
+        </div>
+
+        <!-- 晨光：独立卡，一键打卡；NULL = 未记录 -->
+        <div class="apple-card rounded-2xl p-3.5 flex items-center justify-between">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-base shrink-0">☀️</span>
+            <div class="min-w-0">
+              <p class="text-xs font-bold text-slate-800">晨光</p>
+              <p class="text-[10px] text-slate-400 truncate">起床后 1 小时内</p>
+            </div>
+          </div>
+          <div class="flex gap-1.5 shrink-0" id="morningLightPills">
+            <button type="button" class="pill-sm-btn" data-val="yes" onclick="setMorningLight('yes')">是</button>
+            <button type="button" class="pill-sm-btn" data-val="no" onclick="setMorningLight('no')">否</button>
+          </div>
+        </div>
+
+        <!-- 步数：独立卡，滑块 0–20000 / 500 档；留空 = 当天未记录（断点，不补 0） -->
+        <div class="apple-card rounded-2xl p-3.5 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-base shrink-0">🚶</span>
+              <div class="min-w-0">
+                <p class="text-xs font-bold text-slate-800">步数</p>
+                <p id="steps-meta" class="text-[10px] text-slate-400 truncate">前一天 -- · 近7天日均 --</p>
+              </div>
+            </div>
+            <div class="flex items-baseline gap-1 shrink-0">
+              <span id="steps-value" class="text-xl font-black text-slate-900 leading-none">--</span>
+              <span class="text-[9px] font-bold text-slate-400">步</span>
+            </div>
+          </div>
+          <input type="range" id="input-steps" min="0" max="20000" step="500" value="0" class="w-full accent-blue-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer" oninput="onStepsInput(this.value)">
+          <div class="flex justify-between text-[9px] font-semibold text-slate-300">
+            <span>0</span><span>5,000</span><span>1万</span><span>1.5万</span><span>2万</span>
+          </div>
+          <div class="pt-1 border-t border-slate-100/80 flex items-center justify-between">
+            <span id="steps-hint" class="text-[10px] text-slate-400 truncate">留空表示当天未记录 · 图表断点</span>
+            <button type="button" onclick="clearSteps()" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 px-2 py-0.5 rounded-md bg-slate-50 ml-2 shrink-0">留空</button>
+          </div>
         </div>
 
         <!-- Bento Grid: 三张体重/腰围小卡并排 + 睡眠卡通栏独占一行 -->
@@ -441,13 +482,98 @@
           </div>
         </div>
 
-        <!-- 自由文本区域 (饮食、身体感受) -->
+        <!-- 午餐：折叠卡（默认收起），标题栏显示摘要 + 一键沿用昨天 -->
+        <div class="apple-card rounded-2xl overflow-hidden">
+          <div class="px-3.5 py-3 flex items-center justify-between cursor-pointer select-none" onclick="toggleLunch()">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-base shrink-0">🍚</span>
+              <div class="min-w-0">
+                <p class="text-xs font-bold text-slate-800">午餐</p>
+                <p id="lunch-summary" class="text-[10px] text-slate-400 truncate">今天还没记午餐</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button type="button" onclick="event.stopPropagation(); applyLunchTemplate()" class="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full active:scale-95">沿用昨天</button>
+              <span id="lunch-icon" class="text-xs text-slate-400 transform transition-transform">▼</span>
+            </div>
+          </div>
+
+          <div id="lunch-body" class="hidden px-3.5 pb-3.5 pt-2.5 border-t border-slate-100 space-y-2">
+            <p class="text-[10px] text-slate-400">只记午饭 · 用于观察 13:00–15:00 状态，不必逐餐记账</p>
+
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[10px] font-bold text-slate-500 shrink-0 w-[52px]">吃了吗</span>
+              <div class="flex flex-1 flex-wrap gap-1.5 justify-start" id="lunch-eaten">
+                <button type="button" class="pill-sm-btn" data-val="eaten" onclick="setLunchPill(this)">吃了</button>
+                <button type="button" class="pill-sm-btn" data-val="skipped" onclick="setLunchPill(this)">跳过</button>
+              </div>
+            </div>
+
+            <div class="flex items-start justify-between gap-2" id="lunch-protein-row">
+              <span class="text-[10px] font-bold text-slate-500 shrink-0 w-[52px] pt-1">蛋白来源</span>
+              <div class="flex flex-1 flex-wrap gap-1.5 justify-start" id="lunch-protein">
+                <span class="chip" data-val="chicken" onclick="toggleLunchChip(this)">鸡胸</span>
+                <span class="chip" data-val="egg" onclick="toggleLunchChip(this)">蛋</span>
+                <span class="chip" data-val="fish" onclick="toggleLunchChip(this)">鱼</span>
+                <span class="chip" data-val="beef" onclick="toggleLunchChip(this)">牛肉</span>
+                <span class="chip" data-val="soy" onclick="toggleLunchChip(this)">豆制品</span>
+                <span class="chip" data-val="yogurt" onclick="toggleLunchChip(this)">酸奶</span>
+                <span class="chip" data-val="other" onclick="toggleLunchChip(this)">其他</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2" id="lunch-protein-g-row">
+              <span class="text-[10px] font-bold text-slate-500 shrink-0 w-[52px]">蛋白量</span>
+              <div class="flex flex-1 flex-wrap gap-1.5 justify-start" id="lunch-protein-g">
+                <button type="button" class="pill-sm-btn" data-val="15" onclick="setLunchPill(this)">约15g</button>
+                <button type="button" class="pill-sm-btn" data-val="25" onclick="setLunchPill(this)">约25g</button>
+                <button type="button" class="pill-sm-btn" data-val="35" onclick="setLunchPill(this)">约35g</button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2" id="lunch-staple-row">
+              <span class="text-[10px] font-bold text-slate-500 shrink-0 w-[52px]">主食</span>
+              <div class="flex flex-1 flex-wrap gap-1.5 justify-start" id="lunch-staple">
+                <button type="button" class="pill-sm-btn" data-val="rice" onclick="setLunchPill(this)">白米饭</button>
+                <button type="button" class="pill-sm-btn" data-val="noodle" onclick="setLunchPill(this)">面条</button>
+                <button type="button" class="pill-sm-btn" data-val="grains" onclick="setLunchPill(this)">杂粮</button>
+                <button type="button" class="pill-sm-btn" data-val="potato" onclick="setLunchPill(this)">薯类</button>
+                <button type="button" class="pill-sm-btn" data-val="none" onclick="setLunchPill(this)">无主食</button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2" id="lunch-carb-row">
+              <span class="text-[10px] font-bold text-slate-500 shrink-0 w-[52px]">碳水</span>
+              <div class="flex flex-1 flex-wrap gap-1.5 justify-start" id="lunch-carb">
+                <button type="button" class="pill-sm-btn" data-val="lt20" onclick="setLunchPill(this)">&lt;20g</button>
+                <button type="button" class="pill-sm-btn" data-val="20_35" onclick="setLunchPill(this)">20–35g</button>
+                <button type="button" class="pill-sm-btn" data-val="35_50" onclick="setLunchPill(this)">35–50g</button>
+                <button type="button" class="pill-sm-btn" data-val="gt50" onclick="setLunchPill(this)">&gt;50g</button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2" id="lunch-cook-row">
+              <span class="text-[10px] font-bold text-slate-500 shrink-0 w-[52px]">烹饪</span>
+              <div class="flex flex-1 flex-wrap gap-1.5 justify-start" id="lunch-cook">
+                <button type="button" class="pill-sm-btn" data-val="steam" onclick="setLunchPill(this)">蒸煮</button>
+                <button type="button" class="pill-sm-btn" data-val="stir_fry" onclick="setLunchPill(this)">炒</button>
+                <button type="button" class="pill-sm-btn" data-val="fry" onclick="setLunchPill(this)">煎炸</button>
+                <button type="button" class="pill-sm-btn" data-val="raw" onclick="setLunchPill(this)">生食</button>
+                <button type="button" class="pill-sm-btn" data-val="takeout" onclick="setLunchPill(this)">外卖</button>
+              </div>
+            </div>
+
+            <div id="lunch-yesterday" class="mt-1 pt-2 border-t border-slate-100/80 text-[10px] text-slate-400 truncate">昨天：--</div>
+          </div>
+        </div>
+
+        <!-- 自由文本区域 (身体感受) -->
         <div class="space-y-1.5">
           <div class="flex justify-between items-center text-xs">
-            <span class="font-bold text-slate-700">饮食日记与身体感受</span>
-            <span class="text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-100/80 px-2 py-0.5 rounded-md">自由文本 · 抓大放小</span>
+            <span class="font-bold text-slate-700">身体感受与自由记录</span>
+            <span class="text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-100/80 px-2 py-0.5 rounded-md">饮食已结构化</span>
           </div>
-          <textarea id="input-journal" rows="3" class="w-full apple-card rounded-2xl p-3.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 transition-all resize-none leading-relaxed" placeholder="如：早上一杯纯黑咖啡+鸡蛋2个。午餐牛肉原生米饭。晚上轻微高钠炒菜..."></textarea>
+          <textarea id="input-journal" rows="3" class="w-full apple-card rounded-2xl p-3.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 transition-all resize-none leading-relaxed" placeholder="如：今天状态还行，下午 3 点有点困，喝了杯水走动一下缓过来了…"></textarea>
         </div>
 
         <!-- 🧬 专项生理与习惯打卡折叠面板 -->
@@ -457,7 +583,9 @@
               <span>🧬</span>
               <span>专项生理与习惯打卡 (运动 / 专注达 / 冷水澡)</span>
             </span>
-            <span id="accordionIcon" class="text-xs text-slate-400 transform transition-transform">▼</span>
+            <div class="flex items-center gap-2 shrink-0">
+              <span id="accordionIcon" class="text-xs text-slate-400 transform transition-transform">▼</span>
+            </div>
           </div>
 
           <div id="biohackBody" class="p-4 pt-1 space-y-4 border-t border-slate-100 hidden">
@@ -591,12 +719,6 @@
 
           </div>
         </div>
-
-        <!-- 保存按钮 (Apple Health 现代渐变饱满按钮) -->
-        <button onclick="saveCurrentRecord()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.985] text-white py-3.5 rounded-2xl font-bold shadow-lg shadow-blue-500/25 transition-all flex justify-center items-center space-x-2">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-          <span>保存今日记录</span>
-        </button>
       </section>
 
       <!-- 2. 看板页 (Dashboard View) -->
@@ -615,7 +737,7 @@
           <span class="flex items-center space-x-2.5 min-w-0">
             <span class="text-lg">📊</span>
             <span class="text-xs font-bold text-slate-800 shrink-0">60 天详情</span>
-            <span class="text-[10px] text-slate-400 truncate">三指标 · 逐日全量跟踪</span>
+            <span class="text-[10px] text-slate-400 truncate">四指标 · 逐日全量跟踪</span>
           </span>
           <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         </button>
@@ -690,6 +812,25 @@
           </p>
         </div>
 
+        <!-- 步数趋势图卡片（缺失日断点，不补 0） -->
+        <div class="apple-card p-4 rounded-2xl space-y-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-[10px] uppercase font-bold text-slate-400">步数趋势 (步)</p>
+              <p id="dash-steps-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
+            </div>
+            <div class="flex items-center space-x-3 text-[10px] text-slate-500 font-medium">
+              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-sky-500 mr-1.5 shadow-sm shadow-sky-500/50"></span>每日步数</span>
+            </div>
+          </div>
+          <div class="h-44 w-full">
+            <canvas id="chart-steps"></canvas>
+          </div>
+          <p id="dash-steps-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
+            <span>👆</span><span>点击折线查看当日步数</span>
+          </p>
+        </div>
+
         <!-- 历史流水与运动标签列表 -->
         <div class="apple-card p-4 rounded-2xl space-y-3">
           <p class="text-xs font-bold text-slate-800">近期活动打卡流水</p>
@@ -710,11 +851,12 @@
           <span class="w-12"></span>
         </div>
 
-        <!-- 指标切换：体重 / 腰围 / 睡眠时长，各一条周平均曲线 -->
-        <div class="flex space-x-2">
-          <button onclick="setTrendMetric('weight')" id="trend-tab-weight" class="flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">体重</button>
-          <button onclick="setTrendMetric('waist')" id="trend-tab-waist" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">腰围</button>
-          <button onclick="setTrendMetric('sleep')" id="trend-tab-sleep" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">睡眠时长</button>
+        <!-- 指标切换：体重 / 腰围 / 睡眠 / 步数，各一条周平均曲线 -->
+        <div class="flex space-x-1.5">
+          <button onclick="setTrendMetric('weight')" id="trend-tab-weight" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">体重</button>
+          <button onclick="setTrendMetric('waist')" id="trend-tab-waist" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">腰围</button>
+          <button onclick="setTrendMetric('sleep')" id="trend-tab-sleep" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">睡眠</button>
+          <button onclick="setTrendMetric('steps')" id="trend-tab-steps" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">步数</button>
         </div>
 
         <!-- 周均值折线 + 周内 min/max 区间带 -->
@@ -754,11 +896,12 @@
             <span id="td-header-spacer" class="w-12"></span>
           </div>
 
-          <!-- 指标切换：体重 / 腰围 / 睡眠时长 -->
-          <div id="td-tabs" class="flex space-x-2">
-            <button onclick="setTrendDetailMetric('weight')" id="td-tab-weight" class="flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">体重</button>
-            <button onclick="setTrendDetailMetric('waist')" id="td-tab-waist" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">腰围</button>
-            <button onclick="setTrendDetailMetric('sleep')" id="td-tab-sleep" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">睡眠时长</button>
+          <!-- 指标切换：体重 / 腰围 / 睡眠 / 步数 -->
+          <div id="td-tabs" class="flex space-x-1.5">
+            <button onclick="setTrendDetailMetric('weight')" id="td-tab-weight" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">体重</button>
+            <button onclick="setTrendDetailMetric('waist')" id="td-tab-waist" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">腰围</button>
+            <button onclick="setTrendDetailMetric('sleep')" id="td-tab-sleep" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">睡眠</button>
+            <button onclick="setTrendDetailMetric('steps')" id="td-tab-steps" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">步数</button>
           </div>
         </div>
 
@@ -1183,6 +1326,19 @@
 
     </main>
 
+    <!-- 一期保存方案：吸底保存条（固定在底部 Tab 上方，高度不跳） -->
+    <div id="save-bar" class="shrink-0 px-4 py-2 bg-white/95 backdrop-blur-md border-t border-slate-100">
+      <button id="save-bar-dirty" type="button" onclick="saveCurrentRecord()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.985] text-white py-3 rounded-2xl font-bold shadow-lg shadow-blue-500/25 transition-all flex justify-center items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        <span>保存今日记录</span>
+        <span class="text-[9px] font-bold bg-white/25 px-1.5 py-0.5 rounded">未保存 · 草稿已存</span>
+      </button>
+      <div id="save-bar-clean" class="hidden h-[44px] items-center justify-between px-1">
+        <span id="save-bar-time" class="text-[10px] font-bold text-emerald-600">✓ 今日已保存 --:--</span>
+        <span class="text-[10px] text-slate-400">无改动</span>
+      </div>
+    </div>
+
     <!-- 底部 Tab 导航 (Apple Health 风格底栏) -->
     <nav class="shrink-0 flex border-t border-slate-100 bg-white/95 backdrop-blur-md pb-5 pt-2 px-3 justify-between z-10">
       <button onclick="switchTab('log')" id="tab-log" class="flex flex-col items-center flex-1 text-blue-600 font-bold transition-all active:scale-95">
@@ -1215,6 +1371,7 @@
     let weightChart = null;
     let waistChart = null;
     let sleepChart = null;
+    let stepsChart = null;
 
     // AI 洞察历史页状态（游标分页 + 搜索筛选）
     let historyState = {
@@ -1242,6 +1399,318 @@
       feeling: 'refreshed'
     };
 
+    // ===== 晨光 / 步数 / 午餐 与「保存条 / 脏状态 / 草稿」状态 =====
+    let morningLightState = null;                        // 'yes' | 'no' | null（未记录）
+    let stepsState = { value: null, prefilled: null };   // value=null 表示当天未记录（断点）
+    let lunchState = { touched: false };                 // 是否已确认记录过午餐
+    let prevStepsValue = null;                           // 前一天步数，用于滑块预置与「留空」复位
+    let logDirty = false;                                // 当前日期是否有未保存改动
+    let logSavedAt = '';                                 // 最近一次保存时间 HH:MM（干净态展示）
+    let logHasRecord = false;                            // 当前日期是否已有落库记录
+    let loadedDate = localDateStr(new Date());           // 当前表单对应的日期（切换守卫基准）
+    let suppressDirty = false;                           // 回显表单时暂停脏标记
+    let draftTimer = null;                               // localStorage 草稿写入节流
+
+    const LUNCH_TEXT = {
+      protein: { chicken: '鸡胸', egg: '蛋', fish: '鱼', beef: '牛肉', soy: '豆制品', yogurt: '酸奶', other: '其他' },
+      staple: { rice: '白米饭', noodle: '面条', grains: '杂粮', potato: '薯类', none: '无主食' },
+      carb: { lt20: '<20g', '20_35': '20–35g', '35_50': '35–50g', gt50: '>50g' },
+      cook: { steam: '蒸煮', stir_fry: '炒', fry: '煎炸', raw: '生食', takeout: '外卖' }
+    };
+
+    // ---------- 晨光 ----------
+    function setMorningLight(val) {
+      morningLightState = morningLightState === val ? null : val;
+      syncMorningLightUI();
+      markDirty();
+    }
+
+    function syncMorningLightUI() {
+      document.querySelectorAll('#morningLightPills .pill-sm-btn').forEach(p => {
+        p.classList.toggle('active', p.getAttribute('data-val') === morningLightState);
+      });
+    }
+
+    // ---------- 步数 ----------
+    function onStepsInput(raw) {
+      const v = Number(raw);
+      stepsState.value = isNaN(v) ? null : Math.max(0, Math.min(20000, Math.round(v / 500) * 500));
+      syncStepsSlider();
+      markDirty();
+    }
+
+    function clearSteps() {
+      stepsState.value = null;
+      syncStepsSlider();
+      markDirty();
+    }
+
+    // 滑块位置：已记录 → 记录值；未记录 → 预置前一天值（仅作起点，不写入）
+    function syncStepsSlider() {
+      const slider = document.getElementById('input-steps');
+      if (!slider) return;
+      stepsState.prefilled = stepsState.value === null ? prevStepsValue : null;
+      slider.value = stepsState.value === null ? (prevStepsValue === null ? 0 : prevStepsValue) : stepsState.value;
+      updateStepsDisplay();
+    }
+
+    function updateStepsDisplay() {
+      const v = stepsState.value;
+      const valueEl = document.getElementById('steps-value');
+      if (valueEl) valueEl.innerText = v === null ? '--' : v.toLocaleString('en-US');
+      const hint = document.getElementById('steps-hint');
+      if (!hint) return;
+      if (v === null && stepsState.prefilled !== null) {
+        hint.innerText = `拖动滑块记录 · 已预置昨天 ${stepsState.prefilled.toLocaleString('en-US')} 步`;
+      } else {
+        hint.innerText = '留空表示当天未记录 · 图表断点';
+      }
+    }
+
+    function updateStepsMeta(weekRecords, dateStr) {
+      const prev = weekRecords.find(r => r.record_date === getPrevDateStr(dateStr));
+      prevStepsValue = (prev && prev.steps !== null && prev.steps !== undefined) ? Number(prev.steps) : null;
+      const valid = weekRecords
+        .filter(r => r.record_date !== dateStr && r.steps !== null && r.steps !== undefined)
+        .map(r => Number(r.steps));
+      const avg = valid.length ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length) : null;
+      const meta = document.getElementById('steps-meta');
+      if (meta) {
+        meta.innerText = `前一天 ${prevStepsValue === null ? '--' : prevStepsValue.toLocaleString('en-US')} · 近7天日均 ${avg === null ? '--' : avg.toLocaleString('en-US')}`;
+      }
+    }
+
+    // ---------- 午餐 ----------
+    function toggleLunch() {
+      const body = document.getElementById('lunch-body');
+      const icon = document.getElementById('lunch-icon');
+      const nowHidden = body.classList.toggle('hidden');
+      icon.style.transform = nowHidden ? 'rotate(0deg)' : 'rotate(180deg)';
+    }
+
+    function setLunchPill(el) {
+      el.parentElement.querySelectorAll('.pill-sm-btn').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+      lunchState.touched = true;
+      afterLunchChange();
+    }
+
+    function toggleLunchChip(el) {
+      el.classList.toggle('active');
+      lunchState.touched = true;
+      afterLunchChange();
+    }
+
+    function afterLunchChange() {
+      syncLunchSkipUI();
+      updateLunchSummary();
+      markDirty();
+    }
+
+    // 选了「跳过」时，其余明细行收起
+    function syncLunchSkipUI() {
+      const skipped = lunchPick('lunch-eaten') === 'skipped';
+      ['lunch-protein-row', 'lunch-protein-g-row', 'lunch-staple-row', 'lunch-carb-row', 'lunch-cook-row'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('hidden', skipped);
+      });
+    }
+
+    function lunchPick(id) {
+      const el = document.querySelector(`#${id} .pill-sm-btn.active`);
+      return el ? el.getAttribute('data-val') : '';
+    }
+
+    // 折叠状态下也要能一眼看出今天吃了什么
+    function updateLunchSummary() {
+      const out = document.getElementById('lunch-summary');
+      if (!out) return;
+      if (!lunchState.touched) { out.innerText = '今天还没记午餐'; return; }
+      if (lunchPick('lunch-eaten') === 'skipped') { out.innerText = '今天跳过午餐'; return; }
+      const proteins = Array.from(document.querySelectorAll('#lunch-protein .chip.active'))
+        .map(c => LUNCH_TEXT.protein[c.getAttribute('data-val')] || '');
+      const proteinG = lunchPick('lunch-protein-g');
+      const parts = [
+        proteins.length ? proteins.join('、') : '未选蛋白',
+        proteinG ? `约${proteinG}g` : '',
+        LUNCH_TEXT.staple[lunchPick('lunch-staple')] || '',
+        LUNCH_TEXT.carb[lunchPick('lunch-carb')] || '',
+        LUNCH_TEXT.cook[lunchPick('lunch-cook')] || ''
+      ].filter(Boolean);
+      out.innerText = parts.join(' · ') || '已记午餐（明细空白）';
+    }
+
+    function lunchText(d) {
+      if (!d) return '';
+      if (d.eaten === 'skipped') return '跳过';
+      const proteins = (d.protein || []).map(v => LUNCH_TEXT.protein[v] || v);
+      return [
+        proteins.join('、'),
+        d.protein_g ? `约${d.protein_g}g` : '',
+        LUNCH_TEXT.staple[d.staple] || '',
+        LUNCH_TEXT.carb[d.carb_g] || '',
+        LUNCH_TEXT.cook[d.cooking] || ''
+      ].filter(Boolean).join(' · ');
+    }
+
+    function lunchPayload() {
+      if (!lunchState.touched) return null;
+      const proteins = Array.from(document.querySelectorAll('#lunch-protein .chip.active')).map(c => c.getAttribute('data-val'));
+      return {
+        eaten: lunchPick('lunch-eaten') || 'eaten',
+        protein: proteins,
+        protein_g: parseInt(lunchPick('lunch-protein-g')) || 0,
+        staple: lunchPick('lunch-staple'),
+        carb_g: lunchPick('lunch-carb'),
+        cooking: lunchPick('lunch-cook')
+      };
+    }
+
+    function applyLunch(detail) {
+      document.querySelectorAll('#lunch-eaten .pill-sm-btn, #lunch-protein-g .pill-sm-btn, #lunch-staple .pill-sm-btn, #lunch-carb .pill-sm-btn, #lunch-cook .pill-sm-btn')
+        .forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('#lunch-protein .chip').forEach(c => c.classList.remove('active'));
+      lunchState.touched = !!detail;
+      if (detail) {
+        const mark = (id, val) => {
+          const el = document.querySelector(`#${id} [data-val="${val}"]`);
+          if (el) el.classList.add('active');
+        };
+        mark('lunch-eaten', detail.eaten || 'eaten');
+        (detail.protein || []).forEach(v => mark('lunch-protein', v));
+        if (detail.protein_g) mark('lunch-protein-g', String(detail.protein_g));
+        if (detail.staple) mark('lunch-staple', detail.staple);
+        if (detail.carb_g) mark('lunch-carb', detail.carb_g);
+        if (detail.cooking) mark('lunch-cook', detail.cooking);
+      }
+      syncLunchSkipUI();
+      updateLunchSummary();
+    }
+
+    // 一键沿用昨天的午餐（昨天无记录时提示手动记一次）
+    function applyLunchTemplate() {
+      const prev = yesterdayRecord && yesterdayRecord.lunch;
+      if (!prev) {
+        showToast('昨天没有午餐记录，先手动记一次', false);
+        return;
+      }
+      applyLunch(prev);
+      lunchState.touched = true;
+      markDirty();
+      showToast('已沿用昨天的午餐');
+    }
+
+    function updateLunchYesterdayNote() {
+      const el = document.getElementById('lunch-yesterday');
+      if (!el) return;
+      const d = yesterdayRecord && yesterdayRecord.lunch;
+      el.innerText = '昨天：' + (d ? lunchText(d) : '--');
+    }
+
+    // ---------- 已记进度 ----------
+    function updateLogCompleteness() {
+      const has = id => String(document.getElementById(id).value || '').trim() !== '';
+      let n = 0;
+      if (has('input-weight-am') || has('input-weight-pm')) n++;
+      if (has('input-waist')) n++;
+      if (has('sleepDuration')) n++;
+      if (morningLightState) n++;
+      if (stepsState.value !== null) n++;
+      if (lunchState.touched) n++;
+      const el = document.getElementById('log-count');
+      if (!el) return;
+      el.innerText = `${n}/6`;
+      el.className = n >= 6 ? 'text-emerald-600' : 'text-slate-600';
+    }
+
+    // ---------- 保存条 / 脏状态 / 草稿 ----------
+    function markDirty() {
+      if (suppressDirty) return;
+      logDirty = true;
+      updateLogCompleteness();
+      renderSaveBar();
+      if (draftTimer) clearTimeout(draftTimer);
+      const draftDate = loadedDate;
+      draftTimer = setTimeout(() => { draftTimer = null; saveDraftNow(draftDate); }, 400);
+    }
+
+    // 切日期/切页前把待写入的草稿立即落盘，避免跨日期串数据
+    function flushDraft() {
+      if (draftTimer) { clearTimeout(draftTimer); draftTimer = null; }
+      if (logDirty) saveDraftNow(loadedDate);
+    }
+
+    function renderSaveBar() {
+      const dirtyBtn = document.getElementById('save-bar-dirty');
+      const clean = document.getElementById('save-bar-clean');
+      if (!dirtyBtn || !clean) return;
+      const showClean = !logDirty && logHasRecord;
+      dirtyBtn.classList.toggle('hidden', showClean);
+      clean.classList.toggle('hidden', !showClean);
+      clean.classList.toggle('flex', showClean);
+      if (showClean) {
+        document.getElementById('save-bar-time').innerText = `✓ 今日已保存${logSavedAt ? ' ' + logSavedAt : ''}`;
+      }
+    }
+
+    function draftKey(dateStr) {
+      return `ht_log_draft_${dateStr}`;
+    }
+
+    function saveDraftNow(dateStr) {
+      dateStr = dateStr || loadedDate;
+      if (!dateStr) return;
+      try {
+        localStorage.setItem(draftKey(dateStr), JSON.stringify(collectLogState()));
+      } catch (e) {
+        // 存储写满 / 隐私模式：草稿失败不影响正常保存
+      }
+    }
+
+    function readDraft(dateStr) {
+      try {
+        const raw = localStorage.getItem(draftKey(dateStr));
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        return (obj && obj.record_date === dateStr) ? obj : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function clearDraft(dateStr) {
+      try { localStorage.removeItem(draftKey(dateStr)); } catch (e) { /* 忽略 */ }
+    }
+
+    function shiftDateStr(dateStr, days) {
+      const parts = dateStr.split('-').map(Number);
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      d.setDate(d.getDate() + days);
+      return localDateStr(d);
+    }
+
+    function timeFromRecord(rec) {
+      if (!rec || !rec.updated_at) return '';
+      const d = new Date(rec.updated_at);
+      if (isNaN(d.getTime()) || d.getFullYear() < 2000) return '';
+      return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+    }
+
+    // 切换日期：有未保存改动时先确认（不丢数据，草稿已自动保存）
+    async function handleDateChange(input) {
+      const target = input.value;
+      if (!target) { input.value = loadedDate; return; }
+      if (target === loadedDate) return;
+      if (logDirty) {
+        const ok = await appConfirm(`当前日期还有未保存的改动（草稿已自动保存），确定切换到 ${target}？`, {
+          title: '未保存改动', confirmText: '仍然切换', danger: false
+        });
+        if (!ok) { input.value = loadedDate; return; }
+        flushDraft();
+      }
+      await loadRecordForDate(target);
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       setTodayDate();
       loadSleepThresholds();
@@ -1252,6 +1721,14 @@
         if (!document.hidden) checkDayRollover();
       });
       window.addEventListener('pageshow', checkDayRollover);
+
+      // 记一笔表单：任意输入即标记未保存；日期输入由 handleDateChange 单独处理
+      const logView = document.getElementById('view-log');
+      logView.addEventListener('input', e => { if (e.target.id !== 'input-date') markDirty(); });
+      logView.addEventListener('change', e => { if (e.target.id !== 'input-date') markDirty(); });
+      logView.addEventListener('click', e => {
+        if (e.target.closest('button, .chip')) markDirty();
+      });
     });
 
     function showToast(msg, isSuccess = true) {
@@ -1414,6 +1891,21 @@
     }
 
     function switchTab(tab) {
+      // 离开记一笔时若有未保存改动，先确认（草稿已自动保存，回来可直接恢复）
+      if (currentTab === 'log' && tab !== 'log' && logDirty && !suppressDirty) {
+        appConfirm('今天的改动还没保存（草稿已自动保存），确定先离开吗？', {
+          title: '未保存改动', confirmText: '仍然离开', danger: false
+        }).then(ok => {
+          if (!ok) return;
+          flushDraft();
+          switchTabCore(tab);
+        });
+        return;
+      }
+      switchTabCore(tab);
+    }
+
+    function switchTabCore(tab) {
       currentTab = tab;
       // 历史页/阶段对比页没有对应的底部 Tab，导航高亮仍归属「洞察」；60天详情归属「看板」
       const navKey = (tab === 'history' || tab === 'compare') ? 'insight' : ((tab === 'trend' || tab === 'trend-detail') ? 'dash' : tab);
@@ -1443,6 +1935,10 @@
       // 离开「60天详情」时收回手机框的放宽态（进入时由 renderTrendDetailChart 内的 tdRelayout 处理）
       tdSyncFrame();
 
+      // 吸底保存条只在「记一笔」出现
+      const saveBar = document.getElementById('save-bar');
+      if (saveBar) saveBar.classList.toggle('hidden', tab !== 'log');
+
       if (tab === 'dash') {
         loadDashboardData(dashRange);
       }
@@ -1463,11 +1959,19 @@
       }
     }
 
-    function setTodayDate() {
+    async function setTodayDate() {
       const str = localDateStr(new Date());
+      const input = document.getElementById('input-date');
+      if (input.value && input.value !== str && logDirty) {
+        const ok = await appConfirm('当前日期的改动尚未保存（草稿已自动保存），确定切回今天吗？', {
+          title: '未保存改动', confirmText: '仍然切换', danger: false
+        });
+        if (!ok) { input.value = loadedDate; return; }
+        flushDraft();
+      }
       lastKnownDay = str;
-      document.getElementById('input-date').value = str;
-      loadRecordForDate(str);
+      input.value = str;
+      await loadRecordForDate(str);
     }
 
     // 跨过零点自动切到新的一天：日期选择器前进一天，面板回到默认状态（新日期无记录时即为空表单）。
@@ -1476,6 +1980,8 @@
     function checkDayRollover() {
       const today = localDateStr(new Date());
       if (today === lastKnownDay) return;
+      // 正在编辑且未保存时不强制跨天，避免把改动冲掉
+      if (logDirty) return;
       const input = document.getElementById('input-date');
       const wasToday = input.value === lastKnownDay;
       lastKnownDay = today;
@@ -1774,207 +2280,184 @@
     }
 
     async function loadRecordForDate(dateStr) {
+      loadedDate = dateStr;
+      suppressDirty = true;
+      let rec = null;
       try {
-        // 并行获取当前日期和前一日的记录，供 2x2 Bento 卡片计算较昨日变化
-        const prevDate = getPrevDateStr(dateStr);
-        const [resToday, resPrev] = await Promise.all([
-          fetch(`/api/v1/records/history?start_date=${dateStr}&end_date=${dateStr}`),
-          fetch(`/api/v1/records/history?start_date=${prevDate}&end_date=${prevDate}`)
-        ]);
+        // 一次取近 7 天：当天记录用于回显，前一天用于 Δ 与步数预置，其余用于日均
+        const weekStart = shiftDateStr(dateStr, -6);
+        const resWeek = await fetch(`/api/v1/records/history?start_date=${weekStart}&end_date=${dateStr}`);
+        const jsonWeek = await resWeek.json();
+        const weekRecords = (jsonWeek.code === 200 && Array.isArray(jsonWeek.data)) ? jsonWeek.data : [];
 
-        const [jsonToday, jsonPrev] = await Promise.all([
-          resToday.json(),
-          resPrev.json()
-        ]);
+        yesterdayRecord = weekRecords.find(r => r.record_date === getPrevDateStr(dateStr)) || null;
+        rec = weekRecords.find(r => r.record_date === dateStr) || null;
 
-        yesterdayRecord = (jsonPrev.code === 200 && jsonPrev.data && jsonPrev.data.length > 0) ? jsonPrev.data[0] : null;
-        const json = jsonToday;
-        if (json.code === 200 && json.data && json.data.length > 0) {
-          const rec = json.data[0];
-          document.getElementById('input-weight-am').value = rec.weight_am || '';
-          document.getElementById('input-weight-pm').value = rec.weight_pm || '';
-          document.getElementById('input-waist').value = rec.waist_size || '';
-          document.getElementById('input-journal').value = rec.journal_text || '';
-
-          // 回显睡眠时间与时长
-          if (rec.sleep_start_time) {
-            document.getElementById('sleepBedTime').value = rec.sleep_start_time;
-          } else {
-            document.getElementById('sleepBedTime').value = '00:30';
-          }
-          if (rec.sleep_end_time) {
-            document.getElementById('sleepWakeTime').value = rec.sleep_end_time;
-          } else {
-            document.getElementById('sleepWakeTime').value = '07:15';
-          }
-          if (rec.sleep_hours) {
-            document.getElementById('sleepDuration').value = rec.sleep_hours;
-          }
-
-          // 重新计算标签
-          handleSleepCalculation();
-          if (rec.sleep_hours) {
-            document.getElementById('sleepDuration').value = rec.sleep_hours;
-          }
-
-          // 回显运动（兼容早期单值 type 字段）
-          const recExTypes = exerciseTypesOf(rec.exercise);
-          if (recExTypes.length > 0) {
-            setExerciseTypes(recExTypes);
-            setExerciseIntensity(rec.exercise.intensity || 'light');
-            document.getElementById('exerciseDuration').value = rec.exercise.duration || 40;
-            document.getElementById('exerciseItems').value = rec.exercise.items || '';
-          } else {
-            setExerciseTypes([]);
-          }
-
-          // 回显专注达
-          if (rec.concerta && rec.concerta.taken) {
-            document.getElementById('concertaEnabled').checked = true;
-            toggleConcerta(true);
-            document.getElementById('concertaTime').value = rec.concerta.time || '08:00';
-            document.getElementById('concertaDose').value = rec.concerta.dose || '36';
-            document.getElementById('focusWork').value = rec.concerta.focus_work || 4;
-            document.getElementById('focusWorkText').innerText = (rec.concerta.focus_work || 4) + '分';
-
-            // 副作用
-            const seKeys = rec.concerta.side_effects || [];
-            document.querySelectorAll('#concertaSideEffects .chip').forEach(c => {
-              if (seKeys.includes(c.getAttribute('data-key'))) {
-                c.classList.add('active');
-              } else {
-                c.classList.remove('active');
-              }
-            });
-
-            // 晚间代偿
-            const compKeys = rec.concerta.compensations || [];
-            document.querySelectorAll('#concertaCompensations .chip').forEach(c => {
-              if (compKeys.includes(c.getAttribute('data-key'))) {
-                c.classList.add('active');
-              } else {
-                c.classList.remove('active');
-              }
-            });
-          } else {
-            document.getElementById('concertaEnabled').checked = false;
-            toggleConcerta(false);
-            document.querySelectorAll('#concertaSideEffects .chip, #concertaCompensations .chip').forEach(c => c.classList.remove('active'));
-          }
-
-          // 回显冷水澡
-          if (rec.cold_shower && rec.cold_shower.enabled) {
-            document.getElementById('coldShowerEnabled').checked = true;
-            toggleColdShower(true);
-            setColdShowerTiming(rec.cold_shower.timing || 'morning');
-            setColdShowerFeeling(rec.cold_shower.feeling || 'refreshed');
-            document.getElementById('coldShowerDuration').value = rec.cold_shower.duration || 2;
-            const csTemp = rec.cold_shower.water_temp;
-            document.getElementById('coldShowerWaterTemp').value = (csTemp === null || csTemp === undefined) ? '' : csTemp;
-          } else {
-            document.getElementById('coldShowerEnabled').checked = false;
-            toggleColdShower(false);
-            document.getElementById('coldShowerWaterTemp').value = '';
-          }
-
-        } else {
-          document.getElementById('input-weight-am').value = '';
-          document.getElementById('input-weight-pm').value = '';
-          document.getElementById('input-waist').value = '';
-          document.getElementById('input-journal').value = '';
-          document.getElementById('sleepBedTime').value = '00:30';
-          document.getElementById('sleepWakeTime').value = '07:15';
-          handleSleepCalculation();
-
-          setExerciseTypes([]);
-          document.getElementById('concertaEnabled').checked = false;
-          toggleConcerta(false);
-          document.querySelectorAll('#concertaSideEffects .chip, #concertaCompensations .chip').forEach(c => c.classList.remove('active'));
-          document.getElementById('coldShowerEnabled').checked = false;
-          toggleColdShower(false);
-          document.getElementById('coldShowerWaterTemp').value = '';
-        }
-
-        // 刷新 2x2 Bento 卡片底部的较昨日变化（Δ）展示
-        updateDiffDisplay();
+        applyLogState(rec);
+        updateStepsMeta(weekRecords, dateStr);
+        syncStepsSlider();
+        updateLunchYesterdayNote();
+        logHasRecord = !!rec;
+        logSavedAt = rec ? timeFromRecord(rec) : '';
       } catch (err) {
         console.error("加载单日记录失败", err);
+      } finally {
+        logDirty = false;
+        suppressDirty = false;
+        updateDiffDisplay();
+        updateLogCompleteness();
+        renderSaveBar();
+
+        // 有未保存草稿：恢复并提示（保存成功后草稿会被清除）
+        const draft = readDraft(dateStr);
+        if (draft) {
+          suppressDirty = true;
+          applyLogState(draft);
+          syncStepsSlider();
+          suppressDirty = false;
+          logDirty = true;
+          updateLogCompleteness();
+          renderSaveBar();
+          showToast('已恢复上次未保存的草稿');
+        }
       }
     }
 
-    async function saveCurrentRecord() {
-      const dateStr = document.getElementById('input-date').value;
-      const wAm = document.getElementById('input-weight-am').value;
-      const wPm = document.getElementById('input-weight-pm').value;
-      const waist = document.getElementById('input-waist').value;
-      const sleepHours = document.getElementById('sleepDuration').value;
-      const sleepStart = document.getElementById('sleepBedTime').value;
-      const sleepEnd = document.getElementById('sleepWakeTime').value;
-      const journal = document.getElementById('input-journal').value;
-
-      // 组装运动详情
-      let exercisePayload = {
-        types: exerciseState.types.slice(),
-        type: exerciseState.types[0] || 'none', // 兼容字段：跟随首个类型
-        duration: parseInt(document.getElementById('exerciseDuration').value) || 0,
-        intensity: exerciseState.intensity,
-        items: document.getElementById('exerciseItems').value || ''
+    // 把服务端记录或本地草稿回显到表单（两者字段同名）
+    function applyLogState(s) {
+      s = s || {};
+      const setVal = (id, v) => {
+        const el = document.getElementById(id);
+        if (el) el.value = (v === null || v === undefined) ? '' : v;
       };
+      setVal('input-weight-am', s.weight_am);
+      setVal('input-weight-pm', s.weight_pm);
+      setVal('input-waist', s.waist_size);
+      setVal('input-journal', s.journal_text);
 
-      // 组装专注达详情
-      const concertaTaken = document.getElementById('concertaEnabled').checked;
-      let concertaPayload = null;
-      if (concertaTaken) {
-        const sideEffects = [];
-        document.querySelectorAll('#concertaSideEffects .chip.active').forEach(c => {
-          sideEffects.push(c.getAttribute('data-key'));
-        });
-        const compensations = [];
-        document.querySelectorAll('#concertaCompensations .chip.active').forEach(c => {
-          compensations.push(c.getAttribute('data-key'));
-        });
-
-        concertaPayload = {
-          taken: true,
-          time: document.getElementById('concertaTime').value || '08:00',
-          dose: parseInt(document.getElementById('concertaDose').value) || 36,
-          focus_work: parseInt(document.getElementById('focusWork').value) || 4,
-          focus_study: 4,
-          daily_tasks: 4,
-          social: 4,
-          gaming: 4,
-          crash_time: '18:00',
-          side_effects: sideEffects,
-          compensations: compensations
-        };
-      } else {
-        concertaPayload = { taken: false };
+      // 回显睡眠时间与时长
+      setVal('sleepBedTime', s.sleep_start_time || '00:30');
+      setVal('sleepWakeTime', s.sleep_end_time || '07:15');
+      handleSleepCalculation();
+      if (s.sleep_hours !== null && s.sleep_hours !== undefined) {
+        document.getElementById('sleepDuration').value = s.sleep_hours;
       }
 
-      // 组装冷水澡详情
-      const coldShowerEnabled = document.getElementById('coldShowerEnabled').checked;
-      const coldShowerTempRaw = document.getElementById('coldShowerWaterTemp').value;
-      let coldShowerPayload = {
-        enabled: coldShowerEnabled,
-        timing: coldShowerState.timing,
-        duration: parseInt(document.getElementById('coldShowerDuration').value) || 2,
-        water_temp: coldShowerTempRaw === '' ? null : parseFloat(coldShowerTempRaw),
-        feeling: coldShowerState.feeling
-      };
+      // 回显运动（兼容早期单值 type 字段）
+      const exTypes = exerciseTypesOf(s.exercise);
+      setExerciseTypes(exTypes);
+      if (exTypes.length > 0) {
+        setExerciseIntensity(s.exercise.intensity || 'light');
+        setVal('exerciseDuration', s.exercise.duration || 40);
+        setVal('exerciseItems', s.exercise.items || '');
+      } else {
+        setVal('exerciseDuration', 40);
+        setVal('exerciseItems', '');
+      }
 
-      const payload = {
+      // 回显专注达
+      const con = s.concerta;
+      const conTaken = !!(con && con.taken);
+      document.getElementById('concertaEnabled').checked = conTaken;
+      toggleConcerta(conTaken);
+      if (conTaken) {
+        setVal('concertaTime', con.time || '08:00');
+        document.getElementById('concertaDose').value = String(con.dose || 36);
+        document.getElementById('focusWork').value = con.focus_work || 4;
+        document.getElementById('focusWorkText').innerText = (con.focus_work || 4) + '分';
+      }
+      const seKeys = (con && con.side_effects) || [];
+      document.querySelectorAll('#concertaSideEffects .chip').forEach(c => {
+        c.classList.toggle('active', seKeys.includes(c.getAttribute('data-key')));
+      });
+      const compKeys = (con && con.compensations) || [];
+      document.querySelectorAll('#concertaCompensations .chip').forEach(c => {
+        c.classList.toggle('active', compKeys.includes(c.getAttribute('data-key')));
+      });
+
+      // 回显冷水澡
+      const cs = s.cold_shower;
+      const csOn = !!(cs && cs.enabled);
+      document.getElementById('coldShowerEnabled').checked = csOn;
+      toggleColdShower(csOn);
+      setColdShowerTiming((cs && cs.timing) || 'morning');
+      setColdShowerFeeling((cs && cs.feeling) || 'refreshed');
+      setVal('coldShowerDuration', (cs && cs.duration) || 2);
+      setVal('coldShowerWaterTemp', (cs && cs.water_temp !== null && cs.water_temp !== undefined) ? cs.water_temp : '');
+
+      // 晨光 / 步数 / 午餐
+      morningLightState = s.morning_light === true ? 'yes' : (s.morning_light === false ? 'no' : null);
+      syncMorningLightUI();
+      stepsState.value = (s.steps === null || s.steps === undefined) ? null : Number(s.steps);
+      syncStepsSlider();
+      applyLunch(s.lunch || null);
+    }
+
+    // 汇总当前表单状态：提交与本地草稿共用同一份结构（字段名与服务端记录一致）
+    function collectLogState() {
+      const dateStr = loadedDate || document.getElementById('input-date').value;
+      const val = id => document.getElementById(id).value;
+      const numOrNull = v => (v === '' || v === null || v === undefined || isNaN(parseFloat(v))) ? null : parseFloat(v);
+
+      const sideEffects = [];
+      document.querySelectorAll('#concertaSideEffects .chip.active').forEach(c => sideEffects.push(c.getAttribute('data-key')));
+      const compensations = [];
+      document.querySelectorAll('#concertaCompensations .chip.active').forEach(c => compensations.push(c.getAttribute('data-key')));
+
+      const concertaTaken = document.getElementById('concertaEnabled').checked;
+      const concerta = concertaTaken ? {
+        taken: true,
+        time: val('concertaTime') || '08:00',
+        dose: parseInt(val('concertaDose')) || 36,
+        focus_work: parseInt(val('focusWork')) || 4,
+        focus_study: 4,
+        daily_tasks: 4,
+        social: 4,
+        gaming: 4,
+        crash_time: '18:00',
+        side_effects: sideEffects,
+        compensations: compensations
+      } : { taken: false };
+
+      const tempRaw = val('coldShowerWaterTemp');
+      return {
         record_date: dateStr,
-        weight_am: wAm ? parseFloat(wAm) : null,
-        weight_pm: wPm ? parseFloat(wPm) : null,
-        waist_size: waist ? parseFloat(waist) : null,
-        sleep_hours: sleepHours ? parseFloat(sleepHours) : null,
-        sleep_start_time: sleepStart ? sleepStart : null,
-        sleep_end_time: sleepEnd ? sleepEnd : null,
-        journal_text: journal ? journal : null,
-        exercise: exercisePayload,
-        cold_shower: coldShowerPayload,
-        concerta: concertaPayload
+        weight_am: numOrNull(val('input-weight-am')),
+        weight_pm: numOrNull(val('input-weight-pm')),
+        waist_size: numOrNull(val('input-waist')),
+        sleep_hours: numOrNull(val('sleepDuration')),
+        sleep_start_time: val('sleepBedTime') || null,
+        sleep_end_time: val('sleepWakeTime') || null,
+        journal_text: val('input-journal') || null,
+        // 组装运动详情
+        exercise: {
+          types: exerciseState.types.slice(),
+          type: exerciseState.types[0] || 'none', // 兼容字段：跟随首个类型
+          duration: parseInt(val('exerciseDuration')) || 0,
+          intensity: exerciseState.intensity,
+          items: val('exerciseItems') || ''
+        },
+        // 组装冷水澡详情
+        cold_shower: {
+          enabled: document.getElementById('coldShowerEnabled').checked,
+          timing: coldShowerState.timing,
+          duration: parseInt(val('coldShowerDuration')) || 2,
+          water_temp: tempRaw === '' ? null : parseFloat(tempRaw),
+          feeling: coldShowerState.feeling
+        },
+        concerta: concerta,
+        // 新增：nil / null 即当天未记录
+        morning_light: morningLightState === 'yes' ? true : (morningLightState === 'no' ? false : null),
+        steps: stepsState.value,
+        lunch: lunchPayload()
       };
+    }
+
+    async function saveCurrentRecord() {
+      const payload = collectLogState();
+      const dateStr = payload.record_date;
+      const btn = document.getElementById('save-bar-dirty');
+      if (btn) btn.disabled = true;
 
       try {
         const res = await fetch('/api/v1/records', {
@@ -1984,12 +2467,20 @@
         });
         const json = await res.json();
         if (json.code === 200) {
+          logDirty = false;
+          logHasRecord = true;
+          logSavedAt = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+          if (draftTimer) { clearTimeout(draftTimer); draftTimer = null; }
+          clearDraft(dateStr);
+          renderSaveBar();
           showToast('✓ 保存成功');
         } else {
           showToast(json.message || '保存失败', false);
         }
       } catch (err) {
         showToast('网络错误，请重试', false);
+      } finally {
+        if (btn) btn.disabled = false;
       }
     }
 
@@ -2224,7 +2715,79 @@
         }
       });
 
-      // 4. 活动流水
+      // 4. 步数趋势图（缺失日断点，不补 0；纵轴封顶 2 万）
+      const stepsData = records.map(r => (r.steps === null || r.steps === undefined) ? null : Number(r.steps));
+      const validSteps = stepsData.filter(v => v !== null);
+      if (validSteps.length > 0) {
+        const avgSteps = Math.round(validSteps.reduce((a, b) => a + b, 0) / validSteps.length);
+        document.getElementById('dash-steps-stat').innerText = `${avgSteps.toLocaleString('en-US')} 步 (均值)`;
+      } else {
+        document.getElementById('dash-steps-stat').innerText = '--';
+      }
+      const stepsDetailEl = document.getElementById('dash-steps-detail');
+      stepsDetailEl.innerHTML = '<span>👆</span><span>点击折线查看当日步数</span>';
+      const ctxSteps = document.getElementById('chart-steps').getContext('2d');
+      if (stepsChart) stepsChart.destroy();
+
+      const stepsGrad = ctxSteps.createLinearGradient(0, 0, 0, 160);
+      stepsGrad.addColorStop(0, 'rgba(14, 165, 233, 0.18)');
+      stepsGrad.addColorStop(1, 'rgba(14, 165, 233, 0.00)');
+
+      stepsChart = new Chart(ctxSteps, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '步数',
+            data: stepsData,
+            borderColor: '#0ea5e9',
+            borderWidth: 2.2,
+            backgroundColor: stepsGrad,
+            fill: true,
+            tension: 0.35,
+            spanGaps: false,
+            pointBackgroundColor: '#ffffff',
+            pointBorderColor: '#0ea5e9',
+            pointBorderWidth: 2,
+            pointRadius: 3.5,
+            pointHoverRadius: 5.5,
+            pointHitRadius: 16
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: false } },
+          onHover: (evt, elements) => {
+            evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+          },
+          onClick: (evt, elements) => {
+            if (!elements || !elements.length) return;
+            const r = records[elements[0].index];
+            if (!r) return;
+            const v = (r.steps === null || r.steps === undefined) ? '--' : `${Number(r.steps).toLocaleString('en-US')} 步`;
+            const ml = r.morning_light === true ? ' · 已见晨光' : '';
+            stepsDetailEl.innerHTML = `<span>🚶</span><span><b class="text-slate-700">${r.record_date}</b>　步数 ${v}${ml}</span>`;
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 20000,
+              grid: { color: 'rgba(241, 245, 249, 0.8)' },
+              ticks: {
+                font: { size: 10 },
+                color: '#94a3b8',
+                stepSize: 5000,
+                callback: v => v === 0 ? '0' : `${v / 10000}万`
+              }
+            },
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } }
+          }
+        }
+      });
+
+      // 5. 活动流水
       const listEl = document.getElementById('dash-activities-list');
       listEl.innerHTML = '';
       if (records.length === 0) {
@@ -2275,7 +2838,8 @@
     const TREND_METRICS = {
       weight: { label: '体重周均值 (kg)', field: 'weight_am', unit: 'kg', color: '#2563eb', band: 'rgba(37, 99, 235, 0.13)' },
       waist: { label: '腰围周均值 (cm)', field: 'waist_size', unit: 'cm', color: '#a855f7', band: 'rgba(168, 85, 247, 0.13)' },
-      sleep: { label: '睡眠周均值 (小时)', field: 'sleep_hours', unit: '小时', color: '#10b981', band: 'rgba(16, 185, 129, 0.13)' }
+      sleep: { label: '睡眠周均值 (小时)', field: 'sleep_hours', unit: '小时', color: '#10b981', band: 'rgba(16, 185, 129, 0.13)' },
+      steps: { label: '步数周均值 (步)', field: 'steps', unit: '步', color: '#0ea5e9', band: 'rgba(14, 165, 233, 0.13)', int: true }
     };
     let trendState = { metric: 'weight', records: [], buckets: [], aggs: [] };
     let trendChart = null;
@@ -2321,12 +2885,12 @@
 
     function setTrendMetric(metric) {
       trendState.metric = metric;
-      ['weight', 'waist', 'sleep'].forEach(m => {
+      ['weight', 'waist', 'sleep', 'steps'].forEach(m => {
         const el = document.getElementById(`trend-tab-${m}`);
         if (!el) return;
         el.className = m === metric
-          ? 'flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all'
-          : 'flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+          ? 'flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all'
+          : 'flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
       });
       if (currentTab === 'trend') renderTrendChart();
     }
@@ -2347,6 +2911,7 @@
 
     function renderTrendChart() {
       const cfg = TREND_METRICS[trendState.metric];
+      const fmtTrend = v => cfg.int ? Math.round(v).toLocaleString('en-US') : v.toFixed(1);
       const buckets = trendBuildBuckets();
       const aggs = trendAggregate(trendState.records, buckets, cfg.field);
       trendState.buckets = buckets;
@@ -2366,7 +2931,7 @@
       for (let i = aggs.length - 1; i >= 0; i--) { if (aggs[i].n > 0) { lastIdx = i; break; } }
       if (lastIdx >= 0) {
         const a = aggs[lastIdx], b = buckets[lastIdx];
-        statEl.innerText = `${a.avg.toFixed(1)} ${cfg.unit}`;
+        statEl.innerText = `${fmtTrend(a.avg)} ${cfg.unit}`;
         noteEl.innerHTML = `${b.start.slice(5)}~${b.end.slice(5)} 周均值<br>${a.n} 天数据${a.n <= 3 ? '（低置信）' : ''}`;
       } else {
         statEl.innerText = '--';
@@ -2440,8 +3005,8 @@
                   const a = aggs[item.dataIndex];
                   if (!a || a.n === 0) return '该周无数据';
                   return [
-                    `周均值：${a.avg.toFixed(1)} ${cfg.unit}`,
-                    `区间：${a.min.toFixed(1)} ~ ${a.max.toFixed(1)}`,
+                    `周均值：${fmtTrend(a.avg)} ${cfg.unit}`,
+                    `区间：${fmtTrend(a.min)} ~ ${fmtTrend(a.max)}`,
                     `样本：${a.n} 天${a.n <= 3 ? '（低置信）' : ''}`
                   ];
                 }
@@ -2477,7 +3042,9 @@
     const TD_METRICS = {
       weight: { label: '体重逐日 (kg)', field: 'weight_am', unit: 'kg', color: '#2563eb' },
       waist: { label: '腰围逐日 (cm)', field: 'waist_size', unit: 'cm', color: '#a855f7' },
-      sleep: { label: '睡眠时长逐日 (小时)', field: 'sleep_hours', unit: '小时', color: '#10b981' }
+      sleep: { label: '睡眠时长逐日 (小时)', field: 'sleep_hours', unit: '小时', color: '#10b981', avg: true },
+      // 步数：纵轴封顶 2 万（特殊情况也够用），缺失日断点
+      steps: { label: '步数逐日 (步)', field: 'steps', unit: '步', color: '#0ea5e9', avg: true, yMax: 20000, yStep: 5000, fmt: v => v.toLocaleString('en-US') }
     };
     let trendDetailState = { metric: 'weight', records: [] };
     let trendDetailChart = null;
@@ -2541,12 +3108,12 @@
 
     function setTrendDetailMetric(metric) {
       trendDetailState.metric = metric;
-      ['weight', 'waist', 'sleep'].forEach(m => {
+      ['weight', 'waist', 'sleep', 'steps'].forEach(m => {
         const el = document.getElementById(`td-tab-${m}`);
         if (!el) return;
         el.className = m === metric
-          ? 'flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all'
-          : 'flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+          ? 'flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all'
+          : 'flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
       });
       if (currentTab === 'trend-detail') renderTrendDetailChart();
     }
@@ -2581,6 +3148,10 @@
         const w = (r.waist_size === null || r.waist_size === undefined) ? '--' : `${r.waist_size} cm`;
         return `<b class="text-slate-700">${r.record_date}</b>　腰围 ${w}`;
       }
+      if (metric === 'steps') {
+        const v = (r.steps === null || r.steps === undefined) ? '--' : `${Number(r.steps).toLocaleString('en-US')} 步`;
+        return `<b class="text-slate-700">${r.record_date}</b>　步数 ${v}${r.morning_light === true ? ' · 已见晨光' : ''}`;
+      }
       const tagText = r.sleep_tag === 'RED' ? '熬夜' : (r.sleep_tag === 'YELLOW' ? '轻度' : '正常');
       const hours = (r.sleep_hours === null || r.sleep_hours === undefined) ? '--' : `${r.sleep_hours} 小时`;
       return `<b class="text-slate-700">${r.record_date}</b>　就寝 ${r.sleep_start_time || '--'} · 起床 ${r.sleep_end_time || '--'} · ${hours} · ${tagText}`;
@@ -2610,9 +3181,11 @@
       const noteEl = document.getElementById('td-metric-note');
       const valid = values.filter(v => v !== null);
       if (valid.length > 0) {
-        if (trendDetailState.metric === 'sleep') {
-          const avg = (valid.reduce((a, c) => a + c, 0) / valid.length).toFixed(1);
-          statEl.innerText = `${avg} 小时 (均值)`;
+        if (cfg.avg) {
+          const avg = valid.reduce((a, c) => a + c, 0) / valid.length;
+          statEl.innerText = trendDetailState.metric === 'sleep'
+            ? `${avg.toFixed(1)} 小时 (均值)`
+            : `${Math.round(avg).toLocaleString('en-US')} 步 (均值)`;
         } else {
           statEl.innerText = `${valid[valid.length - 1]} ${cfg.unit}`;
         }
@@ -2653,13 +3226,21 @@
                 label: item => {
                   const v = values[item.dataIndex];
                   if (v === null) return '当日无数据';
-                  return `数值：${v} ${cfg.unit}`;
+                  return `数值：${cfg.fmt ? cfg.fmt(v) : v} ${cfg.unit}`;
                 }
               }
             }
           },
           scales: {
-            y: { beginAtZero: false, ticks: { font: { size: 10 } } },
+            y: cfg.yMax ? {
+              beginAtZero: true,
+              max: cfg.yMax,
+              ticks: {
+                font: { size: 10 },
+                stepSize: cfg.yStep,
+                callback: v => v === 0 ? '0' : `${v / 10000}万`
+              }
+            } : { beginAtZero: false, ticks: { font: { size: 10 } } },
             // 60 点，x 轴约每 3 天一个刻度（maxTicksLimit = 20）；横屏更窄时由 autoSkip 自动稀疏
             x: { ticks: { font: { size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 20 } }
           },
