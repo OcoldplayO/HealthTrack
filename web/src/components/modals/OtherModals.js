@@ -4,6 +4,7 @@
 import modalsHtml from './other-modals.html?raw';
 import { api } from '../../services/api.js';
 import { showToast } from '../Toast.js';
+import { appConfirm, appCopyText, appToast } from '../../utils/dialog.js';
 
 let exportRange = 'all';
 let exportType = 'excel';
@@ -11,6 +12,46 @@ let pendingExportSize = 0;
 
 export function renderOtherModals(container) {
   container.insertAdjacentHTML('beforeend', modalsHtml);
+}
+
+export function openExportModal() {
+  document.getElementById('export-modal')?.classList.remove('hidden');
+  selectExportType(document.querySelector('#export-type-pills button[data-type="excel"]'));
+  selectExportRange(document.querySelector('#export-range-pills button[data-range="all"]'));
+}
+
+export function selectExportType(btn) {
+  if (!btn) return;
+  exportType = btn.getAttribute('data-type');
+  document.querySelectorAll('#export-type-pills button').forEach((p) => {
+    const active = p === btn;
+    p.className = active
+      ? 'py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm transition-all'
+      : 'py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+  });
+  const isJSON = exportType === 'json';
+  const isArchive = exportType === 'archive';
+  document.getElementById('export-range-panel')?.classList.toggle('hidden', isJSON);
+  document.getElementById('export-json-panel')?.classList.toggle('hidden', !isJSON);
+  document.getElementById('export-archive-panel')?.classList.toggle('hidden', !isArchive);
+  document.getElementById('export-start-btn')?.classList.toggle('hidden', isJSON || isArchive);
+  document.getElementById('export-json-btn')?.classList.toggle('hidden', !isJSON);
+  document.getElementById('export-archive-btn')?.classList.toggle('hidden', !isArchive);
+  const sub = document.getElementById('export-subtitle');
+  if (sub) {
+    sub.textContent = isJSON
+      ? '全量备份，包含健康记录与睡前小结'
+      : isArchive
+        ? '小结表格 + 难忘图片，打包为 ZIP'
+        : '导出为 CSV，可用 Excel / WPS 打开';
+  }
+  resetExportResult();
+}
+
+export function exportCurrent() {
+  if (exportType === 'json') return startJSONExport();
+  if (exportType === 'archive') return startArchiveExport();
+  return startExport();
 }
 
 
@@ -768,77 +809,52 @@ export function renderOtherModals(container) {
       }
     }
 
-    /* ============================================================
-       睡前小结（第 4 个 Tab）：今日填写 + 往期回顾 + 小结洞察
-       ============================================================ */
-    const EVO_DEFAULT_BANDS = [
-      { range: [1, 2],  label: '很低落',             tone: 'rose'    },
-      { range: [3, 4],  label: '有点钝',             tone: 'amber'   },
-      { range: [5, 6],  label: '平平',               tone: 'emerald' },
-      { range: [7, 8],  label: '还不错，稳住了节奏', tone: 'indigo'  },
-      { range: [9, 10], label: '满分的一天',         tone: 'violet'  }
-    ];
-    const EVO_TONE = {
-      rose:    { dot: '#f43f5e', chip: 'text-rose-600 bg-rose-50 border-rose-100',          band: 'bg-rose-50 text-rose-600' },
-      amber:   { dot: '#f59e0b', chip: 'text-amber-600 bg-amber-50 border-amber-100',       band: 'bg-amber-50 text-amber-700' },
-      emerald: { dot: '#10b981', chip: 'text-emerald-600 bg-emerald-50 border-emerald-100', band: 'bg-emerald-50 text-emerald-700' },
-      indigo:  { dot: '#6366f1', chip: 'text-indigo-600 bg-indigo-50 border-indigo-100',    band: 'bg-indigo-50 text-indigo-600' },
-      violet:  { dot: '#8b5cf6', chip: 'text-violet-600 bg-violet-50 border-violet-100',    band: 'bg-violet-50 text-violet-600' }
-    };
-    const EVO_TONE_CYCLE = ['rose', 'amber', 'emerald', 'indigo', 'violet'];
-    const EVO_PAGE_SIZE = 6;
+// 统一导出与向 window 挂载方法，兼容 HTML 模板内联 onclick / onchange 调用
+const openImportModal = openImportFromSheet;
+const openMemoImportModal = openMemoFromSheet;
+const openImportBatchesModal = openImportBatchesFromSheet;
+const closeImportModal = closeImport;
+const closeMemoImportModal = closeMemo;
+const closeImportBatchesModal = closeBatches;
+const closeExportModal = closeExport;
 
-    let evoBands = null; // null = 尚未从 /api/config 载入
-    let evoState = {
-      date: '',
-      photoId: null,     // 当前日期已保存的图片 ID
-      pendingBlob: null, // 本地新选、尚未上传的压缩图
-      summaries: [],     // 全部小结（后端按 record_date 倒序）
-      dateFilter: 'all',
-      scoreFilter: 'all',
-      visible: EVO_PAGE_SIZE,
-      insightBusy: false,
-      insightRange: 7,   // 小结洞察关联的生理数据窗口（7 / 30 天）
-    };
-    let evoSwipe = { W: 84, drag: null, suppressClick: 0 };
-
-    function evoBandOf(score) {
-      const bands = evoBands || EVO_DEFAULT_BANDS;
-      return bands.find(b => score >= b.range[0] && score <= b.range[1]) || bands[bands.length - 1];
-    }
-    function evoTone(tone) { return EVO_TONE[tone] || EVO_TONE.indigo; }
-    function evoToday() {
-      const d = new Date(), p = n => String(n).padStart(2, '0');
-      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
-    }
-    function evoWeekday(dateStr) {
-      const names = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-      const d = new Date(dateStr + 'T00:00:00');
-      return isNaN(d.getTime()) ? '' : names[d.getDay()];
-    }
-    function evoDaysAgo(dateStr) {
-      const today = new Date(evoToday() + 'T00:00:00');
-      const target = new Date(dateStr + 'T00:00:00');
-      return Math.round((today - target) / 86400000);
-    }
-    function evoMmdd(d) { return d ? d.slice(5) : ''; }
-    function evoMonthKey(d) { return d ? d.slice(0, 7) : ''; }
-    function evoMonthLabel(k) { const parts = k.split('-'); return parts[0] + ' 年 ' + Number(parts[1]) + ' 月'; }
-    function evoAttr(s) {
-      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-
-    // ---------- 载入 ----------
-
-window.appConfirm = appConfirm;
 window.openExportModal = openExportModal;
-window.closeExportModal = closeExportModal;
+window.closeExport = closeExport;
+window.closeExportModal = closeExport;
+window.closeExportOnBackdrop = closeExportOnBackdrop;
+window.selectExportType = selectExportType;
+window.selectExportRange = selectExportRange;
+window.exportCurrent = exportCurrent;
+
 window.openImportModal = openImportModal;
+window.openImportFromSheet = openImportFromSheet;
+window.closeImport = closeImport;
 window.closeImportModal = closeImportModal;
+window.closeImportOnBackdrop = closeImportOnBackdrop;
+window.impPickFile = impPickFile;
+window.impFileSelected = impFileSelected;
+window.impSelectMode = impSelectMode;
+window.impToggleSkipErrors = impToggleSkipErrors;
+window.impConfirm = impConfirm;
+
 window.openMemoImportModal = openMemoImportModal;
-window.closeMemoImportModal = closeMemoImportModal;
+window.openMemoFromSheet = openMemoFromSheet;
+window.closeMemo = closeMemo;
+window.closeMemoModal = closeMemo;
+window.closeMemoImportModal = closeMemo;
+window.closeMemoOnBackdrop = closeMemoOnBackdrop;
+window.impPreviewMemo = impPreviewMemo;
+
 window.openImportBatchesModal = openImportBatchesModal;
+window.openImportBatchesFromSheet = openImportBatchesFromSheet;
+window.closeBatches = closeBatches;
 window.closeImportBatchesModal = closeImportBatchesModal;
-window.evoClosePhoto = function() {
+window.closeBatchesOnBackdrop = closeBatchesOnBackdrop;
+window.impRetryBatch = impRetryBatch;
+window.retryBatch = impRetryBatch;
+window.downloadFailedRows = downloadFailedRows;
+window.downloadImportTemplate = downloadImportTemplate;
+
+window.evoClosePhoto = function () {
   document.getElementById('ev-photo-viewer')?.classList.add('hidden');
 };

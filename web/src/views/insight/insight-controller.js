@@ -7,6 +7,7 @@ import { api } from '../../services/api.js';
 import { store } from '../../services/state.js';
 import { localDateStr, shiftDateStr } from '../../utils/date.js';
 import { showToast } from '../../components/Toast.js';
+import { appConfirm, appCopyText, appToast } from '../../utils/dialog.js';
 
 let insightDays = 30;
 let insightEndDate = localDateStr(new Date());
@@ -36,6 +37,24 @@ export function activateInsight() {
   if (typeof checkPeriodInsight === 'function') {
     checkPeriodInsight();
   }
+}
+
+export function setInsightDays(days) {
+  insightDays = days;
+  ['7', '30', '60'].forEach((d) => {
+    const el = document.getElementById(`pill-${d}`);
+    if (!el) return;
+    if (parseInt(d) === days) {
+      el.className =
+        'flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all';
+    } else {
+      el.className =
+        'flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+    }
+  });
+  // 三档彼此独立：先同步清掉上一档位残留内容，避免切换瞬间串档，再按新档位回显
+  applyEmptyInsightUI();
+  checkPeriodInsight();
 }
 
     function resolveInsightEndDate() {
@@ -649,84 +668,6 @@ export function activateInsight() {
       }
     }
 
-    // 通用确认弹窗：返回 Promise<boolean>。用于替代原生 confirm()，
-    // 原生对话框在安卓 WebView（未实现 onJsConfirm）恒返回 false，且在 IDE 内嵌浏览器会打断宿主组件树。
-    function appConfirm(message, options) {
-      const opts = options || {};
-      return new Promise(resolve => {
-        const modal = document.getElementById('app-confirm-modal');
-        const titleEl = document.getElementById('app-confirm-title');
-        const msgEl = document.getElementById('app-confirm-msg');
-        const okBtn = document.getElementById('app-confirm-ok');
-        const cancelBtn = document.getElementById('app-confirm-cancel');
-        if (!modal) { resolve(false); return; }
-
-        titleEl.innerText = opts.title || '请确认';
-        msgEl.innerText = message || '';
-        okBtn.innerText = opts.confirmText || '确定';
-        if (opts.danger === false) {
-          okBtn.className = 'flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors';
-        } else {
-          okBtn.className = 'flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors';
-        }
-
-        const cleanup = () => {
-          modal.classList.add('hidden');
-          okBtn.onclick = null;
-          cancelBtn.onclick = null;
-          modal.onclick = null;
-        };
-        okBtn.onclick = () => { cleanup(); resolve(true); };
-        cancelBtn.onclick = () => { cleanup(); resolve(false); };
-        modal.onclick = (e) => { if (e.target === modal) { cleanup(); resolve(false); } };
-
-        modal.classList.remove('hidden');
-      });
-    }
-
-    // 复制文本：安卓端优先走原生剪贴板桥，其次 Clipboard API，最后 textarea + execCommand。
-    async function appCopyText(text) {
-      if (window.HealthTrack && typeof window.HealthTrack.copyText === 'function') {
-        try {
-          window.HealthTrack.copyText(text);
-          return true;
-        } catch (e) { /* 继续走 Web API */ }
-      }
-      try {
-        if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(text);
-          return true;
-        }
-      } catch (e) { /* 回退到 execCommand */ }
-      try {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.setAttribute('readonly', '');
-        ta.style.position = 'fixed';
-        ta.style.top = '-2000px';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        ta.setSelectionRange(0, text.length);
-        const ok = document.execCommand('copy');
-        document.body.removeChild(ta);
-        return ok;
-      } catch (e) {
-        return false;
-      }
-    }
-
-    // 轻量提示条：替代原生 alert()，避免安卓端静默无提示。
-    let appToastTimer = null;
-    function appToast(message) {
-      const el = document.getElementById('app-toast');
-      if (!el) return;
-      el.innerText = message || '';
-      el.classList.remove('hidden');
-      if (appToastTimer) clearTimeout(appToastTimer);
-      appToastTimer = setTimeout(() => el.classList.add('hidden'), 2600);
-    }
-
     async function deleteSelectedInsights() {
       const ids = historyState.items.map(i => i.id).filter(id => historyState.selected[id]);
       if (!ids.length) return;
@@ -1295,7 +1236,20 @@ export function activateInsight() {
       }
     }
 
-window.openInsightHistory = openInsightHistory;
+// 挂载方法至 window，兼容模板内联事件监听
+window.setInsightDays = setInsightDays;
+window.setInsightEndDate = setInsightEndDate;
+window.setInsightEndMode = setInsightEndMode;
 window.generateInsightStream = generateInsightStream;
-window.switchInsightRange = switchInsightRange;
+window.openInsightHistory = openInsightHistory;
+window.setHistoryFilter = setHistoryFilter;
+window.setHistoryFilterCompare = setHistoryFilterCompare;
+window.onHistorySearchInput = onHistorySearchInput;
+window.loadHistory = loadHistory;
+window.toggleHistoryManage = toggleHistoryManage;
+window.toggleHistorySelectAll = toggleHistorySelectAll;
+window.deleteSelectedInsights = deleteSelectedInsights;
 window.openCompareView = openCompareView;
+window.cmpBack = cmpBack;
+window.cmpStepMonth = cmpStepMonth;
+window.cmpGenerateStream = cmpGenerateStream;

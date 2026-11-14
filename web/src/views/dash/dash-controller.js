@@ -805,21 +805,6 @@ export function activateDash() {
 
     tdWatchOrientation();
 
-    function setInsightDays(days) {
-      insightDays = days;
-      ['7', '30', '60'].forEach(d => {
-        const el = document.getElementById(`pill-${d}`);
-        if (parseInt(d) === days) {
-          el.className = 'flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all';
-        } else {
-          el.className = 'flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
-        }
-      });
-      // 三档彼此独立：先同步清掉上一档位残留内容，避免切换瞬间串档，再按新档位回显
-      applyEmptyInsightUI();
-      checkPeriodInsight();
-    }
-
 // 导出与全局挂载
 window.switchDashRange = switchDashRange;
 window.openTrendView = openTrendView;

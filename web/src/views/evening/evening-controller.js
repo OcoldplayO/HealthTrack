@@ -7,9 +7,11 @@ import { api } from '../../services/api.js';
 import { store } from '../../services/state.js';
 import { localDateStr } from '../../utils/date.js';
 import { showToast } from '../../components/Toast.js';
+import { appConfirm, appCopyText, appToast } from '../../utils/dialog.js';
 
 export function initEveningView(container) {
   container.insertAdjacentHTML('beforeend', templateHtml);
+  initEveningHistoryDelegation();
 }
 
 export function activateEvening() {
@@ -826,19 +828,21 @@ export function activateEvening() {
       document.querySelectorAll('#ev-history-list .evo-swipe.open').forEach(s => { if (s !== except) s.classList.remove('open'); });
     }
     // 事件委托：点卡片头展开/收起；已滑开的卡片点一下先收起
-    document.getElementById('ev-history-list').addEventListener('click', e => {
-      const head = e.target.closest('.evo-entry-head');
-      if (!head || Date.now() - evoSwipe.suppressClick < 320) return;
-      const swipe = head.closest('.evo-swipe');
-      if (swipe && swipe.classList.contains('open')) { swipe.classList.remove('open'); return; }
-      evoCloseAllSwipe();
-      const card = head.parentElement;
-      const bodyEl = card.querySelector('.evo-collapsible');
-      const arrow = head.querySelector('.evo-entry-arrow');
-      const open = !bodyEl.classList.contains('open');
-      bodyEl.classList.toggle('open', open);
-      if (arrow) arrow.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
-    });
+    function initEveningHistoryDelegation() {
+      document.getElementById('ev-history-list')?.addEventListener('click', e => {
+        const head = e.target.closest('.evo-entry-head');
+        if (!head || Date.now() - evoSwipe.suppressClick < 320) return;
+        const swipe = head.closest('.evo-swipe');
+        if (swipe && swipe.classList.contains('open')) { swipe.classList.remove('open'); return; }
+        evoCloseAllSwipe();
+        const card = head.parentElement;
+        const bodyEl = card.querySelector('.evo-collapsible');
+        const arrow = head.querySelector('.evo-entry-arrow');
+        const open = !bodyEl.classList.contains('open');
+        bodyEl.classList.toggle('open', open);
+        if (arrow) arrow.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+      });
+    }
 
     async function evAskDelete(date) {
       const r = evoState.summaries.find(x => x.record_date === date);
@@ -872,6 +876,26 @@ export function activateEvening() {
       }
     }
 
-    window.loadEveningTab = loadEveningTab;
-window.evoSubmit = evoSubmit;
-window.evoGenerateInsight = evoGenerateInsight;
+// 挂载到 window 供模板内联事件监听使用
+window.loadEveningTab = loadEveningTab;
+window.evSetToday = evSetToday;
+window.evOnDateChange = evOnDateChange;
+window.evUpdateDoneCount = evUpdateDoneCount;
+window.evoOpenPhoto = evoOpenPhoto;
+window.evOnPhotoPick = evOnPhotoPick;
+window.evRemovePhoto = evRemovePhoto;
+window.evUpdateScore = evUpdateScore;
+window.evToggleBandEditor = evToggleBandEditor;
+window.evResetBands = evResetBands;
+window.evSaveBands = evSaveBands;
+window.evSave = evSave;
+window.evoSubmit = evSave;
+window.evSetInsightRange = evSetInsightRange;
+window.evGenerateInsight = evGenerateInsight;
+window.evoGenerateInsight = evGenerateInsight;
+window.evResetInsight = evResetInsight;
+window.evToggleThinking = evToggleThinking;
+window.evSetDateFilter = evSetDateFilter;
+window.evSetScoreFilter = evSetScoreFilter;
+window.evResetFilters = evResetFilters;
+window.evAskDelete = evAskDelete;
