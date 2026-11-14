@@ -1,0 +1,171 @@
+      <section id="view-insight" class="fade-in space-y-4 hidden">
+        <div class="flex justify-between items-center gap-2">
+          <div class="flex items-center space-x-1.5 min-w-0 shrink">
+            <span class="text-lg shrink-0">✨</span>
+            <h2 class="text-base font-bold text-slate-900 truncate">AI 智能健康复盘</h2>
+          </div>
+          <div class="flex items-center space-x-1.5 shrink-0">
+            <button onclick="openCompareView()" class="flex items-center space-x-1 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors">
+              <span class="font-mono text-xs font-medium">阶段对比</span>
+            </button>
+            <button onclick="openInsightHistory()" class="flex items-center space-x-1 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors">
+              <span class="font-mono text-xs font-medium">历史</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 分析周期选择胶囊 -->
+        <div class="flex space-x-2">
+          <button onclick="setInsightDays(7)" id="pill-7" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 7 天</button>
+          <button onclick="setInsightDays(30)" id="pill-30" class="flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">近 30 天</button>
+          <button onclick="setInsightDays(60)" id="pill-60" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 60 天</button>
+        </div>
+
+        <!-- 分析窗口截止日：默认跟随今天；选昨天或手选日期即可回溯补生成 -->
+        <div class="flex items-center space-x-2">
+          <span class="text-xs font-bold text-slate-500 shrink-0">截止日</span>
+          <button onclick="setInsightEndMode('today')" id="endpill-today" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">今天</button>
+          <button onclick="setInsightEndMode('yesterday')" id="endpill-yesterday" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">昨天</button>
+          <input type="date" id="insight-end-date" onchange="setInsightEndDate(this.value)"
+                 class="flex-1 min-w-0 px-2 py-1.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+        </div>
+
+        <button onclick="generateInsightStream()" id="btn-generate-insight" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 rounded-2xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex justify-center items-center space-x-2">
+          <span class="font-mono">生成阶段深度洞察</span>
+        </button>
+
+        <!-- 洞察渲染卡片 (SSE 流式输出，Apple Health 浅蓝微渐变柔和卡片) -->
+        <div class="apple-card p-5 space-y-3 min-h-[300px]">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <span class="text-xs font-bold text-blue-600 flex items-center space-x-1.5">
+              <span class="font-mono text-xs">AI</span>
+              <span>关联分析与归因结论</span>
+            </span>
+            <span id="insight-status-tag" class="text-[10px] text-slate-400">点击上方按钮开始</span>
+          </div>
+
+          <div id="insight-content" class="text-sm text-slate-700 leading-relaxed markdown-body">
+            <p>欢迎来到 AI 洞察页面！系统会自动提取你在选定周期内的体重走势、夜间呼吸失水、熬夜红黄绿分布、以及饮食运动日记，并由大模型进行深度因果归因与复盘。</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. AI 洞察历史页 (Insight History View) -->
+      <section id="view-history" class="fade-in space-y-4 hidden">
+        <div class="flex justify-between items-center">
+          <button onclick="switchTab('insight')" class="flex items-center space-x-0.5 text-slate-500 hover:text-slate-800 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            <span class="text-xs font-bold">返回</span>
+          </button>
+          <h2 class="text-sm font-bold text-neutral-900">洞察历史</h2>
+          <button onclick="toggleHistoryManage()" id="history-manage-btn" class="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl transition-colors">管理</button>
+        </div>
+
+        <!-- 关键词搜索 -->
+        <div class="relative">
+          <input id="history-search" oninput="onHistorySearchInput()" type="text" placeholder="搜索洞察内容关键词…"
+            class="w-full bg-white border border-slate-200/90 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm transition-all">
+          <svg class="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path></svg>
+        </div>
+
+        <!-- 档位筛选 -->
+        <div class="flex space-x-2">
+          <button onclick="setHistoryFilter(0)" id="hfilter-0" class="flex-1 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white transition-all">全部</button>
+          <button onclick="setHistoryFilter(7)" id="hfilter-7" class="flex-1 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 7 天</button>
+          <button onclick="setHistoryFilter(30)" id="hfilter-30" class="flex-1 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 30 天</button>
+          <button onclick="setHistoryFilter(60)" id="hfilter-60" class="flex-1 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">近 60 天</button>
+          <button onclick="setHistoryFilterCompare()" id="hfilter-compare" class="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">⇄ 阶段对比</button>
+        </div>
+
+        <!-- 历史列表 -->
+        <div id="history-list" class="space-y-2.5"></div>
+
+        <!-- 加载更多（游标分页，每批 10 条） -->
+        <button onclick="loadHistory(false)" id="history-loadmore" class="hidden w-full py-2.5 rounded-xl apple-card text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all">加载更多</button>
+
+        <!-- 管理模式底部操作条 -->
+        <div id="history-delete-bar" class="hidden sticky bottom-2 z-10 flex items-center justify-between bg-slate-900/95 backdrop-blur-md text-white rounded-2xl px-4 py-2.5 shadow-xl">
+          <button onclick="toggleHistorySelectAll()" id="history-selectall-btn" class="text-xs font-bold text-slate-200 hover:text-white transition-colors">全选</button>
+          <span id="history-selected-count" class="text-xs text-slate-300">已选 0 项</span>
+          <button onclick="deleteSelectedInsights()" id="history-delete-btn" class="text-xs font-bold bg-slate-600/60 text-slate-300 px-3.5 py-1.5 rounded-xl cursor-not-allowed transition-colors" disabled>删除所选</button>
+        </div>
+      </section>
+
+      <!-- 5. 阶段对比独立视图 (Compare View) -->
+      <section id="view-compare" class="fade-in space-y-4 hidden">
+        <!-- topbar -->
+        <div class="flex justify-between items-center">
+          <button onclick="cmpBack()" class="flex items-center space-x-0.5 text-slate-500 hover:text-slate-800 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            <span class="text-xs font-bold">返回</span>
+          </button>
+          <h2 class="text-base font-bold text-slate-900">⇄ 阶段对比</h2>
+          <span class="w-12"></span>
+        </div>
+
+        <!-- 两月选择器 -->
+        <div class="apple-card p-3 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex-1 min-w-0 flex items-center justify-center space-x-0.5">
+              <button onclick="cmpStepMonth('a',-1)" id="cmp-a-prev" class="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 text-base font-bold leading-none transition-colors">‹</button>
+              <div class="text-center min-w-0">
+                <p class="text-[9px] uppercase font-bold text-slate-400">对比月 A</p>
+                <p id="cmp-a-label" class="text-[13px] font-black text-slate-900 whitespace-nowrap">—</p>
+              </div>
+              <button onclick="cmpStepMonth('a',1)" id="cmp-a-next" class="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 text-base font-bold leading-none transition-colors">›</button>
+            </div>
+            <span class="px-1 text-[9px] font-black text-slate-300 shrink-0">vs</span>
+            <div class="flex-1 min-w-0 flex items-center justify-center space-x-0.5">
+              <button onclick="cmpStepMonth('b',-1)" id="cmp-b-prev" class="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 text-base font-bold leading-none transition-colors">‹</button>
+              <div class="text-center min-w-0">
+                <p class="text-[9px] uppercase font-bold text-slate-400">对比月 B</p>
+                <p id="cmp-b-label" class="text-[13px] font-black text-slate-900 whitespace-nowrap">—</p>
+              </div>
+              <button onclick="cmpStepMonth('b',1)" id="cmp-b-next" class="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 text-base font-bold leading-none transition-colors">›</button>
+            </div>
+          </div>
+          <p class="text-[10px] text-slate-400 text-center">默认「上月 vs 上上个月」· 两月互不重叠 · 支持跨年对比</p>
+        </div>
+
+        <!-- 未过完 / 数据不足 提示条 -->
+        <div id="cmp-warn" class="hidden bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-3 py-2 text-[11px] leading-relaxed"></div>
+
+        <!-- 生成按钮 -->
+        <button onclick="cmpGenerateStream()" id="compare-gen-btn" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 rounded-2xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex justify-center items-center space-x-2">
+          <span class="font-mono">生成阶段对比综述</span>
+        </button>
+
+        <!-- 指标对比表 -->
+        <div class="apple-card p-4 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <span class="text-xs font-medium text-neutral-700 font-mono">指标对比</span>
+            <span id="cmp-table-meta" class="text-[10px] text-slate-400"></span>
+          </div>
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-[10px] text-slate-400">
+                <th class="text-left font-bold pb-2">指标</th>
+                <th id="cmp-col-a" class="text-right font-bold pb-2">月 A</th>
+                <th id="cmp-col-b" class="text-right font-bold pb-2">月 B</th>
+                <th class="text-right font-bold pb-2">Δ</th>
+              </tr>
+            </thead>
+            <tbody id="compare-table-body"></tbody>
+          </table>
+        </div>
+
+        <!-- AI 阶段对比综述卡片 -->
+        <div class="apple-card p-5 space-y-3 min-h-[300px]">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <span class="text-xs font-bold text-indigo-600 flex items-center space-x-1">
+              <span class="font-mono text-xs font-medium">阶段对比综述</span>
+            </span>
+            <span id="cmp-status-tag" class="text-[10px] text-slate-400">点击上方按钮开始</span>
+          </div>
+          <div id="compare-insight-card" class="text-sm text-slate-700 leading-relaxed markdown-body">
+            <p>选择两个月，点击「生成阶段对比综述」，AI 将对两个自然月的体重、腰围、睡眠、运动与服药情况做横向对比与归因分析。</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. 睡前小结 (Evening Summary View) -->

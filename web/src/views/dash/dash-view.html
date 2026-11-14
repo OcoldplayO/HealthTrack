@@ -1,0 +1,210 @@
+      <section id="view-dash" class="fade-in space-y-4 hidden">
+        <div class="flex justify-between items-center">
+          <h2 class="text-base font-bold text-slate-900">数据趋势看板</h2>
+          <div class="flex bg-slate-200/70 p-0.5 rounded-xl text-xs font-semibold">
+            <button onclick="switchDashRange(7)" id="btn-range-7" class="px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all">近7天</button>
+            <button onclick="switchDashRange(30)" id="btn-range-30" class="px-3 py-1 rounded-lg text-slate-600 transition-all">近30天</button>
+            <button onclick="switchDashRange(60)" id="btn-range-60" class="px-3 py-1 rounded-lg text-slate-600 transition-all">近60天</button>
+          </div>
+        </div>
+
+        <!-- 60天详情入口（独立视图，逐日；与周平均趋势互补） -->
+        <button onclick="openTrendDetailView()" class="w-full flex items-center justify-between apple-card hover:border-blue-300 rounded-2xl px-4 py-3 transition-all active:scale-[0.99]">
+          <span class="flex items-center space-x-2.5 min-w-0">
+            <svg class="w-4 h-4 text-neutral-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <span class="text-xs font-medium text-neutral-800 shrink-0">60 天详情</span>
+            <span class="text-[10px] text-slate-400 truncate">四指标 · 逐日全量跟踪</span>
+          </span>
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        </button>
+
+        <!-- 周平均趋势分析入口（独立视图，不占用底部导航） -->
+        <button onclick="openTrendView()" class="w-full flex items-center justify-between apple-card hover:border-emerald-300 rounded-2xl px-4 py-3 transition-all active:scale-[0.99]">
+          <span class="flex items-center space-x-2.5 min-w-0">
+            <svg class="w-4 h-4 text-neutral-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span class="text-xs font-medium text-neutral-800 shrink-0">周平均趋势分析</span>
+            <span class="text-[10px] text-slate-400 truncate">近 12 周 · 周均值 + 区间带</span>
+          </span>
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        </button>
+
+        <!-- 体重趋势图卡片 -->
+        <div class="apple-card p-4 rounded-2xl space-y-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-[10px] uppercase font-bold text-slate-400">体重变化趋势 (kg)</p>
+              <p id="dash-weight-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
+            </div>
+            <div class="flex items-center space-x-3 text-[10px] text-slate-500 font-medium">
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-800"></span>晨起空腹</span>
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-400"></span>睡前</span>
+            </div>
+          </div>
+          <div class="h-44 w-full">
+            <canvas id="chart-weight"></canvas>
+          </div>
+          <p id="dash-weight-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
+            <span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日晨重 / 睡前重</span>
+          </p>
+        </div>
+
+        <!-- 腰围趋势图卡片（模板同体重折线图） -->
+        <div class="apple-card p-4 rounded-2xl space-y-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-[10px] uppercase font-bold text-slate-400">腰围变化趋势 (cm)</p>
+              <p id="dash-waist-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
+            </div>
+            <div class="flex items-center space-x-3 text-[10px] text-slate-500 font-medium">
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-600"></span>腰围</span>
+            </div>
+          </div>
+          <div class="h-44 w-full">
+            <canvas id="chart-waist"></canvas>
+          </div>
+          <p id="dash-waist-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
+            <span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日腰围</span>
+          </p>
+        </div>
+
+        <!-- 睡眠时长与熬夜分级柱状图 -->
+        <div class="apple-card p-4 rounded-2xl space-y-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-[10px] uppercase font-bold text-slate-400">睡眠作息与质量 (小时)</p>
+              <p id="dash-sleep-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
+            </div>
+            <div class="flex items-center space-x-2 text-[10px] text-slate-500 font-medium">
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-900"></span>正常</span>
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-500"></span>轻度</span>
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-300"></span>熬夜</span>
+            </div>
+          </div>
+          <div class="h-36 w-full">
+            <canvas id="chart-sleep"></canvas>
+          </div>
+          <p id="dash-sleep-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
+            <span class="font-mono text-[10px] text-neutral-400">↑ 点击柱图查看就寝 / 起床时间</span>
+          </p>
+        </div>
+
+        <!-- 步数趋势图卡片（缺失日断点，不补 0） -->
+        <div class="apple-card p-4 rounded-2xl space-y-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-[10px] uppercase font-bold text-slate-400">步数趋势 (步)</p>
+              <p id="dash-steps-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
+            </div>
+            <div class="flex items-center space-x-3 text-[10px] text-slate-500 font-medium">
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-600"></span>每日步数</span>
+            </div>
+          </div>
+          <div class="h-44 w-full">
+            <canvas id="chart-steps"></canvas>
+          </div>
+          <p id="dash-steps-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
+            <span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日步数</span>
+          </p>
+        </div>
+
+        <!-- 历史流水与运动标签列表 -->
+        <div class="apple-card p-4 rounded-2xl space-y-3">
+          <p class="text-xs font-bold text-slate-800">近期活动打卡流水</p>
+          <div id="dash-activities-list" class="space-y-2 text-xs max-h-48 overflow-y-auto no-scrollbar">
+            <!-- 动态注入 -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 2.1 周平均趋势分析（独立视图，看板入口进入，不占用底部导航） -->
+      <section id="view-trend" class="fade-in space-y-4 hidden">
+        <div class="flex justify-between items-center">
+          <button onclick="switchTab('dash')" class="flex items-center space-x-0.5 text-slate-500 hover:text-slate-800 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            <span class="text-xs font-bold">返回</span>
+          </button>
+          <h2 class="text-sm font-bold text-neutral-900">周平均趋势</h2>
+          <span class="w-12"></span>
+        </div>
+
+        <!-- 指标切换：体重 / 腰围 / 睡眠 / 步数，各一条周平均曲线 -->
+        <div class="flex space-x-1.5">
+          <button onclick="setTrendMetric('weight')" id="trend-tab-weight" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">体重</button>
+          <button onclick="setTrendMetric('waist')" id="trend-tab-waist" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">腰围</button>
+          <button onclick="setTrendMetric('sleep')" id="trend-tab-sleep" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">睡眠</button>
+          <button onclick="setTrendMetric('steps')" id="trend-tab-steps" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">步数</button>
+        </div>
+
+        <!-- 周均值折线 + 周内 min/max 区间带 -->
+        <div class="apple-card p-4 rounded-2xl space-y-3">
+          <div class="flex justify-between items-start">
+            <div>
+              <p id="trend-metric-label" class="text-[10px] uppercase font-bold text-slate-400">体重周均值 (kg)</p>
+              <p id="trend-metric-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
+            </div>
+            <div id="trend-metric-note" class="text-[10px] text-slate-500 text-right leading-relaxed">近 12 周</div>
+          </div>
+          <div class="h-56 w-full">
+            <canvas id="chart-trend"></canvas>
+          </div>
+          <p id="trend-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
+            <span class="font-mono text-[10px] text-neutral-400">↑ 点击节点查看该周均值与区间</span>
+          </p>
+        </div>
+
+        <!-- 图例与口径说明 -->
+        <div class="apple-card p-3.5 text-[11px] text-slate-500 leading-relaxed space-y-1.5">
+          <p><span class="inline-block w-4 h-2.5 rounded bg-slate-300/70 align-middle mr-1.5"></span>区间带 = 该周内所有日值的 min ~ max（非标准差）</p>
+          <p><span class="inline-block w-2.5 h-2.5 rounded-full border-2 border-slate-400 bg-white align-middle mr-1.5"></span>空心节点 + 虚线 = 该周仅 1~3 天数据，均值置信偏低</p>
+          <p><span class="inline-block w-4 h-0.5 bg-slate-300 align-middle mr-1.5"></span>某周 0 天数据时折线断开、区间带留空（不按 0 计）</p>
+        </div>
+      </section>
+
+      <!-- 2b. 60天详情独立视图（方案 A：单一总入口 → 独立视图，逐日折线） -->
+      <section id="view-trend-detail" class="fade-in space-y-4 hidden">
+        <div id="td-topbar" class="space-y-4">
+          <div id="td-header" class="flex justify-between items-center">
+            <button onclick="switchTab('dash')" class="flex items-center space-x-0.5 text-slate-500 hover:text-slate-800 transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+              <span class="text-xs font-bold">返回</span>
+            </button>
+            <h2 class="text-sm font-bold text-neutral-900">60天详情</h2>
+            <span id="td-header-spacer" class="w-12"></span>
+          </div>
+
+          <!-- 指标切换：体重 / 腰围 / 睡眠 / 步数 -->
+          <div id="td-tabs" class="flex space-x-1.5">
+            <button onclick="setTrendDetailMetric('weight')" id="td-tab-weight" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">体重</button>
+            <button onclick="setTrendDetailMetric('waist')" id="td-tab-waist" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">腰围</button>
+            <button onclick="setTrendDetailMetric('sleep')" id="td-tab-sleep" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">睡眠</button>
+            <button onclick="setTrendDetailMetric('steps')" id="td-tab-steps" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">步数</button>
+          </div>
+        </div>
+
+        <!-- 逐日折线：竖屏固定日宽横向滚动 / 横屏自适应压进一屏 -->
+        <div id="td-card" class="apple-card p-4 rounded-2xl space-y-3">
+          <div id="td-metric-head" class="flex justify-between items-start">
+            <div>
+              <p id="td-metric-label" class="text-[10px] uppercase font-bold text-slate-400">体重逐日 (kg)</p>
+              <p id="td-metric-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
+            </div>
+            <div id="td-metric-note" class="text-[10px] text-slate-500 text-right leading-relaxed">近 60 天逐日</div>
+          </div>
+          <div id="td-chart-scroll" class="w-full overflow-x-auto no-scrollbar">
+            <div id="td-chart-box" style="width:1560px;height:220px;">
+              <canvas id="chart-trend-detail"></canvas>
+            </div>
+          </div>
+          <p id="td-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
+            <span class="font-mono text-[10px] text-neutral-400">↔ 拖动看全 60 天 · 点击节点看当日详情</span>
+          </p>
+        </div>
+
+        <!-- 口径说明 -->
+        <div id="td-legend-card" class="apple-card p-3.5 text-[11px] text-slate-500 leading-relaxed space-y-1.5">
+          <p><span class="inline-block w-4 h-0.5 bg-slate-300 align-middle mr-1.5"></span>缺失日折线断开（不按 0 计），可横向拖动逐日查看</p>
+          <p><span class="inline-block w-4 h-2 bg-slate-200 align-middle mr-1.5"></span>横屏时图表自动压进一屏，x 轴约每 3 天一个刻度</p>
+        </div>
+      </section>
+
+      <!-- 3. AI 洞察页 (Insight View) -->

@@ -1,0 +1,191 @@
+    <!-- 导出数据弹窗：Excel 表格与 JSON 完整备份两种方式 -->
+    <div id="export-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeExportOnBackdrop(event)">
+      <section class="w-full max-w-sm bg-white rounded-xl border border-neutral-200 shadow-lg overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="export-title">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div>
+            <h2 id="export-title" class="font-bold text-slate-900">导出数据</h2>
+            <p id="export-subtitle" class="text-xs text-slate-400 mt-0.5">导出为 CSV，可用 Excel / WPS 打开</p>
+          </div>
+          <button onclick="closeExport()" aria-label="关闭导出" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500">✕</button>
+        </div>
+        <div class="p-5 space-y-4">
+          <div class="grid grid-cols-3 gap-2" id="export-type-pills">
+            <button type="button" data-type="excel" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm transition-all">Excel</button>
+            <button type="button" data-type="json" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">JSON</button>
+            <button type="button" data-type="archive" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">图文归档</button>
+          </div>
+          <div id="export-range-panel">
+            <label class="block text-xs font-bold text-slate-600 mb-2">导出范围</label>
+            <div class="grid grid-cols-3 gap-2" id="export-range-pills">
+              <button data-range="7" onclick="selectExportRange(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">最近7天</button>
+              <button data-range="30" onclick="selectExportRange(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">最近30天</button>
+              <button data-range="all" onclick="selectExportRange(this)" class="py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm transition-all">全部</button>
+            </div>
+          </div>
+          <div id="export-json-panel" class="hidden">
+            <div class="rounded-2xl bg-amber-50 border border-amber-100 px-3.5 py-3 text-[11px] leading-relaxed text-amber-800">
+              <p class="font-bold text-xs mb-1.5">这是完整备份，不是筛选导出</p>
+              <ul class="space-y-1 list-disc list-inside">
+                <li>包含全部健康记录与睡前小结，不受时间范围限制</li>
+                <li>不包含小结照片与 AI 洞察</li>
+                <li>之后可在「导入数据」中原样回灌，用于换机或重装恢复</li>
+              </ul>
+            </div>
+          </div>
+          <div id="export-archive-panel" class="hidden">
+            <div class="rounded-2xl bg-indigo-50 border border-indigo-100 px-3.5 py-3 text-[11px] leading-relaxed text-indigo-800">
+              <p class="font-bold text-xs mb-1.5">图文小结归档（ZIP）</p>
+              <ul class="space-y-1 list-disc list-inside">
+                <li>包含所选范围内的小结表格与全部难忘图片</li>
+                <li>解压后：summaries.csv + photos/ 日期.jpg + manifest.json</li>
+                <li>图片为应用内保存的压缩版，不包含手机相册原文件</li>
+              </ul>
+            </div>
+          </div>
+          <div id="export-result" class="hidden text-xs rounded-xl px-3 py-2.5"></div>
+          <button id="export-start-btn" type="button" onclick="exportCurrent()" class="w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">开始导出</button>
+          <button id="export-json-btn" type="button" onclick="exportCurrent()" class="hidden w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">导出 JSON 备份</button>
+          <button id="export-archive-btn" type="button" onclick="exportCurrent()" class="hidden w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">导出图文归档</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 导入数据弹窗：选择文件 → 预检预览 → 确认写入 -->
+    <div id="import-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeImportOnBackdrop(event)">
+      <section class="w-full max-w-md sm:max-w-lg bg-white rounded-xl border border-neutral-200 shadow-lg overflow-hidden flex flex-col max-h-[88vh]" role="dialog" aria-modal="true" aria-labelledby="import-title">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <h2 id="import-title" class="font-bold text-slate-900">导入数据</h2>
+            <p id="import-subtitle" class="text-xs text-slate-400 mt-0.5">预检不写入数据，确认后才会导入</p>
+          </div>
+          <button onclick="closeImport()" aria-label="关闭导入" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500">✕</button>
+        </div>
+        <div class="p-5 space-y-4 overflow-y-auto no-scrollbar">
+          <div id="import-step-pick">
+            <!-- 安卓文件选择器对 text/csv 等 MIME 支持不一致，这里放开选择范围，由服务端校验文件类型 -->
+            <input id="import-file-input" type="file" accept="*/*" class="hidden" onchange="impFileSelected(this)">
+            <button id="import-pick-btn" type="button" onclick="impPickFile()" class="w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">选择文件</button>
+            <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">支持 CSV 模板与 HealthTrack JSON 备份，单次最多 5000 行 / 5 MB。手机端请先把文件保存到「下载」目录，xlsx 需另存为 CSV。</p>
+          </div>
+
+          <div id="import-step-preview" class="hidden space-y-3">
+            <div class="rounded-2xl bg-slate-50 px-3.5 py-3">
+              <p id="import-file-meta" class="text-[11px] text-slate-500 break-all"></p>
+              <div class="grid grid-cols-5 gap-1.5 mt-2.5 text-center">
+                <div><p class="text-[10px] text-slate-400">总行数</p><p id="imp-stat-total" class="text-sm font-bold text-slate-800">0</p></div>
+                <div><p class="text-[10px] text-slate-400">新增</p><p id="imp-stat-inserted" class="text-sm font-bold text-emerald-600">0</p></div>
+                <div><p class="text-[10px] text-slate-400">更新</p><p id="imp-stat-updated" class="text-sm font-bold text-blue-600">0</p></div>
+                <div><p class="text-[10px] text-slate-400">警告</p><p id="imp-stat-warnings" class="text-sm font-bold text-amber-600">0</p></div>
+                <div><p class="text-[10px] text-slate-400">错误</p><p id="imp-stat-errors" class="text-sm font-bold text-rose-600">0</p></div>
+              </div>
+            </div>
+            <div id="import-dup-tip" class="hidden rounded-xl bg-amber-50 border border-amber-100 px-3 py-2.5 text-[11px] leading-relaxed text-amber-800"></div>
+            <div id="import-fatal" class="hidden rounded-xl bg-rose-50 border border-rose-100 px-3 py-2.5 text-[11px] leading-relaxed text-rose-700"></div>
+            <div id="import-issue-wrap" class="hidden">
+              <p class="text-xs font-bold text-slate-600 mb-1.5">需要关注的行 <span id="import-issue-count" class="text-slate-400 font-normal"></span></p>
+              <div id="import-issue-list" class="space-y-1 max-h-36 overflow-y-auto no-scrollbar"></div>
+            </div>
+            <div id="import-diff-wrap" class="hidden">
+              <p class="text-xs font-bold text-slate-600 mb-1.5">将要写入的日期 <span id="import-diff-count" class="text-slate-400 font-normal"></span></p>
+              <div id="import-diff-list" class="space-y-1 max-h-36 overflow-y-auto no-scrollbar"></div>
+            </div>
+          </div>
+
+          <div id="import-step-options" class="hidden space-y-3">
+            <div>
+              <p class="text-xs font-bold text-slate-600 mb-1.5">同一天已有数据时</p>
+              <div class="space-y-2">
+                <button type="button" data-mode="merge" onclick="impSelectMode(this)" class="w-full text-left px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white transition-all">
+                  <span class="block text-xs font-bold text-slate-800">合并（推荐）</span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5">只覆盖文件中填写了值的字段，空单元格保留旧数据</span>
+                </button>
+                <button type="button" data-mode="overwrite" onclick="impSelectMode(this)" class="w-full text-left px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white transition-all">
+                  <span class="block text-xs font-bold text-slate-800">替换</span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5">整行覆盖，文件中的空值会清空原有数据</span>
+                </button>
+              </div>
+            </div>
+            <label id="import-skip-wrap" class="hidden flex items-start space-x-2 rounded-xl bg-amber-50 border border-amber-100 px-3 py-2.5">
+              <input id="import-skip-errors" type="checkbox" class="mt-0.5 accent-amber-600" onchange="impToggleSkipErrors(this)">
+              <span class="text-[11px] leading-relaxed text-amber-800">跳过错误行，只导入正常行。失败行可在「导入记录」中导出修正后补导。</span>
+            </label>
+          </div>
+
+          <div id="import-result" class="hidden text-xs rounded-xl px-3 py-2.5"></div>
+        </div>
+        <div class="px-5 py-4 border-t border-slate-100 shrink-0 flex gap-2">
+          <button type="button" onclick="closeImport()" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors">取消</button>
+          <button id="import-confirm-btn" type="button" onclick="impConfirm()" disabled class="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm transition-colors opacity-50">确认导入</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 备忘录粘贴导入 -->
+    <div id="memo-import-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeMemoOnBackdrop(event)">
+      <section class="w-full max-w-md sm:max-w-lg bg-white rounded-xl border border-neutral-200 shadow-lg overflow-hidden flex flex-col max-h-[88vh]" role="dialog" aria-modal="true" aria-labelledby="memo-import-title">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <h2 id="memo-import-title" class="font-bold text-slate-900">从备忘录导入</h2>
+            <p class="text-xs text-slate-400 mt-0.5">粘贴后先预检，确认无误再写入</p>
+          </div>
+          <button onclick="closeMemo()" aria-label="关闭备忘录导入" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500">✕</button>
+        </div>
+        <div class="p-5 space-y-3 overflow-y-auto no-scrollbar">
+          <textarea id="memo-import-text" rows="10" placeholder="例如：&#10;10-01 76.9 78.2 腰78 睡23:30-7:00&#10;10-02 76.8 早上有点累" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-y"></textarea>
+          <div class="flex items-center justify-between">
+            <label for="memo-year-base" class="text-xs font-bold text-slate-600">年份基准</label>
+            <select id="memo-year-base" class="border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500"></select>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed">未写年份时按年份基准推断，晚于今天的日期归到上一年。</p>
+        </div>
+        <div class="px-5 py-4 border-t border-slate-100 shrink-0 flex gap-2">
+          <button type="button" onclick="closeMemo()" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors">取消</button>
+          <button id="memo-preview-btn" type="button" onclick="impPreviewMemo()" class="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20">预检</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 导入批次历史 -->
+    <div id="import-batches-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeBatchesOnBackdrop(event)">
+      <section class="w-full max-w-md sm:max-w-lg bg-white rounded-xl border border-neutral-200 shadow-lg overflow-hidden flex flex-col max-h-[88vh]" role="dialog" aria-modal="true" aria-labelledby="batches-title">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <h2 id="batches-title" class="font-bold text-slate-900">导入记录</h2>
+            <p class="text-xs text-slate-400 mt-0.5">失败批次可重试或导出失败行</p>
+          </div>
+          <button onclick="closeBatches()" aria-label="关闭导入记录" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500">✕</button>
+        </div>
+        <div id="batches-list" class="p-4 space-y-2.5 overflow-y-auto no-scrollbar">
+          <p class="text-xs text-slate-400 text-center py-8">加载中…</p>
+        </div>
+        <div class="px-5 py-4 border-t border-slate-100 shrink-0">
+          <button type="button" onclick="closeBatches()" class="w-full py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors">关闭</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 通用确认弹窗（替代原生 confirm，兼容安卓 WebView 与内嵌浏览器） -->
+    <div id="app-confirm-modal" class="hidden fixed inset-0 z-[70] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center">
+      <section class="w-full max-w-xs bg-white rounded-xl border border-neutral-200 shadow-lg overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="app-confirm-title">
+        <div class="px-5 pt-5">
+          <h2 id="app-confirm-title" class="font-bold text-slate-900 text-base">请确认</h2>
+          <p id="app-confirm-msg" class="text-sm text-slate-500 mt-2 leading-relaxed"></p>
+        </div>
+        <div class="p-5 flex gap-2">
+          <button id="app-confirm-cancel" type="button" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors">取消</button>
+          <button id="app-confirm-ok" type="button" class="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors">确定删除</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 轻量错误提示条（替代原生 alert） -->
+    <div id="app-toast" class="hidden fixed left-1/2 -translate-x-1/2 bottom-24 z-[80] max-w-[90%] px-4 py-2.5 rounded-2xl bg-slate-900/95 text-white text-xs shadow-xl"></div>
+
+    <!-- 小结图片全屏查看 -->
+    <div id="ev-photo-viewer" class="hidden fixed inset-0 z-[85] bg-slate-950/95 flex items-center justify-center" onclick="evoClosePhoto()" role="dialog" aria-modal="true" aria-label="查看小结图片">
+      <img id="ev-photo-viewer-img" src="" alt="" class="w-full h-full object-contain p-4 select-none">
+      <button type="button" onclick="event.stopPropagation(); evoClosePhoto()" aria-label="关闭图片" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/15 text-white text-lg leading-none flex items-center justify-center backdrop-blur active:scale-95 transition-transform">✕</button>
+      <p class="absolute bottom-6 inset-x-0 text-center text-[11px] text-white/60">点击任意处关闭</p>
+    </div>
+
+    <!-- 核心内容切换区 -->
