@@ -1,0 +1,378 @@
+<!-- 1. 记一笔 (Log View) 模块模板 -->
+<section id="view-log" class="fade-in space-y-3">
+  <!-- 日期切换行：单线药丸样式，日期数字 font-mono -->
+  <div class="flex justify-between items-center">
+    <div class="flex items-center gap-2">
+      <input type="date" id="input-date" class="bg-white border border-neutral-200 text-neutral-800 text-xs font-mono font-medium rounded-lg px-3 py-1.5 w-[128px] outline-none focus:border-neutral-700 transition-colors">
+      <span class="text-[10px] font-mono text-neutral-400">已记 <span id="log-count" class="text-neutral-600">0/6</span></span>
+    </div>
+    <button id="btn-today-date" class="text-[11px] font-medium text-neutral-600 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 px-3 py-1.5 rounded-lg transition-all active:scale-95 font-mono">今日</button>
+  </div>
+
+  <!-- 晨光：极简卡，1.5px 太阳 SVG + 极简双态按钮 -->
+  <div class="ht-card flex items-center justify-between">
+    <div class="flex items-center gap-2.5 min-w-0">
+      <div class="w-8 h-8 rounded-lg border border-neutral-200 flex items-center justify-center shrink-0 text-neutral-500">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </div>
+      <div class="min-w-0">
+        <p class="text-xs font-medium text-neutral-800">晨光</p>
+        <p class="text-[10px] text-neutral-400 truncate font-mono">起床后 1h 内</p>
+      </div>
+    </div>
+    <div class="flex gap-1 shrink-0" id="morningLightPills">
+      <button type="button" class="ht-seg-btn" data-val="yes">YES</button>
+      <button type="button" class="ht-seg-btn" data-val="no">NO</button>
+    </div>
+  </div>
+
+  <!-- 步数：极客风卡，1.5px 步行 SVG，巨大等宽数字，极细滑轨 -->
+  <div class="ht-card space-y-2.5">
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 rounded-lg border border-neutral-200 flex items-center justify-center shrink-0 text-neutral-500">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><path d="M9 12l2 2 4-4"/><path d="M14 8l-2 4-3 2-2 4"/><path d="M10 8l3 1 2-2"/></svg>
+        </div>
+        <div class="min-w-0">
+          <p class="text-xs font-medium text-neutral-800">步数</p>
+          <p id="steps-meta" class="text-[10px] text-neutral-400 truncate font-mono">昨 -- · 7d均 --</p>
+        </div>
+      </div>
+      <div class="flex items-baseline gap-1 shrink-0">
+        <span id="steps-value" class="text-2xl font-bold text-neutral-900 leading-none font-mono tracking-tighter tabular-nums">--</span>
+        <span class="text-[10px] font-medium text-neutral-400 font-mono">步</span>
+      </div>
+    </div>
+    <input type="range" id="input-steps" min="0" max="20000" step="500" value="0" class="ht-range w-full cursor-pointer">
+    <div class="flex justify-between text-[9px] font-mono text-neutral-300">
+      <span>0</span><span>5k</span><span>10k</span><span>15k</span><span>20k</span>
+    </div>
+    <div class="pt-2 border-t border-neutral-100 flex items-center justify-between">
+      <span id="steps-hint" class="text-[10px] text-neutral-400 truncate font-mono">留空 = 断点（不补 0）</span>
+      <button type="button" id="btn-clear-steps" class="text-[10px] font-medium text-neutral-400 hover:text-neutral-700 px-2 py-0.5 rounded border border-neutral-200 hover:border-neutral-400 ml-2 shrink-0 transition-colors">留空</button>
+    </div>
+  </div>
+
+  <!-- 晚间卡：睡前体重 -->
+  <div class="ht-card">
+    <div class="flex items-center justify-between mb-2.5">
+      <div class="flex items-center gap-2">
+        <div class="w-6 h-6 rounded-md border border-neutral-200 flex items-center justify-center text-neutral-400">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </div>
+        <span class="text-[10px] font-medium text-neutral-500 uppercase tracking-widest font-mono">Evening</span>
+      </div>
+      <span class="text-[10px] text-neutral-400 font-mono">睡前体重</span>
+    </div>
+    <div class="flex items-baseline gap-1.5">
+      <input type="number" step="0.1" id="input-weight-pm" placeholder="--" class="text-2xl font-bold font-mono text-neutral-900 w-full min-w-0 outline-none bg-transparent placeholder-neutral-200 border-b border-neutral-200 focus:border-neutral-800 pb-0.5 transition-colors tabular-nums">
+      <span class="text-xs font-mono font-medium text-neutral-400 shrink-0 pb-0.5">kg</span>
+    </div>
+    <div id="diff-weight-pm" class="mt-2 pt-2 border-t border-neutral-100 flex items-center justify-between text-[9px] text-neutral-400 font-mono font-medium">
+      <span>等待今晚称重</span>
+      <span class="text-neutral-300">--:--</span>
+    </div>
+  </div>
+
+  <!-- Morning Metrics 大卡：晨起空腹体重 + 晨起腰围 2 列 -->
+  <div class="ht-card">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <div class="w-6 h-6 rounded-md border border-neutral-200 flex items-center justify-center text-neutral-400">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/></svg>
+        </div>
+        <span class="text-[10px] font-medium text-neutral-500 uppercase tracking-widest font-mono">Morning Metrics</span>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <!-- 晨起空腹体重 -->
+      <div>
+        <p class="text-[10px] font-mono text-neutral-400 uppercase tracking-wider mb-2">空腹体重</p>
+        <div class="flex items-baseline gap-1">
+          <input type="number" step="0.1" id="input-weight-am" placeholder="--" class="text-2xl font-bold font-mono text-neutral-900 w-full min-w-0 outline-none bg-transparent placeholder-neutral-200 border-b border-neutral-200 focus:border-neutral-800 pb-0.5 transition-colors tabular-nums">
+          <span class="text-xs font-mono font-medium text-neutral-400 shrink-0 pb-0.5">kg</span>
+        </div>
+        <div id="diff-weight-am" class="mt-1.5 text-[9px] text-neutral-400 font-mono font-medium flex items-center justify-between">
+          <span>较昨日 --</span><span class="text-neutral-300">晨测</span>
+        </div>
+      </div>
+      <!-- 晨起腰围 -->
+      <div class="border-l border-neutral-100 pl-4">
+        <p class="text-[10px] font-mono text-neutral-400 uppercase tracking-wider mb-2">腰围</p>
+        <div class="flex items-baseline gap-1">
+          <input type="number" step="0.1" id="input-waist" placeholder="--" class="text-2xl font-bold font-mono text-neutral-900 w-full min-w-0 outline-none bg-transparent placeholder-neutral-200 border-b border-neutral-200 focus:border-neutral-800 pb-0.5 transition-colors tabular-nums">
+          <span class="text-xs font-mono font-medium text-neutral-400 shrink-0 pb-0.5">cm</span>
+        </div>
+        <div id="diff-waist" class="mt-1.5 text-[9px] text-neutral-400 font-mono font-medium flex items-center justify-between">
+          <span>较昨日 --</span><span class="text-neutral-300">标准</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 昨晚睡眠卡：通栏单线，时长等宽大数字 -->
+  <div class="ht-card">
+    <div class="flex justify-between items-center mb-3">
+      <div class="flex items-center gap-2">
+        <div class="w-6 h-6 rounded-md border border-neutral-200 flex items-center justify-center text-neutral-400">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </div>
+        <span class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest">昨晚睡眠</span>
+      </div>
+      <span id="sleepTagBadge" class="badge-green text-[9px] px-1.5 py-0.5">● 未熬夜</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="flex items-baseline gap-1 shrink-0">
+        <input type="number" step="0.1" id="sleepDuration" value="6.8" class="text-3xl font-bold font-mono text-neutral-900 w-[72px] outline-none bg-transparent border-b border-neutral-200 focus:border-neutral-800 pb-0.5 transition-colors tabular-nums">
+        <span class="text-sm font-mono font-medium text-neutral-400">h</span>
+      </div>
+      <div class="flex-1 min-w-0 flex flex-col gap-1.5">
+        <label class="flex items-center gap-2 text-[10px] font-mono text-neutral-400">
+          <span class="shrink-0 w-7">入睡</span>
+          <input type="time" id="sleepBedTime" value="00:30" class="flex-1 min-w-0 w-0 border-b border-neutral-200 focus:border-neutral-800 py-0.5 text-[11px] font-mono font-medium text-neutral-700 outline-none bg-transparent transition-colors">
+        </label>
+        <label class="flex items-center gap-2 text-[10px] font-mono text-neutral-400">
+          <span class="shrink-0 w-7">起床</span>
+          <input type="time" id="sleepWakeTime" value="07:15" class="flex-1 min-w-0 w-0 border-b border-neutral-200 focus:border-neutral-800 py-0.5 text-[11px] font-mono font-medium text-neutral-700 outline-none bg-transparent transition-colors">
+        </label>
+      </div>
+    </div>
+    <div id="diff-sleep" class="mt-2.5 pt-2 border-t border-neutral-100 flex items-center justify-between text-[9px] text-neutral-400 font-mono font-medium">
+      <span>较昨日 --</span><span class="text-neutral-300">节律</span>
+    </div>
+  </div>
+
+  <!-- 午餐：折叠卡 -->
+  <div class="apple-card rounded-xl overflow-hidden">
+    <div class="px-3.5 py-3 flex items-center justify-between cursor-pointer select-none" id="lunch-toggle">
+      <div class="flex items-center gap-2 min-w-0">
+        <div class="w-8 h-8 rounded-lg border border-neutral-200 flex items-center justify-center shrink-0 text-neutral-500">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>
+        </div>
+        <div class="min-w-0">
+          <p class="text-xs font-medium text-neutral-800">午餐</p>
+          <p id="lunch-summary" class="text-[10px] text-neutral-400 truncate font-mono">今天还没记午餐</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button type="button" id="btn-lunch-template" class="text-[10px] font-medium text-neutral-600 bg-neutral-100 border border-neutral-200 px-2.5 py-1 rounded-full active:scale-95">沿用昨天</button>
+        <span id="lunch-icon" class="text-xs text-neutral-400 transform transition-transform">▼</span>
+      </div>
+    </div>
+
+    <div id="lunch-body" class="hidden px-3.5 pb-3.5 pt-2.5 border-t border-neutral-100 space-y-2">
+      <p class="text-[10px] text-neutral-400 font-mono">只记午饭 · 用于观察 13:00–15:00 状态，不必逐餐记账</p>
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-[10px] font-medium text-neutral-500 shrink-0 w-[52px]">吃了吗</span>
+        <div class="flex flex-1 flex-wrap gap-1.5 justify-start" id="lunch-eaten">
+          <button type="button" class="pill-sm-btn" data-val="eaten">吃了</button>
+          <button type="button" class="pill-sm-btn" data-val="skipped">跳过</button>
+        </div>
+      </div>
+      <div class="flex items-start justify-between gap-2" id="lunch-protein-row">
+        <span class="text-[10px] font-medium text-neutral-500 shrink-0 w-[52px] pt-1">蛋白来源</span>
+        <div class="flex flex-1 flex-wrap gap-1.5 justify-start" id="lunch-protein">
+          <span class="chip" data-val="chicken">鸡胸</span>
+          <span class="chip" data-val="egg">蛋</span>
+          <span class="chip" data-val="fish">鱼</span>
+          <span class="chip" data-val="beef">牛肉</span>
+          <span class="chip" data-val="soy">豆制品</span>
+          <span class="chip" data-val="yogurt">酸奶</span>
+          <span class="chip" data-val="other">其他</span>
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-2" id="lunch-protein-g-row">
+        <span class="text-[10px] font-medium text-neutral-500 shrink-0 w-[52px]">蛋白量</span>
+        <div class="flex flex-1 flex-wrap gap-1.5 justify-start" id="lunch-protein-g">
+          <button type="button" class="pill-sm-btn" data-val="15">约15g</button>
+          <button type="button" class="pill-sm-btn" data-val="25">约25g</button>
+          <button type="button" class="pill-sm-btn" data-val="35">约35g</button>
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-2" id="lunch-staple-row">
+        <span class="text-[10px] font-medium text-neutral-500 shrink-0 w-[52px]">主食</span>
+        <div class="flex flex-1 flex-wrap gap-1.5 justify-start" id="lunch-staple">
+          <button type="button" class="pill-sm-btn" data-val="rice">白米饭</button>
+          <button type="button" class="pill-sm-btn" data-val="noodle">面条</button>
+          <button type="button" class="pill-sm-btn" data-val="grains">杂粮</button>
+          <button type="button" class="pill-sm-btn" data-val="potato">薯类</button>
+          <button type="button" class="pill-sm-btn" data-val="none">无主食</button>
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-2" id="lunch-carb-row">
+        <span class="text-[10px] font-medium text-neutral-500 shrink-0 w-[52px]">碳水</span>
+        <div class="flex flex-1 flex-wrap gap-1.5 justify-start" id="lunch-carb">
+          <button type="button" class="pill-sm-btn" data-val="lt20">&lt;20g</button>
+          <button type="button" class="pill-sm-btn" data-val="20_35">20–35g</button>
+          <button type="button" class="pill-sm-btn" data-val="35_50">35–50g</button>
+          <button type="button" class="pill-sm-btn" data-val="gt50">&gt;50g</button>
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-2" id="lunch-cook-row">
+        <span class="text-[10px] font-medium text-neutral-500 shrink-0 w-[52px]">烹饪</span>
+        <div class="flex flex-1 flex-wrap gap-1.5 justify-start" id="lunch-cook">
+          <button type="button" class="pill-sm-btn" data-val="steam">蒸煮</button>
+          <button type="button" class="pill-sm-btn" data-val="stir_fry">炒</button>
+          <button type="button" class="pill-sm-btn" data-val="fry">煎炸</button>
+          <button type="button" class="pill-sm-btn" data-val="raw">生食</button>
+          <button type="button" class="pill-sm-btn" data-val="takeout">外卖</button>
+        </div>
+      </div>
+      <div id="lunch-yesterday" class="mt-1 pt-2 border-t border-neutral-100 text-[10px] text-neutral-400 font-mono truncate">昨天：--</div>
+    </div>
+  </div>
+
+  <!-- 身体感受自由记录 -->
+  <div class="space-y-1.5">
+    <div class="flex justify-between items-center text-xs">
+      <span class="font-medium text-neutral-700">身体感受与自由记录</span>
+      <span class="text-[10px] font-mono text-neutral-500 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded">饮食已结构化</span>
+    </div>
+    <textarea id="input-journal" rows="3" class="w-full ht-card text-xs text-neutral-800 placeholder-neutral-400 outline-none focus:border-neutral-700 transition-all resize-none leading-relaxed" placeholder="如：今天状态还行，下午 3 点有点困，喝了杯水走动一下缓过来了…"></textarea>
+  </div>
+
+  <!-- 专项生理打卡折叠面板 -->
+  <div class="apple-card rounded-xl overflow-hidden transition-all">
+    <div class="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-50/80 transition-colors" id="biohack-toggle">
+      <span class="text-xs font-medium text-neutral-800 flex items-center space-x-2">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-neutral-500 shrink-0"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>
+        <span>专项生理打卡（运动 · 专注达 · 冷水澡）</span>
+      </span>
+      <div class="flex items-center gap-2 shrink-0">
+        <span id="accordionIcon" class="text-xs text-neutral-400 transform transition-transform">▼</span>
+      </div>
+    </div>
+    <div id="biohackBody" class="p-4 pt-1 space-y-4 border-t border-neutral-100 hidden">
+      <!-- 1. 运动模块 -->
+      <div class="space-y-2.5 pb-3 border-b border-neutral-100">
+        <span class="text-xs font-medium text-neutral-700 block">运动训练</span>
+        <div class="flex space-x-2" id="exerciseTypePills">
+          <button type="button" class="pill-btn active" data-val="none">无运动</button>
+          <button type="button" class="pill-btn" data-val="cardio">有氧运动</button>
+          <button type="button" class="pill-btn" data-val="strength">力量抗阻</button>
+        </div>
+        <p class="text-[10px] text-neutral-400 font-mono">有氧与力量可同时选中；点「无运动」清空其他选择</p>
+        <div id="exerciseSubForm" class="space-y-2 pt-1 hidden">
+          <div class="flex items-center justify-between text-xs text-neutral-500">
+            <span>强度:</span>
+            <div class="flex space-x-1.5" id="exerciseIntensityPills">
+              <button type="button" class="pill-sm-btn active" data-val="light">轻松</button>
+              <button type="button" class="pill-sm-btn" data-val="medium">中等</button>
+              <button type="button" class="pill-sm-btn" data-val="failure">力竭/过载</button>
+            </div>
+          </div>
+          <div class="flex space-x-2 text-xs">
+            <input type="number" id="exerciseDuration" placeholder="时长(分)" class="w-24 border border-neutral-200 bg-neutral-50 rounded-lg px-2.5 py-1.5 outline-none font-bold font-mono" value="40">
+            <input type="text" id="exerciseItems" placeholder="备注，如 骑行3km / 腿部深蹲" class="flex-1 border border-neutral-200 bg-neutral-50 rounded-lg px-2.5 py-1.5 outline-none font-mono">
+          </div>
+        </div>
+      </div>
+      <!-- 2. 专注达模块 -->
+      <div class="space-y-2.5 pb-3 border-b border-neutral-100">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-neutral-700">专注达服药追踪</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="concertaEnabled" class="sr-only peer">
+            <div class="w-8 h-4 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-neutral-900"></div>
+          </label>
+        </div>
+        <div id="concertaSubForm" class="space-y-2.5 pt-1 hidden">
+          <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+            <div class="flex items-center space-x-1.5">
+              <span class="text-neutral-500">时间:</span>
+              <input type="time" id="concertaTime" value="08:00" class="border border-neutral-200 rounded-lg px-2 py-1 outline-none">
+            </div>
+            <div class="flex items-center space-x-1.5">
+              <span class="text-neutral-500">剂量:</span>
+              <select id="concertaDose" class="border border-neutral-200 rounded-lg px-2 py-1 outline-none bg-white">
+                <option value="18">18mg</option>
+                <option value="36" selected>36mg</option>
+                <option value="54">54mg</option>
+              </select>
+            </div>
+          </div>
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs text-neutral-600 font-mono">
+              <span>工作启动力:</span>
+              <span id="focusWorkText" class="font-bold text-neutral-900">4分</span>
+            </div>
+            <input type="range" id="focusWork" min="1" max="5" value="4" class="ht-range w-full cursor-pointer">
+          </div>
+          <div class="space-y-1">
+            <span class="text-[10px] text-neutral-400 font-mono block">副作用表现:</span>
+            <div class="flex flex-wrap gap-1.5" id="concertaSideEffects">
+              <span class="chip" data-key="appetite_loss">食欲抑制</span>
+              <span class="chip" data-key="thirst">口干</span>
+              <span class="chip" data-key="crash">晚间疲劳Crash</span>
+            </div>
+          </div>
+          <div class="space-y-1">
+            <span class="text-[10px] text-neutral-400 font-mono block">晚间代偿手段:</span>
+            <div class="flex flex-wrap gap-1.5" id="concertaCompensations">
+              <span class="chip chip-warn" data-key="monster_energy">魔爪/高咖啡因</span>
+              <span class="chip chip-warn" data-key="sugar_craving">高糖暴食冲动</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 3. 冷水澡模块 -->
+      <div class="space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-neutral-700">冷水澡刺激</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="coldShowerEnabled" class="sr-only peer">
+            <div class="w-8 h-4 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-neutral-900"></div>
+          </label>
+        </div>
+        <div id="coldShowerSubForm" class="space-y-2 pt-1 hidden font-mono">
+          <div class="flex items-center justify-between text-xs text-neutral-500">
+            <span>时段:</span>
+            <div class="flex space-x-1.5" id="csTimingPills">
+              <button type="button" class="pill-sm-btn active" data-val="morning">晨起即刻</button>
+              <button type="button" class="pill-sm-btn" data-val="post_workout">训练后</button>
+              <button type="button" class="pill-sm-btn" data-val="evening">睡前</button>
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-xs text-neutral-500">
+            <span>时长:</span>
+            <div class="flex items-center space-x-1">
+              <input type="number" id="coldShowerDuration" value="2" class="w-14 border border-neutral-200 rounded-lg px-2 py-1 text-center font-bold">
+              <span>分钟</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-xs text-neutral-500">
+            <span>水温(估):</span>
+            <div class="flex items-center space-x-1">
+              <input type="number" id="coldShowerWaterTemp" step="0.5" min="0" max="40" placeholder="--" class="w-14 border border-neutral-200 rounded-lg px-2 py-1 text-center font-bold">
+              <span>℃</span>
+            </div>
+          </div>
+          <div class="space-y-1">
+            <span class="text-[10px] text-neutral-400 block">即刻体感:</span>
+            <div class="flex flex-wrap gap-1.5" id="csFeelingPills">
+              <button type="button" class="pill-sm-btn active" data-val="refreshed">神清气爽</button>
+              <button type="button" class="pill-sm-btn" data-val="neutral">无明显感觉</button>
+              <button type="button" class="pill-sm-btn" data-val="shivering">寒冷困倦</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 吸底保存条：单线极简风格 -->
+<div id="save-bar" class="shrink-0 px-4 py-2 bg-white/95 backdrop-blur-md border-t border-neutral-200/80">
+  <div class="flex items-center justify-between gap-3">
+    <div class="min-w-0 flex-1">
+      <div id="save-status" class="flex items-center gap-1.5 text-xs text-neutral-500 font-mono">
+        <span id="save-dot" class="w-2 h-2 rounded-full bg-neutral-300"></span>
+        <span id="save-text" class="truncate">未修改</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0 font-mono">
+      <button type="button" id="btn-reset-log" class="text-xs px-3 py-1.5 rounded-lg border border-neutral-200 hover:border-neutral-400 text-neutral-600 transition-colors">重置</button>
+      <button type="button" id="btn-save-log" class="text-xs px-4 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white font-medium transition-colors">保存</button>
+    </div>
+  </div>
+</div>

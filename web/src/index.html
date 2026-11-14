@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>HealthTrack 智能健康追踪</title>
+  <!-- Tailwind CSS 本地离线版 -->
+  <script src="./vendor/tailwind-3.4.17.js"></script>
+  <!-- Chart.js 本地离线版 -->
+  <script src="./vendor/chart-4.5.1.umd.min.js"></script>
+  <!-- JetBrains Mono 字体引用 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-neutral-100 text-neutral-900 font-sans antialiased min-h-screen flex flex-col justify-between select-none">
+  <!-- 移动端主框 -->
+  <div id="app-frame" class="max-w-md w-full mx-auto h-screen flex flex-col bg-neutral-50 sm:border sm:border-neutral-200 sm:my-4 sm:rounded-xl sm:h-[840px] overflow-hidden relative">
+    <!-- 主内容挂载区 -->
+    <main class="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 no-scrollbar bg-neutral-50 relative" id="main-content">
+      <!-- 动态视图插槽 -->
+    </main>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
