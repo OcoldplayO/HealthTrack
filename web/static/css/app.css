@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    HealthTrack app.css — 从 index.html 提取 + Apple Health UI 2.0
    v2.0  (Phase 0+1 合并：零回归拆分 + 设计系统 Tokens)
    ============================================================ */
@@ -339,12 +339,12 @@ input[type="range"].evo-score-slider::-moz-range-thumb {
   --ah-blue-soft:   #EBF4FF;
   --ah-blue-light:  rgba(0, 122, 255, 0.08);
 
-  /* 中性色 */
-  --ah-bg:          #F2F2F7;   /* iOS 系统背景灰 */
-  --ah-surface:     #FFFFFF;
-  --ah-surface2:    #F8F9FB;
-  --ah-border:      rgba(60, 60, 67, 0.13);
-  --ah-border-soft: rgba(60, 60, 67, 0.07);
+  /* 中性色（Neutral 极简灰阶） */
+  --ah-bg:          #fafafa;
+  --ah-surface:     #ffffff;
+  --ah-surface2:    #f5f5f5;
+  --ah-border:      rgba(0, 0, 0, 0.10);
+  --ah-border-soft: rgba(0, 0, 0, 0.07);
 
   /* 文字 */
   --ah-text-primary:   #1C1C1E;
@@ -359,11 +359,11 @@ input[type="range"].evo-score-slider::-moz-range-thumb {
   --ah-purple: #AF52DE;
   --ah-teal:   #32ADE6;
 
-  /* 阴影层级 */
-  --ah-shadow-xs: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --ah-shadow-sm: 0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
-  --ah-shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
-  --ah-shadow-lg: 0 8px 28px rgba(0,0,0,0.10), 0 3px 10px rgba(0,0,0,0.05);
+  /* 阴影层级（精简为 1px 单线与微投影） */
+  --ah-shadow-xs: 0 1px 2px rgba(0,0,0,0.02);
+  --ah-shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+  --ah-shadow-md: 0 2px 6px rgba(0,0,0,0.05);
+  --ah-shadow-lg: 0 4px 12px rgba(0,0,0,0.06);
 
   /* 圆角 */
   --ah-radius-sm: 10px;
@@ -392,8 +392,12 @@ input[type="range"].evo-score-slider::-moz-range-thumb {
 .apple-card {
   background: var(--ah-surface);
   border: 1px solid var(--ah-border-soft);
-  box-shadow: var(--ah-shadow-xs);
-  transition: box-shadow 0.2s ease;
+  box-shadow: none;
+  border-radius: 12px;
+  transition: border-color 0.15s ease;
+}
+.apple-card:hover {
+  border-color: rgba(0, 0, 0, 0.14);
 }
 .apple-card-hover:active {
   box-shadow: var(--ah-shadow-sm);
@@ -666,4 +670,119 @@ input[type="range"].evo-score-slider::-moz-range-thumb {
 #diff-sleep > span:last-child {
   font-size: 8px;
   flex-shrink: 0;
+}
+
+
+/* ============================================================
+   HealthTrack v3.0 — 极简极客风 (Linear / Vercel / Raycast)
+   JetBrains Mono + 中性黑白灰 + 1px 单线美学
+   ============================================================ */
+
+/* ── 字体：JetBrains Mono 降级回退链 ── */
+:root {
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+
+  /* 极简中性色 Design Tokens */
+  --ht-bg:         #fafafa;    /* neutral-50 */
+  --ht-surface:    #ffffff;
+  --ht-border:     rgba(0, 0, 0, 0.09);
+  --ht-border-md:  rgba(0, 0, 0, 0.18);
+  --ht-text-1:     #171717;    /* neutral-900 */
+  --ht-text-2:     #525252;    /* neutral-600 */
+  --ht-text-3:     #a3a3a3;    /* neutral-400 */
+  --ht-text-4:     #d4d4d4;    /* neutral-300 */
+}
+
+/* ── font-mono 全局工具类 ── */
+.font-mono { font-family: var(--font-mono) !important; }
+
+/* 等宽数字特性（所有数字对齐） */
+.tabular-nums { font-feature-settings: "tnum" 1; }
+
+/* ── 极简卡片：1px 中性线，无浮动大投影 ── */
+.ht-card {
+  background: var(--ht-surface);
+  border: 1px solid var(--ht-border);
+  border-radius: 12px;    /* rounded-xl，非 rounded-3xl */
+  padding: 14px 16px;
+  transition: border-color 0.15s ease;
+}
+.ht-card:focus-within {
+  border-color: var(--ht-border-md);
+}
+
+/* ── 底部 Nav 激活状态样式 ── */
+.ht-nav-btn { transition: color 0.15s ease; }
+.ht-nav-btn.active { color: #171717; }
+
+/* ── 极简 Segmented Switch (YES / NO) ── */
+.ht-seg-btn {
+  padding: 0.3rem 0.75rem;
+  border-radius: 7px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  background: #f5f5f5;
+  color: #737373;      /* neutral-500 */
+  border: 1px solid #e5e5e5;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+.ht-seg-btn.active {
+  background: #171717;
+  color: #ffffff;
+  border-color: #171717;
+}
+
+/* ── 极细 Range Slider ── */
+.ht-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  background: #e5e5e5;    /* neutral-200 */
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+}
+.ht-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #171717;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.20);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.ht-range::-webkit-slider-thumb:active { transform: scale(1.18); }
+.ht-range::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #171717;
+  border: 2px solid #fff;
+  cursor: pointer;
+}
+.ht-range::-moz-range-track {
+  height: 2px;
+  background: #e5e5e5;
+  border-radius: 9999px;
+}
+
+/* ── 过渡趋势 Tab 按钮极简化 ── */
+#trend-tab-weight.active,
+#trend-tab-waist.active,
+#trend-tab-sleep.active,
+#trend-tab-steps.active {
+  background: #171717;
+  color: #fff;
+  box-shadow: none;
+}
+
+/* ── 看板 Tab 按钮激活色 ── */
+#btn-range-7, #btn-range-30, #btn-range-60 {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
 }

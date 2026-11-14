@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -8,10 +8,14 @@
   <script src="vendor/tailwind-3.4.17.js"></script>
   <!-- Chart.js：本地内置（锁定 4.5.1），不依赖公网 CDN，断网可用 -->
   <script src="vendor/chart-4.5.1.umd.min.js"></script>
-  <!-- 应用样式：本地 CSS（v2.0 Apple Health UI 改版），不依赖公网 CDN，断网可用 -->
-  <link rel="stylesheet" href="css/app.css?v=2.0">
+  <!-- JetBrains Mono 等宽字体（极简极客风数字对齐，断网时降级 monospace） -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- 应用样式：本地 CSS（v3.0 极简极客风重构版），不依赖公网 CDN，断网可用 -->
+  <link rel="stylesheet" href="css/app.css?v=3.0">
 </head>
-<body class="bg-slate-100 text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between select-none">
+<body class="bg-neutral-100 text-neutral-900 font-sans antialiased min-h-screen flex flex-col justify-between select-none">
 
   <!-- 顶部 Toast 提示框 -->
   <div id="toast" class="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 transition-all duration-300 opacity-0 pointer-events-none -translate-y-4">
@@ -22,30 +26,34 @@
   </div>
 
   <!-- 主容器 (移动端居中适配，Apple Health 干净卡片背景与精细圆角阴影) -->
-  <div id="app-frame" class="max-w-md w-full mx-auto h-screen flex flex-col bg-slate-50 sm:shadow-2xl sm:my-4 sm:rounded-3xl sm:h-[840px] overflow-hidden relative border border-slate-200/80">
+  <div id="app-frame" class="max-w-md w-full mx-auto h-screen flex flex-col bg-neutral-50 sm:border sm:border-neutral-200 sm:my-4 sm:rounded-xl sm:h-[840px] overflow-hidden relative">
 
-    <!-- 顶部状态栏 -->
-    <header class="pt-5 pb-3 px-6 bg-white/95 backdrop-blur-md border-b border-slate-100 flex justify-between items-center shrink-0 z-10">
+    <!-- 顶部状态栏（极简极客风，单线分割） -->
+    <header class="pt-4 pb-3 px-5 bg-white border-b border-neutral-200/80 flex justify-between items-center shrink-0 z-10">
       <div class="flex items-center space-x-2.5">
-        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-500/25">HT</div>
+        <!-- HT 极简黑色单线圆环标识 -->
+        <div class="w-8 h-8 rounded-lg border border-neutral-900 text-neutral-900 flex items-center justify-center font-black text-[11px] tracking-tight">HT</div>
         <div>
-          <h1 class="text-base font-extrabold text-slate-900 leading-none">HealthTrack</h1>
-          <p class="text-[10px] font-semibold text-slate-400 mt-0.5">智能健康洞察系统</p>
+          <h1 class="text-sm font-bold text-neutral-900 leading-none tracking-tight">HealthTrack</h1>
+          <p class="text-[10px] font-medium text-neutral-400 mt-0.5 tracking-wide font-mono">HEALTH · TRACK</p>
         </div>
       </div>
-      <div class="flex items-center space-x-2">
-        <button onclick="openSettings()" title="AI 设置" aria-label="AI 设置" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-600 transition-all flex items-center justify-center text-sm">
-          ⚙️
+      <div class="flex items-center space-x-1.5">
+        <!-- 设置按钮：1.5px 极细齿轮 SVG -->
+        <button onclick="openSettings()" title="AI 设置" aria-label="AI 设置" class="w-8 h-8 rounded-lg border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 active:scale-95 text-neutral-500 transition-all flex items-center justify-center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
-        <button onclick="openDataSheet()" title="数据管理：导入与导出" class="h-8 px-3 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 rounded-xl transition-all flex items-center justify-center space-x-1 text-xs font-bold">
-          <span>📦 数据</span>
+        <!-- 数据按钮：1.5px 极细盒子 SVG + 文字 -->
+        <button onclick="openDataSheet()" title="数据管理：导入与导出" class="h-8 px-2.5 border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 active:scale-95 text-neutral-600 rounded-lg transition-all flex items-center space-x-1.5 text-[11px] font-medium">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>数据</span>
         </button>
       </div>
     </header>
 
     <!-- AI 配置弹窗：真实 API Key 不会回显，仅允许用户替换它。 -->
     <div id="settings-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeSettingsOnBackdrop(event)">
-      <section class="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <section class="w-full max-w-sm bg-white rounded-xl border border-neutral-200 shadow-lg overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div>
             <h2 id="settings-title" class="font-bold text-slate-900">AI 服务设置</h2>
@@ -99,7 +107,7 @@
 
     <!-- 数据管理底部面板：导入与导出的统一入口 -->
     <div id="data-sheet" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm flex items-end sm:items-center justify-center" onclick="closeDataSheetOnBackdrop(event)">
-      <section class="w-full max-w-md sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="data-sheet-title">
+      <section class="w-full max-w-md sm:max-w-sm bg-white rounded-t-3xl sm:rounded-xl border border-neutral-200 shadow-lg overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="data-sheet-title">
         <div class="flex items-center justify-between px-5 pt-5 pb-3">
           <div>
             <h2 id="data-sheet-title" class="font-bold text-slate-900">数据管理</h2>
@@ -113,7 +121,7 @@
             <div class="space-y-2">
               <button onclick="openImportFromSheet()" class="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors text-left">
                 <span class="flex items-center space-x-3">
-                  <span class="text-lg">📥</span>
+                  <svg class="w-5 h-5 text-neutral-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
                   <span>
                     <span class="block text-sm font-bold text-slate-800">从文件导入</span>
                     <span class="block text-[11px] text-slate-400 mt-0.5">CSV 模板 / JSON 完整备份</span>
@@ -123,7 +131,7 @@
               </button>
               <button onclick="openMemoFromSheet()" class="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors text-left">
                 <span class="flex items-center space-x-3">
-                  <span class="text-lg">📝</span>
+                  <svg class="w-5 h-5 text-neutral-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>
                   <span>
                     <span class="block text-sm font-bold text-slate-800">从备忘录导入</span>
                     <span class="block text-[11px] text-slate-400 mt-0.5">粘贴手写笔记，自动逐行解析</span>
@@ -133,15 +141,15 @@
               </button>
             </div>
             <div class="grid grid-cols-2 gap-2 mt-2">
-              <button onclick="openImportBatchesFromSheet()" class="py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-xs font-bold text-slate-700">🗂 导入记录</button>
-              <button onclick="downloadImportTemplate()" class="py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-xs font-bold text-slate-700">📄 下载模板</button>
+              <button onclick="openImportBatchesFromSheet()" class="py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-xs font-bold text-slate-700">导入记录</button>
+              <button onclick="downloadImportTemplate()" class="py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-xs font-bold text-slate-700">下载模板</button>
             </div>
           </div>
           <div>
             <p class="text-[10px] font-bold text-slate-400 mb-1.5">导出</p>
             <button onclick="openExportFromSheet()" class="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors text-left">
               <span class="flex items-center space-x-3">
-                <span class="text-lg">📤</span>
+                <svg class="w-5 h-5 text-neutral-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 <span>
                   <span class="block text-sm font-bold text-slate-800">导出数据</span>
                   <span class="block text-[11px] text-slate-400 mt-0.5">Excel 表格 / JSON 完整备份</span>
@@ -156,7 +164,7 @@
 
     <!-- 导出数据弹窗：Excel 表格与 JSON 完整备份两种方式 -->
     <div id="export-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeExportOnBackdrop(event)">
-      <section class="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="export-title">
+      <section class="w-full max-w-sm bg-white rounded-xl border border-neutral-200 shadow-lg overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="export-title">
         <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div>
             <h2 id="export-title" class="font-bold text-slate-900">导出数据</h2>
@@ -166,9 +174,9 @@
         </div>
         <div class="p-5 space-y-4">
           <div class="grid grid-cols-3 gap-2" id="export-type-pills">
-            <button type="button" data-type="excel" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm transition-all">📊 Excel</button>
-            <button type="button" data-type="json" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">💾 JSON</button>
-            <button type="button" data-type="archive" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">🖼 图文归档</button>
+            <button type="button" data-type="excel" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm transition-all">Excel</button>
+            <button type="button" data-type="json" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">JSON</button>
+            <button type="button" data-type="archive" onclick="selectExportType(this)" class="py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">图文归档</button>
           </div>
           <div id="export-range-panel">
             <label class="block text-xs font-bold text-slate-600 mb-2">导出范围</label>
@@ -208,7 +216,7 @@
 
     <!-- 导入数据弹窗：选择文件 → 预检预览 → 确认写入 -->
     <div id="import-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeImportOnBackdrop(event)">
-      <section class="w-full max-w-md sm:max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]" role="dialog" aria-modal="true" aria-labelledby="import-title">
+      <section class="w-full max-w-md sm:max-w-lg bg-white rounded-xl border border-neutral-200 shadow-lg overflow-hidden flex flex-col max-h-[88vh]" role="dialog" aria-modal="true" aria-labelledby="import-title">
         <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
           <div>
             <h2 id="import-title" class="font-bold text-slate-900">导入数据</h2>
@@ -278,7 +286,7 @@
 
     <!-- 备忘录粘贴导入 -->
     <div id="memo-import-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeMemoOnBackdrop(event)">
-      <section class="w-full max-w-md sm:max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]" role="dialog" aria-modal="true" aria-labelledby="memo-import-title">
+      <section class="w-full max-w-md sm:max-w-lg bg-white rounded-xl border border-neutral-200 shadow-lg overflow-hidden flex flex-col max-h-[88vh]" role="dialog" aria-modal="true" aria-labelledby="memo-import-title">
         <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
           <div>
             <h2 id="memo-import-title" class="font-bold text-slate-900">从备忘录导入</h2>
@@ -303,7 +311,7 @@
 
     <!-- 导入批次历史 -->
     <div id="import-batches-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center" onclick="closeBatchesOnBackdrop(event)">
-      <section class="w-full max-w-md sm:max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]" role="dialog" aria-modal="true" aria-labelledby="batches-title">
+      <section class="w-full max-w-md sm:max-w-lg bg-white rounded-xl border border-neutral-200 shadow-lg overflow-hidden flex flex-col max-h-[88vh]" role="dialog" aria-modal="true" aria-labelledby="batches-title">
         <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
           <div>
             <h2 id="batches-title" class="font-bold text-slate-900">导入记录</h2>
@@ -322,7 +330,7 @@
 
     <!-- 通用确认弹窗（替代原生 confirm，兼容安卓 WebView 与内嵌浏览器） -->
     <div id="app-confirm-modal" class="hidden fixed inset-0 z-[70] bg-slate-950/40 backdrop-blur-sm p-4 flex items-center justify-center">
-      <section class="w-full max-w-xs bg-white rounded-3xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="app-confirm-title">
+      <section class="w-full max-w-xs bg-white rounded-xl border border-neutral-200 shadow-lg overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="app-confirm-title">
         <div class="px-5 pt-5">
           <h2 id="app-confirm-title" class="font-bold text-slate-900 text-base">请确认</h2>
           <p id="app-confirm-msg" class="text-sm text-slate-500 mt-2 leading-relaxed"></p>
@@ -345,140 +353,155 @@
     </div>
 
     <!-- 核心内容切换区 -->
-    <main class="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 no-scrollbar bg-slate-50/50 relative" id="main-content">
+    <main class="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 no-scrollbar bg-neutral-50 relative" id="main-content">
       
       <!-- 1. 记一笔 (Log View) -->
-      <section id="view-log" class="fade-in space-y-3.5">
+      <section id="view-log" class="fade-in space-y-3">
+        <!-- 日期切换行：单线药丸样式，日期数字 font-mono -->
         <div class="flex justify-between items-center">
-          <div class="flex items-center space-x-2">
-            <input type="date" id="input-date" class="bg-white border border-slate-200/90 text-slate-800 text-xs font-bold rounded-xl px-3 py-1.5 w-[124px] outline-none focus:border-blue-500 shadow-sm" onchange="handleDateChange(this)">
-            <span class="text-[10px] font-bold text-slate-400">已记 <span id="log-count" class="text-slate-600">0/6</span></span>
+          <div class="flex items-center gap-2">
+            <input type="date" id="input-date" class="bg-white border border-neutral-200 text-neutral-800 text-xs font-mono font-medium rounded-lg px-3 py-1.5 w-[128px] outline-none focus:border-neutral-700 transition-colors" onchange="handleDateChange(this)">
+            <span class="text-[10px] font-mono text-neutral-400">已记 <span id="log-count" class="text-neutral-600">0/6</span></span>
           </div>
-          <button onclick="setTodayDate()" class="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3.5 py-1.5 rounded-full transition-all border border-blue-100/80 active:scale-95">今日</button>
+          <button onclick="setTodayDate()" class="text-[11px] font-medium text-neutral-600 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 px-3 py-1.5 rounded-lg transition-all active:scale-95">今日</button>
         </div>
 
-        <!-- 晨光：独立卡，一键打卡；NULL = 未记录 -->
-        <div class="apple-card rounded-2xl p-3.5 flex items-center justify-between">
-          <div class="flex items-center gap-2 min-w-0">
-            <span class="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-base shrink-0">☀️</span>
+        <!-- 晨光：极简卡，1.5px 太阳 SVG + 极简双态按钮 -->
+        <div class="ht-card flex items-center justify-between">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <!-- 太阳 SVG 1.5px -->
+            <div class="w-8 h-8 rounded-lg border border-neutral-200 flex items-center justify-center shrink-0 text-neutral-500">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            </div>
             <div class="min-w-0">
-              <p class="text-xs font-bold text-slate-800">晨光</p>
-              <p class="text-[10px] text-slate-400 truncate">起床后 1 小时内</p>
+              <p class="text-xs font-medium text-neutral-800">晨光</p>
+              <p class="text-[10px] text-neutral-400 truncate font-mono">起床后 1h 内</p>
             </div>
           </div>
-          <div class="flex gap-1.5 shrink-0" id="morningLightPills">
-            <button type="button" class="pill-sm-btn" data-val="yes" onclick="setMorningLight('yes')">是</button>
-            <button type="button" class="pill-sm-btn" data-val="no" onclick="setMorningLight('no')">否</button>
+          <div class="flex gap-1 shrink-0" id="morningLightPills">
+            <button type="button" class="ht-seg-btn" data-val="yes" onclick="setMorningLight('yes')">YES</button>
+            <button type="button" class="ht-seg-btn" data-val="no" onclick="setMorningLight('no')">NO</button>
           </div>
         </div>
 
-        <!-- 步数：独立卡，滑块 0–20000 / 500 档；留空 = 当天未记录（断点，不补 0） -->
-        <div class="apple-card rounded-2xl p-3.5 space-y-2">
+        <!-- 步数：极客风卡，1.5px 步行 SVG，巨大等宽数字，极细滑轨 -->
+        <div class="ht-card space-y-2.5">
           <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-base shrink-0">🚶</span>
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="w-8 h-8 rounded-lg border border-neutral-200 flex items-center justify-center shrink-0 text-neutral-500">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><path d="M9 12l2 2 4-4"/><path d="M14 8l-2 4-3 2-2 4"/><path d="M10 8l3 1 2-2"/></svg>
+              </div>
               <div class="min-w-0">
-                <p class="text-xs font-bold text-slate-800">步数</p>
-                <p id="steps-meta" class="text-[10px] text-slate-400 truncate">前一天 -- · 近7天日均 --</p>
+                <p class="text-xs font-medium text-neutral-800">步数</p>
+                <p id="steps-meta" class="text-[10px] text-neutral-400 truncate font-mono">昨 -- · 7d均 --</p>
               </div>
             </div>
+            <!-- 巨大等宽数字 -->
             <div class="flex items-baseline gap-1 shrink-0">
-              <span id="steps-value" class="text-xl font-black text-slate-900 leading-none">--</span>
-              <span class="text-[9px] font-bold text-slate-400">步</span>
+              <span id="steps-value" class="text-2xl font-bold text-neutral-900 leading-none font-mono tracking-tighter tabular-nums">--</span>
+              <span class="text-[10px] font-medium text-neutral-400 font-mono">步</span>
             </div>
           </div>
-          <input type="range" id="input-steps" min="0" max="20000" step="500" value="0" class="w-full accent-blue-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer" oninput="onStepsInput(this.value)">
-          <div class="flex justify-between text-[9px] font-semibold text-slate-300">
-            <span>0</span><span>5,000</span><span>1万</span><span>1.5万</span><span>2万</span>
+          <!-- 极细滑轨 -->
+          <input type="range" id="input-steps" min="0" max="20000" step="500" value="0" class="ht-range w-full cursor-pointer" oninput="onStepsInput(this.value)">
+          <div class="flex justify-between text-[9px] font-mono text-neutral-300">
+            <span>0</span><span>5k</span><span>10k</span><span>15k</span><span>20k</span>
           </div>
-          <div class="pt-1 border-t border-slate-100/80 flex items-center justify-between">
-            <span id="steps-hint" class="text-[10px] text-slate-400 truncate">留空表示当天未记录 · 图表断点</span>
-            <button type="button" onclick="clearSteps()" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 px-2 py-0.5 rounded-md bg-slate-50 ml-2 shrink-0">留空</button>
+          <div class="pt-2 border-t border-neutral-100 flex items-center justify-between">
+            <span id="steps-hint" class="text-[10px] text-neutral-400 truncate font-mono">留空 = 断点（不补 0）</span>
+            <button type="button" onclick="clearSteps()" class="text-[10px] font-medium text-neutral-400 hover:text-neutral-700 px-2 py-0.5 rounded border border-neutral-200 hover:border-neutral-400 ml-2 shrink-0 transition-colors">留空</button>
           </div>
         </div>
 
-        <!-- Bento Grid: 三张体重/腰围小卡并排 + 睡眠卡通栏独占一行 -->
-        <div class="grid grid-cols-3 gap-2.5">
-          <!-- 1. 睡前体重 -->
-          <div class="apple-card apple-card-hover p-2.5 rounded-2xl flex flex-col justify-between min-w-0">
-            <div>
-              <div class="flex justify-between items-center gap-1">
-                <span class="text-[10px] font-bold text-slate-400 truncate">睡前体重</span>
-                <span class="text-xs shrink-0">🌙</span>
+        <!-- Morning Metrics 大卡：2列（晨起空腹体重 + 晨起腰围）+ 晚间体重独立卡 -->
+        <!-- 晚间卡：睡前体重（独立副级卡，时段分隔） -->
+        <div class="ht-card">
+          <div class="flex items-center justify-between mb-2.5">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 rounded-md border border-neutral-200 flex items-center justify-center text-neutral-400">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
               </div>
-              <div class="mt-1.5 flex items-baseline space-x-0.5">
-                <input type="number" step="0.1" id="input-weight-pm" placeholder="--" class="text-xl font-black text-slate-900 w-full min-w-0 outline-none bg-transparent placeholder-slate-300" oninput="updateDiffDisplay()">
-                <span class="text-[9px] font-bold text-slate-400 shrink-0">kg</span>
-              </div>
+              <span class="text-[10px] font-medium text-neutral-500 uppercase tracking-widest font-mono">Evening</span>
             </div>
-            <div id="diff-weight-pm" class="mt-2 pt-1.5 border-t border-slate-100/80 flex items-center justify-between text-[9px] text-slate-400 font-medium">
-              <span>等待今晚称重</span>
-              <span class="text-slate-300">--:--</span>
+            <span class="text-[10px] text-neutral-400 font-mono">睡前体重</span>
+          </div>
+          <div class="flex items-baseline gap-1.5">
+            <input type="number" step="0.1" id="input-weight-pm" placeholder="--" class="text-2xl font-bold font-mono text-neutral-900 w-full min-w-0 outline-none bg-transparent placeholder-neutral-200 border-b border-neutral-200 focus:border-neutral-800 pb-0.5 transition-colors tabular-nums" oninput="updateDiffDisplay()">
+            <span class="text-xs font-mono font-medium text-neutral-400 shrink-0 pb-0.5">kg</span>
+          </div>
+          <div id="diff-weight-pm" class="mt-2 pt-2 border-t border-neutral-100 flex items-center justify-between text-[9px] text-neutral-400 font-mono font-medium">
+            <span>等待今晚称重</span>
+            <span class="text-neutral-300">--:--</span>
+          </div>
+        </div>
+
+        <!-- Morning Metrics 大卡：晨起空腹体重 + 晨起腰围，2列精致布局 -->
+        <div class="ht-card">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 rounded-md border border-neutral-200 flex items-center justify-center text-neutral-400">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/></svg>
+              </div>
+              <span class="text-[10px] font-medium text-neutral-500 uppercase tracking-widest font-mono">Morning Metrics</span>
             </div>
           </div>
-
-          <!-- 2. 晨起空腹体重 -->
-          <div class="apple-card apple-card-hover p-2.5 rounded-2xl flex flex-col justify-between min-w-0">
+          <div class="grid grid-cols-2 gap-4">
+            <!-- 晨起空腹体重 -->
             <div>
-              <div class="flex justify-between items-center gap-1">
-                <span class="text-[10px] font-bold text-slate-400 truncate">晨起空腹</span>
-                <span class="text-xs shrink-0">🌅</span>
+              <p class="text-[10px] font-mono text-neutral-400 uppercase tracking-wider mb-2">空腹体重</p>
+              <div class="flex items-baseline gap-1">
+                <input type="number" step="0.1" id="input-weight-am" placeholder="--" class="text-2xl font-bold font-mono text-neutral-900 w-full min-w-0 outline-none bg-transparent placeholder-neutral-200 border-b border-neutral-200 focus:border-neutral-800 pb-0.5 transition-colors tabular-nums" oninput="updateDiffDisplay()">
+                <span class="text-xs font-mono font-medium text-neutral-400 shrink-0 pb-0.5">kg</span>
               </div>
-              <div class="mt-1.5 flex items-baseline space-x-0.5">
-                <input type="number" step="0.1" id="input-weight-am" placeholder="--" class="text-xl font-black text-slate-900 w-full min-w-0 outline-none bg-transparent placeholder-slate-300" oninput="updateDiffDisplay()">
-                <span class="text-[9px] font-bold text-slate-400 shrink-0">kg</span>
+              <div id="diff-weight-am" class="mt-1.5 text-[9px] text-neutral-400 font-mono font-medium flex items-center justify-between">
+                <span>较昨日 --</span><span class="text-neutral-300">晨测</span>
               </div>
             </div>
-            <div id="diff-weight-am" class="mt-2 pt-1.5 border-t border-slate-100/80 flex items-center justify-between text-[9px] text-slate-400 font-medium">
-              <span>较昨日 --</span>
-              <span class="text-slate-300">晨测</span>
+            <!-- 晨起腰围 -->
+            <div class="border-l border-neutral-100 pl-4">
+              <p class="text-[10px] font-mono text-neutral-400 uppercase tracking-wider mb-2">腰围</p>
+              <div class="flex items-baseline gap-1">
+                <input type="number" step="0.1" id="input-waist" placeholder="--" class="text-2xl font-bold font-mono text-neutral-900 w-full min-w-0 outline-none bg-transparent placeholder-neutral-200 border-b border-neutral-200 focus:border-neutral-800 pb-0.5 transition-colors tabular-nums" oninput="updateDiffDisplay()">
+                <span class="text-xs font-mono font-medium text-neutral-400 shrink-0 pb-0.5">cm</span>
+              </div>
+              <div id="diff-waist" class="mt-1.5 text-[9px] text-neutral-400 font-mono font-medium flex items-center justify-between">
+                <span>较昨日 --</span><span class="text-neutral-300">标准</span>
+              </div>
             </div>
           </div>
+        </div>
 
-          <!-- 3. 晨起腰围 -->
-          <div class="apple-card apple-card-hover p-2.5 rounded-2xl flex flex-col justify-between min-w-0">
-            <div>
-              <div class="flex justify-between items-center gap-1">
-                <span class="text-[10px] font-bold text-slate-400 truncate">晨起腰围</span>
-                <span class="text-xs shrink-0">📏</span>
+        <!-- 睡眠卡：通栏，极简单线，时长等宽大数字 -->
+        <div class="ht-card">
+          <div class="flex justify-between items-center mb-3">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 rounded-md border border-neutral-200 flex items-center justify-center text-neutral-400">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
               </div>
-              <div class="mt-1.5 flex items-baseline space-x-0.5">
-                <input type="number" step="0.1" id="input-waist" placeholder="--" class="text-xl font-black text-slate-900 w-full min-w-0 outline-none bg-transparent placeholder-slate-300" oninput="updateDiffDisplay()">
-                <span class="text-[9px] font-bold text-slate-400 shrink-0">cm</span>
-              </div>
+              <span class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest">昨晚睡眠</span>
             </div>
-            <div id="diff-waist" class="mt-2 pt-1.5 border-t border-slate-100/80 flex items-center justify-between text-[9px] text-slate-400 font-medium">
-              <span>较昨日 --</span>
-              <span class="text-slate-300">标准</span>
+            <span id="sleepTagBadge" class="badge-green text-[9px] px-1.5 py-0.5">● 未熬夜</span>
+          </div>
+          <div class="flex items-center gap-4">
+            <!-- 时长：等宽大数字 -->
+            <div class="flex items-baseline gap-1 shrink-0">
+              <input type="number" step="0.1" id="sleepDuration" value="6.8" class="text-3xl font-bold font-mono text-neutral-900 w-[72px] outline-none bg-transparent border-b border-neutral-200 focus:border-neutral-800 pb-0.5 transition-colors tabular-nums" oninput="updateDiffDisplay()">
+              <span class="text-sm font-mono font-medium text-neutral-400">h</span>
+            </div>
+            <!-- 入睡/起床时间 -->
+            <div class="flex-1 min-w-0 flex flex-col gap-1.5">
+              <label class="flex items-center gap-2 text-[10px] font-mono text-neutral-400">
+                <span class="shrink-0 w-7">入睡</span>
+                <input type="time" id="sleepBedTime" value="00:30" class="flex-1 min-w-0 w-0 border-b border-neutral-200 focus:border-neutral-800 py-0.5 text-[11px] font-mono font-medium text-neutral-700 outline-none bg-transparent transition-colors" oninput="handleSleepCalculation()">
+              </label>
+              <label class="flex items-center gap-2 text-[10px] font-mono text-neutral-400">
+                <span class="shrink-0 w-7">起床</span>
+                <input type="time" id="sleepWakeTime" value="07:15" class="flex-1 min-w-0 w-0 border-b border-neutral-200 focus:border-neutral-800 py-0.5 text-[11px] font-mono font-medium text-neutral-700 outline-none bg-transparent transition-colors" oninput="handleSleepCalculation()">
+              </label>
             </div>
           </div>
-
-          <!-- 4. 昨晚睡眠（通栏：时长直接微调 + 入睡/起床时间） -->
-          <div class="apple-card apple-card-hover p-3.5 rounded-2xl col-span-3">
-            <div class="flex justify-between items-center gap-2">
-              <span class="text-[11px] font-bold text-slate-400 shrink-0">昨晚睡眠</span>
-              <span id="sleepTagBadge" class="badge-green text-[9px] px-1.5 py-0.5">● 未熬夜</span>
-            </div>
-            <div class="mt-1.5 flex items-center gap-3.5">
-              <div class="flex items-baseline space-x-1 shrink-0">
-                <input type="number" step="0.1" id="sleepDuration" value="6.8" class="text-[22px] font-black text-slate-900 w-[64px] outline-none bg-transparent" oninput="updateDiffDisplay()">
-                <span class="text-xs font-bold text-slate-400">h</span>
-              </div>
-              <div class="flex-1 min-w-0 flex flex-col gap-1">
-                <label class="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
-                  <span class="shrink-0">入睡</span>
-                  <input type="time" id="sleepBedTime" value="00:30" class="flex-1 min-w-0 w-0 border border-slate-200/80 bg-slate-50 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500" oninput="handleSleepCalculation()">
-                </label>
-                <label class="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
-                  <span class="shrink-0">起床</span>
-                  <input type="time" id="sleepWakeTime" value="07:15" class="flex-1 min-w-0 w-0 border border-slate-200/80 bg-slate-50 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500" oninput="handleSleepCalculation()">
-                </label>
-              </div>
-            </div>
-            <div id="diff-sleep" class="mt-2 pt-2 border-t border-slate-100/80 flex items-center justify-between text-[10px] text-slate-400 font-medium">
-              <span>较昨日 --</span>
-              <span class="text-slate-300">节律</span>
-            </div>
+          <div id="diff-sleep" class="mt-2.5 pt-2 border-t border-neutral-100 flex items-center justify-between text-[9px] text-neutral-400 font-mono font-medium">
+            <span>较昨日 --</span><span class="text-neutral-300">节律</span>
           </div>
         </div>
 
@@ -486,10 +509,12 @@
         <div class="apple-card rounded-2xl overflow-hidden">
           <div class="px-3.5 py-3 flex items-center justify-between cursor-pointer select-none" onclick="toggleLunch()">
             <div class="flex items-center gap-2 min-w-0">
-              <span class="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-base shrink-0">🍚</span>
+              <div class="w-8 h-8 rounded-lg border border-neutral-200 flex items-center justify-center shrink-0 text-neutral-500">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>
+              </div>
               <div class="min-w-0">
-                <p class="text-xs font-bold text-slate-800">午餐</p>
-                <p id="lunch-summary" class="text-[10px] text-slate-400 truncate">今天还没记午餐</p>
+                <p class="text-xs font-medium text-neutral-800">午餐</p>
+                <p id="lunch-summary" class="text-[10px] text-neutral-400 truncate">今天还没记午餐</p>
               </div>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
@@ -576,12 +601,12 @@
           <textarea id="input-journal" rows="3" class="w-full apple-card rounded-2xl p-3.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 transition-all resize-none leading-relaxed" placeholder="如：今天状态还行，下午 3 点有点困，喝了杯水走动一下缓过来了…"></textarea>
         </div>
 
-        <!-- 🧬 专项生理与习惯打卡折叠面板 -->
+        <!-- 专项生理与习惯打卡折叠面板 -->
         <div class="apple-card rounded-2xl overflow-hidden transition-all">
           <div class="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 transition-colors" onclick="toggleBiohackPanel()">
-            <span class="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
-              <span>🧬</span>
-              <span>专项生理与习惯打卡 (运动 / 专注达 / 冷水澡)</span>
+            <span class="text-xs font-medium text-neutral-800 flex items-center space-x-2">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-neutral-500 shrink-0"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>
+              <span>专项生理与习惯打卡（运动 · 专注达 · 冷水澡）</span>
             </span>
             <div class="flex items-center gap-2 shrink-0">
               <span id="accordionIcon" class="text-xs text-slate-400 transform transition-transform">▼</span>
@@ -592,8 +617,8 @@
             <!-- 1. 运动模块 -->
             <div class="space-y-2.5 pb-3 border-b border-slate-100">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-700 flex items-center space-x-1">
-                  <span>🏋️</span>
+                <span class="text-xs font-medium text-neutral-700 flex items-center space-x-1.5">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-neutral-500"><path d="M6.5 6.5h11M17.5 6.5v11M6.5 17.5h11M6.5 6.5v11"/><circle cx="12" cy="12" r="2"/></svg>
                   <span>运动训练</span>
                 </span>
               </div>
@@ -622,8 +647,8 @@
             <!-- 2. 专注达 (Concerta) 模块 -->
             <div class="space-y-2.5 pb-3 border-b border-slate-100">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-700 flex items-center space-x-1">
-                  <span>💊</span>
+                <span class="text-xs font-medium text-neutral-700 flex items-center space-x-1.5">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-neutral-500"><rect x="1" y="8" width="22" height="8" rx="4"/><line x1="12" y1="8" x2="12" y2="16"/></svg>
                   <span>专注达服药追踪</span>
                 </span>
                 <label class="relative inline-flex items-center cursor-pointer">
@@ -674,8 +699,8 @@
             <!-- 3. 冷水澡模块 -->
             <div class="space-y-2.5">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-700 flex items-center space-x-1">
-                  <span>🚿</span>
+                <span class="text-xs font-medium text-neutral-700 flex items-center space-x-1.5">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-neutral-500"><path d="M4 12h16"/><path d="M4 6c3-3 9-3 12 0"/><path d="M4 18c3 3 9 3 12 0"/></svg>
                   <span>冷水澡刺激</span>
                 </span>
                 <label class="relative inline-flex items-center cursor-pointer">
@@ -709,9 +734,9 @@
                 <div class="space-y-1">
                   <span class="text-[10px] text-slate-400 font-semibold block">即刻体感:</span>
                   <div class="flex flex-wrap gap-1.5" id="csFeelingPills">
-                    <button type="button" class="pill-sm-btn active" data-val="refreshed" onclick="setColdShowerFeeling('refreshed')">🟢 神清气爽</button>
-                    <button type="button" class="pill-sm-btn" data-val="neutral" onclick="setColdShowerFeeling('neutral')">🟡 无明显感觉</button>
-                    <button type="button" class="pill-sm-btn" data-val="shivering" onclick="setColdShowerFeeling('shivering')">🔴 寒冷困倦</button>
+                    <button type="button" class="pill-sm-btn active" data-val="refreshed" onclick="setColdShowerFeeling('refreshed')">神清气爽</button>
+                    <button type="button" class="pill-sm-btn" data-val="neutral" onclick="setColdShowerFeeling('neutral')">无明显感觉</button>
+                    <button type="button" class="pill-sm-btn" data-val="shivering" onclick="setColdShowerFeeling('shivering')">寒冷困倦</button>
                   </div>
                 </div>
               </div>
@@ -735,8 +760,8 @@
         <!-- 60天详情入口（独立视图，逐日；与周平均趋势互补） -->
         <button onclick="openTrendDetailView()" class="w-full flex items-center justify-between apple-card hover:border-blue-300 rounded-2xl px-4 py-3 transition-all active:scale-[0.99]">
           <span class="flex items-center space-x-2.5 min-w-0">
-            <span class="text-lg">📊</span>
-            <span class="text-xs font-bold text-slate-800 shrink-0">60 天详情</span>
+            <svg class="w-4 h-4 text-neutral-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <span class="text-xs font-medium text-neutral-800 shrink-0">60 天详情</span>
             <span class="text-[10px] text-slate-400 truncate">四指标 · 逐日全量跟踪</span>
           </span>
           <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
@@ -745,8 +770,8 @@
         <!-- 周平均趋势分析入口（独立视图，不占用底部导航） -->
         <button onclick="openTrendView()" class="w-full flex items-center justify-between apple-card hover:border-emerald-300 rounded-2xl px-4 py-3 transition-all active:scale-[0.99]">
           <span class="flex items-center space-x-2.5 min-w-0">
-            <span class="text-lg">📈</span>
-            <span class="text-xs font-bold text-slate-800 shrink-0">周平均趋势分析</span>
+            <svg class="w-4 h-4 text-neutral-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span class="text-xs font-medium text-neutral-800 shrink-0">周平均趋势分析</span>
             <span class="text-[10px] text-slate-400 truncate">近 12 周 · 周均值 + 区间带</span>
           </span>
           <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
@@ -760,15 +785,15 @@
               <p id="dash-weight-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
             </div>
             <div class="flex items-center space-x-3 text-[10px] text-slate-500 font-medium">
-              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-blue-600 mr-1.5 shadow-sm shadow-blue-500/50"></span>晨起空腹</span>
-              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-amber-500 mr-1.5 shadow-sm shadow-amber-500/50"></span>睡前</span>
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-800"></span>晨起空腹</span>
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-400"></span>睡前</span>
             </div>
           </div>
           <div class="h-44 w-full">
             <canvas id="chart-weight"></canvas>
           </div>
           <p id="dash-weight-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
-            <span>👆</span><span>点击折线查看当日晨重 / 睡前重</span>
+            <span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日晨重 / 睡前重</span>
           </p>
         </div>
 
@@ -780,14 +805,14 @@
               <p id="dash-waist-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
             </div>
             <div class="flex items-center space-x-3 text-[10px] text-slate-500 font-medium">
-              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-purple-500 mr-1.5 shadow-sm shadow-purple-500/50"></span>腰围</span>
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-600"></span>腰围</span>
             </div>
           </div>
           <div class="h-44 w-full">
             <canvas id="chart-waist"></canvas>
           </div>
           <p id="dash-waist-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
-            <span>👆</span><span>点击折线查看当日腰围</span>
+            <span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日腰围</span>
           </p>
         </div>
 
@@ -799,16 +824,16 @@
               <p id="dash-sleep-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
             </div>
             <div class="flex items-center space-x-2 text-[10px] text-slate-500 font-medium">
-              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-emerald-500 mr-1"></span>正常</span>
-              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-amber-400 mr-1"></span>轻度</span>
-              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-rose-500 mr-1"></span>熬夜</span>
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-900"></span>正常</span>
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-500"></span>轻度</span>
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-300"></span>熬夜</span>
             </div>
           </div>
           <div class="h-36 w-full">
             <canvas id="chart-sleep"></canvas>
           </div>
           <p id="dash-sleep-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
-            <span>👆</span><span>点击柱状图查看当日就寝 / 起床时间</span>
+            <span class="font-mono text-[10px] text-neutral-400">↑ 点击柱图查看就寝 / 起床时间</span>
           </p>
         </div>
 
@@ -820,14 +845,14 @@
               <p id="dash-steps-stat" class="text-xl font-black text-slate-900 tracking-tight mt-0.5">--</p>
             </div>
             <div class="flex items-center space-x-3 text-[10px] text-slate-500 font-medium">
-              <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-sky-500 mr-1.5 shadow-sm shadow-sky-500/50"></span>每日步数</span>
+              <span class="flex items-center gap-1 font-mono text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-neutral-600"></span>每日步数</span>
             </div>
           </div>
           <div class="h-44 w-full">
             <canvas id="chart-steps"></canvas>
           </div>
           <p id="dash-steps-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
-            <span>👆</span><span>点击折线查看当日步数</span>
+            <span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日步数</span>
           </p>
         </div>
 
@@ -847,7 +872,7 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
             <span class="text-xs font-bold">返回</span>
           </button>
-          <h2 class="text-base font-bold text-slate-900">📈 周平均趋势</h2>
+          <h2 class="text-sm font-bold text-neutral-900">周平均趋势</h2>
           <span class="w-12"></span>
         </div>
 
@@ -872,7 +897,7 @@
             <canvas id="chart-trend"></canvas>
           </div>
           <p id="trend-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
-            <span>👆</span><span>点击节点查看该周均值与区间</span>
+            <span class="font-mono text-[10px] text-neutral-400">↑ 点击节点查看该周均值与区间</span>
           </p>
         </div>
 
@@ -892,7 +917,7 @@
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
               <span class="text-xs font-bold">返回</span>
             </button>
-            <h2 class="text-base font-bold text-slate-900">📊 60天详情</h2>
+            <h2 class="text-sm font-bold text-neutral-900">60天详情</h2>
             <span id="td-header-spacer" class="w-12"></span>
           </div>
 
@@ -920,7 +945,7 @@
             </div>
           </div>
           <p id="td-detail" class="text-[11px] text-slate-500 flex items-start space-x-1 pt-1 border-t border-slate-100">
-            <span>👆</span><span>横向拖动看全 60 天 · 点击节点看当日详情</span>
+            <span class="font-mono text-[10px] text-neutral-400">↔ 拖动看全 60 天 · 点击节点看当日详情</span>
           </p>
         </div>
 
@@ -940,10 +965,10 @@
           </div>
           <div class="flex items-center space-x-1.5 shrink-0">
             <button onclick="openCompareView()" class="flex items-center space-x-1 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors">
-              <span>⇄</span><span>阶段对比</span>
+              <span class="font-mono text-xs font-medium">阶段对比</span>
             </button>
             <button onclick="openInsightHistory()" class="flex items-center space-x-1 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors">
-              <span>🕘</span><span>历史</span>
+              <span class="font-mono text-xs font-medium">历史</span>
             </button>
           </div>
         </div>
@@ -965,14 +990,14 @@
         </div>
 
         <button onclick="generateInsightStream()" id="btn-generate-insight" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 rounded-2xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex justify-center items-center space-x-2">
-          <span>🚀 生成阶段深度洞察</span>
+          <span class="font-mono">生成阶段深度洞察</span>
         </button>
 
         <!-- 洞察渲染卡片 (SSE 流式输出，Apple Health 浅蓝微渐变柔和卡片) -->
         <div class="apple-card p-5 space-y-3 min-h-[300px]">
           <div class="flex items-center justify-between pb-2 border-b border-slate-100">
             <span class="text-xs font-bold text-blue-600 flex items-center space-x-1.5">
-              <span>💡</span>
+              <span class="font-mono text-xs">AI</span>
               <span>关联分析与归因结论</span>
             </span>
             <span id="insight-status-tag" class="text-[10px] text-slate-400">点击上方按钮开始</span>
@@ -991,7 +1016,7 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
             <span class="text-xs font-bold">返回</span>
           </button>
-          <h2 class="text-base font-bold text-slate-900">🕘 洞察历史</h2>
+          <h2 class="text-sm font-bold text-neutral-900">洞察历史</h2>
           <button onclick="toggleHistoryManage()" id="history-manage-btn" class="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl transition-colors">管理</button>
         </div>
 
@@ -1066,13 +1091,13 @@
 
         <!-- 生成按钮 -->
         <button onclick="cmpGenerateStream()" id="compare-gen-btn" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 rounded-2xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex justify-center items-center space-x-2">
-          <span>🚀 生成阶段对比综述</span>
+          <span class="font-mono">生成阶段对比综述</span>
         </button>
 
         <!-- 指标对比表 -->
         <div class="apple-card p-4 rounded-2xl space-y-3">
           <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-            <span class="text-xs font-bold text-slate-700">📊 指标对比</span>
+            <span class="text-xs font-medium text-neutral-700 font-mono">指标对比</span>
             <span id="cmp-table-meta" class="text-[10px] text-slate-400"></span>
           </div>
           <table class="w-full text-xs">
@@ -1092,7 +1117,7 @@
         <div class="apple-card p-5 space-y-3 min-h-[300px]">
           <div class="flex items-center justify-between pb-2 border-b border-slate-100">
             <span class="text-xs font-bold text-indigo-600 flex items-center space-x-1">
-              <span>💡 阶段对比综述</span>
+              <span class="font-mono text-xs font-medium">阶段对比综述</span>
             </span>
             <span id="cmp-status-tag" class="text-[10px] text-slate-400">点击上方按钮开始</span>
           </div>
@@ -1115,7 +1140,7 @@
               <p class="evo-eyebrow">EVENING REVIEW</p>
               <h1 class="text-xl font-black text-slate-900 tracking-tight mt-0.5">睡前小结</h1>
             </div>
-            <span class="text-2xl leading-none select-none">🌙</span>
+            <div class="w-8 h-8 rounded-lg border border-neutral-200 flex items-center justify-center text-neutral-700"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></div>
           </div>
 
           <div class="relative flex items-center justify-between mt-4">
@@ -1234,7 +1259,7 @@
           <!-- ── 小结洞察（深色卡，独立身份） ── -->
           <div class="evo-ai-card p-4 ev-rise" style="animation-delay:.2s">
             <div class="flex items-center justify-between mb-3">
-              <span class="text-[11px] font-bold text-white flex items-center space-x-1.5"><span>🔗</span><span>小结洞察</span></span>
+              <span class="text-[11px] font-bold text-white flex items-center space-x-1.5"><span class="font-mono text-[11px] font-medium">小结洞察</span></span>
               <span class="text-[9px] font-bold text-indigo-200 bg-white/10 px-2 py-0.5 rounded-full">独立于「洞察」页</span>
             </div>
 
@@ -1260,7 +1285,7 @@
               <!-- 与「洞察」页一致：思维链在上，正文在下 -->
               <div class="pb-2.5 border-b border-white/10">
                 <button onclick="evToggleThinking()" class="text-[10px] font-bold text-slate-400 hover:text-slate-200 flex items-center space-x-1.5 active:scale-[.97] transition-transform">
-                  <span id="think-arrow" class="transform transition-transform text-[8px]">▶</span><span>💭 思维链推导</span>
+                  <span id="think-arrow" class="transform transition-transform text-[8px]">▶</span><span>思维链推导</span>
                 </button>
                 <div id="think-body" class="evo-collapsible">
                   <p id="think-text" class="mt-2 text-[10px] text-slate-400 bg-white/5 rounded-xl p-3 leading-relaxed whitespace-pre-line"></p>
@@ -1310,7 +1335,7 @@
             <div id="ev-history-list" class="space-y-0"></div>
 
             <div id="ev-history-empty" class="hidden evo-card p-8 text-center">
-              <p class="text-2xl">🫧</p>
+              <p class="font-mono text-xs text-neutral-400">NO DATA</p>
               <p class="text-xs font-bold text-slate-600 mt-2">没有符合条件的小结</p>
               <p class="text-[10px] text-slate-400 mt-1">试着放宽日期或评分范围</p>
             </div>
@@ -1339,28 +1364,42 @@
       </div>
     </div>
 
-    <!-- 底部 Tab 导航 (Apple Health 风格底栏) -->
-    <nav class="shrink-0 flex border-t border-slate-100 bg-white/95 backdrop-blur-md pb-5 pt-2 px-3 justify-between z-10">
-      <button onclick="switchTab('log')" id="tab-log" class="flex flex-col items-center flex-1 text-blue-600 font-bold transition-all active:scale-95">
-        <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
-        <span class="text-[10px]">记一笔</span>
+    <!-- 底部 Tab 导航（极简极客风，单线分割，18px SVG，等宽标签） -->
+    <nav class="shrink-0 flex border-t border-neutral-200/80 bg-white pb-5 pt-2 px-2 justify-between z-10">
+      <button onclick="switchTab('log')" id="tab-log" class="ht-nav-btn active flex flex-col items-center flex-1 text-neutral-900 transition-all active:scale-95">
+        <svg class="w-[18px] h-[18px] mb-1" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span class="text-[10px] font-medium">记一笔</span>
       </button>
-      <button onclick="switchTab('dash')" id="tab-dash" class="flex flex-col items-center flex-1 text-slate-400 hover:text-slate-700 transition-all active:scale-95">
-        <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-        <span class="text-[10px]">看板</span>
+      <button onclick="switchTab('dash')" id="tab-dash" class="ht-nav-btn flex flex-col items-center flex-1 text-neutral-400 hover:text-neutral-700 transition-all active:scale-95">
+        <svg class="w-[18px] h-[18px] mb-1" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="8" width="4" height="13"/><rect x="17" y="4" width="4" height="17"/></svg>
+        <span class="text-[10px] font-medium">看板</span>
       </button>
-      <button onclick="switchTab('insight')" id="tab-insight" class="flex flex-col items-center flex-1 text-slate-400 hover:text-slate-700 transition-all active:scale-95 relative">
-        <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-        <span class="text-[10px]">洞察</span>
+      <button onclick="switchTab('insight')" id="tab-insight" class="ht-nav-btn flex flex-col items-center flex-1 text-neutral-400 hover:text-neutral-700 transition-all active:scale-95 relative">
+        <svg class="w-[18px] h-[18px] mb-1" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <span class="text-[10px] font-medium">洞察</span>
       </button>
-      <button onclick="switchTab('evening')" id="tab-evening" class="flex flex-col items-center flex-1 text-slate-400 hover:text-slate-700 transition-all active:scale-95">
-        <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
-        <span class="text-[10px]">睡前小结</span>
+      <button onclick="switchTab('evening')" id="tab-evening" class="ht-nav-btn flex flex-col items-center flex-1 text-neutral-400 hover:text-neutral-700 transition-all active:scale-95">
+        <svg class="w-[18px] h-[18px] mb-1" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <span class="text-[10px] font-medium">睡前</span>
       </button>
     </nav>
   </div>
 
   <script>
+    // ── Chart.js 全局极简配置（JetBrains Mono 字体 + 中性色） ──
+    if (typeof Chart !== 'undefined') {
+      Chart.defaults.font.family = "'JetBrains Mono', 'Cascadia Code', monospace";
+      Chart.defaults.font.size = 10;
+      Chart.defaults.color = '#a3a3a3';
+      Chart.defaults.plugins.tooltip.backgroundColor = '#171717';
+      Chart.defaults.plugins.tooltip.titleColor = '#ffffff';
+      Chart.defaults.plugins.tooltip.bodyColor = '#d4d4d4';
+      Chart.defaults.plugins.tooltip.padding = 10;
+      Chart.defaults.plugins.tooltip.cornerRadius = 8;
+      Chart.defaults.plugins.tooltip.titleFont = { family: "'JetBrains Mono', monospace", weight: '600', size: 11 };
+      Chart.defaults.plugins.tooltip.bodyFont = { family: "'JetBrains Mono', monospace", size: 10 };
+    }
+
     let currentTab = 'log';
     let dashRange = 7;
     let insightDays = 30;
@@ -1426,7 +1465,7 @@
     }
 
     function syncMorningLightUI() {
-      document.querySelectorAll('#morningLightPills .pill-sm-btn').forEach(p => {
+      document.querySelectorAll('#morningLightPills button').forEach(p => {
         p.classList.toggle('active', p.getAttribute('data-val') === morningLightState);
       });
     }
@@ -1924,11 +1963,11 @@
         const btn = document.getElementById(`tab-${t}`);
         if (!btn) return;
         if (t === navKey) {
-          btn.classList.add('text-blue-600', 'font-bold');
-          btn.classList.remove('text-slate-400');
+          btn.classList.add('active', 'text-neutral-900');
+          btn.classList.remove('text-neutral-400', 'text-slate-400');
         } else {
-          btn.classList.remove('text-blue-600', 'font-bold');
-          btn.classList.add('text-slate-400');
+          btn.classList.remove('active', 'text-neutral-900', 'text-blue-600', 'font-bold');
+          btn.classList.add('text-neutral-400');
         }
       });
 
@@ -2213,7 +2252,7 @@
           } else if (diff > 0) {
             diffAmEl.innerHTML = `<span class="text-rose-500 font-bold">↑ 较昨日 +${diff.toFixed(1)}</span><span class="text-slate-300">晨测</span>`;
           } else {
-            diffAmEl.innerHTML = `<span class="text-blue-600 font-bold">较昨日 持平</span><span class="text-slate-300">晨测</span>`;
+            diffAmEl.innerHTML = `<span class="text-neutral-800 font-mono font-semibold">较昨日 持平</span><span class="text-neutral-300 font-mono">晨测</span>`;
           }
         } else {
           diffAmEl.innerHTML = `<span>较昨日 --</span><span class="text-slate-300">晨测</span>`;
@@ -2232,7 +2271,7 @@
             } else if (diff > 0) {
               diffPmEl.innerHTML = `<span class="text-rose-500 font-bold">↑ 较昨日 +${diff.toFixed(1)}</span><span class="text-slate-300">晚测</span>`;
             } else {
-              diffPmEl.innerHTML = `<span class="text-blue-600 font-bold">较昨日 持平</span><span class="text-slate-300">晚测</span>`;
+              diffPmEl.innerHTML = `<span class="text-neutral-800 font-mono font-semibold">较昨日 持平</span><span class="text-neutral-300 font-mono">晚测</span>`;
             }
           } else {
             diffPmEl.innerHTML = `<span>今晚已记录</span><span class="text-slate-300">晚测</span>`;
@@ -2253,7 +2292,7 @@
           } else if (diff > 0) {
             diffWaistEl.innerHTML = `<span class="text-amber-600 font-bold">较昨日 +${diff.toFixed(1)}</span><span class="text-slate-300">略增</span>`;
           } else {
-            diffWaistEl.innerHTML = `<span class="text-blue-600 font-bold">较昨日 持平</span><span class="text-slate-300">稳定</span>`;
+            diffWaistEl.innerHTML = `<span class="text-neutral-800 font-mono font-semibold">较昨日 持平</span><span class="text-neutral-300 font-mono">稳定</span>`;
           }
         } else {
           diffWaistEl.innerHTML = `<span>平稳区间</span><span class="text-slate-300">标准</span>`;
@@ -2271,7 +2310,7 @@
           } else if (diff > 0) {
             diffSleepEl.innerHTML = `<span class="text-emerald-600 font-bold">较前日 +${diff.toFixed(1)}h</span><span class="text-slate-300">充足</span>`;
           } else {
-            diffSleepEl.innerHTML = `<span class="text-blue-600 font-bold">较前日 持平</span><span class="text-slate-300">规律</span>`;
+            diffSleepEl.innerHTML = `<span class="text-neutral-800 font-mono font-semibold">较前日 持平</span><span class="text-neutral-300 font-mono">规律</span>`;
           }
         } else {
           diffSleepEl.innerHTML = `<span>较昨日 --</span><span class="text-slate-300">节律</span>`;
@@ -2486,9 +2525,13 @@
 
     function switchDashRange(days) {
       dashRange = days;
-      document.getElementById('btn-range-7').className = days === 7 ? 'px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all' : 'px-3 py-1 rounded-lg text-slate-600 transition-all';
-      document.getElementById('btn-range-30').className = days === 30 ? 'px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all' : 'px-3 py-1 rounded-lg text-slate-600 transition-all';
-      document.getElementById('btn-range-60').className = days === 60 ? 'px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all' : 'px-3 py-1 rounded-lg text-slate-600 transition-all';
+      ['7', '30', '60'].forEach(d => {
+        const btn = document.getElementById('btn-range-' + d);
+        if (!btn) return;
+        btn.className = (Number(d) === days)
+          ? 'px-3 py-1 rounded-md bg-white border border-neutral-200 text-neutral-900 font-mono font-medium shadow-sm transition-all'
+          : 'px-3 py-1 rounded-md text-neutral-500 hover:text-neutral-900 font-mono font-medium transition-all';
+      });
       loadDashboardData(days);
     }
 
@@ -2515,9 +2558,9 @@
       const waistData = records.map(r => r.waist_size);
       const sleepHoursData = records.map(r => r.sleep_hours);
       const sleepColors = records.map(r => {
-        if (r.sleep_tag === 'RED') return '#f43f5e';
-        if (r.sleep_tag === 'YELLOW') return '#fbbf24';
-        return '#10b981';
+        if (r.sleep_tag === 'RED') return '#d4d4d4';
+        if (r.sleep_tag === 'YELLOW') return '#737373';
+        return '#171717';
       });
 
       // 统计均值
@@ -2539,18 +2582,18 @@
 
       // 1. 体重趋势图（点击某天查看晨起 / 睡前体重与夜间排水差值）
       const weightDetailEl = document.getElementById('dash-weight-detail');
-      weightDetailEl.innerHTML = '<span>👆</span><span>点击折线查看当日晨重 / 睡前重</span>';
+      weightDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日晨重 / 睡前重</span>';
       const ctxWeight = document.getElementById('chart-weight').getContext('2d');
       if (weightChart) weightChart.destroy();
 
       // 创建柔和 Apple Health 渐变填充
       const weightGradAm = ctxWeight.createLinearGradient(0, 0, 0, 160);
-      weightGradAm.addColorStop(0, 'rgba(37, 99, 235, 0.18)');
-      weightGradAm.addColorStop(1, 'rgba(37, 99, 235, 0.00)');
+      weightGradAm.addColorStop(0, 'rgba(0, 0, 0, 0.04)');
+      weightGradAm.addColorStop(1, 'rgba(0, 0, 0, 0.00)');
 
       const weightGradPm = ctxWeight.createLinearGradient(0, 0, 0, 160);
-      weightGradPm.addColorStop(0, 'rgba(245, 158, 11, 0.12)');
-      weightGradPm.addColorStop(1, 'rgba(245, 158, 11, 0.00)');
+      weightGradPm.addColorStop(0, 'rgba(0, 0, 0, 0.02)');
+      weightGradPm.addColorStop(1, 'rgba(0, 0, 0, 0.00)');
 
       weightChart = new Chart(ctxWeight, {
         type: 'line',
@@ -2560,14 +2603,14 @@
             {
               label: '晨起体重',
               data: weightAmData,
-              borderColor: '#2563eb',
+              borderColor: '#171717',
               borderWidth: 2.2,
               backgroundColor: weightGradAm,
               fill: true,
               tension: 0.35,
               spanGaps: true,
               pointBackgroundColor: '#ffffff',
-              pointBorderColor: '#2563eb',
+              pointBorderColor: '#171717',
               pointBorderWidth: 2,
               pointRadius: 3.5,
               pointHoverRadius: 5.5,
@@ -2612,11 +2655,11 @@
               else note = '偏高';
               diffHtml = ` · 夜间排水 <b class="text-slate-700">${d.toFixed(1)} kg</b>（${note}）`;
             }
-            weightDetailEl.innerHTML = `<span>⚖️</span><span><b class="text-slate-700">${r.record_date}</b>　晨起 ${fmtW(am)} · 睡前 ${fmtW(pm)}${diffHtml}</span>`;
+            weightDetailEl.innerHTML = `<span class="font-mono text-neutral-400">·</span><span><b class="text-neutral-800 font-mono">${r.record_date}</b>　晨起 ${fmtW(am)} · 睡前 ${fmtW(pm)}${diffHtml}</span>`;
           },
           scales: {
-            y: { beginAtZero: false, grid: { color: 'rgba(241, 245, 249, 0.8)' }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
-            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } }
+            y: { beginAtZero: false, grid: { color: '#f5f5f5' }, ticks: { font: { size: 10 }, color: '#a3a3a3' } },
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#a3a3a3' } }
           }
         }
       });
@@ -2629,13 +2672,13 @@
         document.getElementById('dash-waist-stat').innerText = '--';
       }
       const waistDetailEl = document.getElementById('dash-waist-detail');
-      waistDetailEl.innerHTML = '<span>👆</span><span>点击折线查看当日腰围</span>';
+      waistDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日腰围</span>';
       const ctxWaist = document.getElementById('chart-waist').getContext('2d');
       if (waistChart) waistChart.destroy();
 
       const waistGrad = ctxWaist.createLinearGradient(0, 0, 0, 160);
-      waistGrad.addColorStop(0, 'rgba(168, 85, 247, 0.18)');
-      waistGrad.addColorStop(1, 'rgba(168, 85, 247, 0.00)');
+      waistGrad.addColorStop(0, 'rgba(0, 0, 0, 0.03)');
+      waistGrad.addColorStop(1, 'rgba(0, 0, 0, 0.00)');
 
       waistChart = new Chart(ctxWaist, {
         type: 'line',
@@ -2644,14 +2687,14 @@
           datasets: [{
             label: '腰围',
             data: waistData,
-            borderColor: '#a855f7',
+            borderColor: '#525252',
             borderWidth: 2.2,
             backgroundColor: waistGrad,
             fill: true,
             tension: 0.35,
             spanGaps: true,
             pointBackgroundColor: '#ffffff',
-            pointBorderColor: '#a855f7',
+            pointBorderColor: '#525252',
             pointBorderWidth: 2,
             pointRadius: 3.5,
             pointHoverRadius: 5.5,
@@ -2668,18 +2711,18 @@
             const r = records[elements[0].index];
             if (!r) return;
             const waistText = (r.waist_size === null || r.waist_size === undefined) ? '--' : `${r.waist_size} cm`;
-            waistDetailEl.innerHTML = `<span>📏</span><span><b class="text-slate-700">${r.record_date}</b>　腰围 ${waistText}</span>`;
+            waistDetailEl.innerHTML = `<span class="font-mono text-neutral-400">·</span><span><b class="text-neutral-800 font-mono">${r.record_date}</b>　腰围 ${waistText}</span>`;
           },
           scales: {
-            y: { beginAtZero: false, grid: { color: 'rgba(241, 245, 249, 0.8)' }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
-            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } }
+            y: { beginAtZero: false, grid: { color: '#f5f5f5' }, ticks: { font: { size: 10 }, color: '#a3a3a3' } },
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#a3a3a3' } }
           }
         }
       });
 
       // 3. 睡眠柱状图（点击某根柱子查看当日就寝 / 起床时间）
       const sleepDetailEl = document.getElementById('dash-sleep-detail');
-      sleepDetailEl.innerHTML = '<span>👆</span><span>点击柱状图查看当日就寝 / 起床时间</span>';
+      sleepDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击柱图查看就寝 / 起床时间</span>';
       const ctxSleep = document.getElementById('chart-sleep').getContext('2d');
       if (sleepChart) sleepChart.destroy();
       sleepChart = new Chart(ctxSleep, {
@@ -2706,11 +2749,11 @@
             if (!r) return;
             const tagText = r.sleep_tag === 'RED' ? '熬夜' : (r.sleep_tag === 'YELLOW' ? '轻度' : '正常');
             const hours = (r.sleep_hours === null || r.sleep_hours === undefined) ? '--' : `${r.sleep_hours} 小时`;
-            sleepDetailEl.innerHTML = `<span>🛏</span><span><b class="text-slate-700">${r.record_date}</b>　就寝 ${r.sleep_start_time || '--'} · 起床 ${r.sleep_end_time || '--'} · ${hours} · ${tagText}</span>`;
+            sleepDetailEl.innerHTML = `<span class="font-mono text-neutral-400">·</span><span><b class="text-neutral-800 font-mono">${r.record_date}</b>　就寝 ${r.sleep_start_time || '--'} · 起床 ${r.sleep_end_time || '--'} · ${hours} · ${tagText}</span>`;
           },
           scales: {
-            y: { beginAtZero: true, max: 12, grid: { color: 'rgba(241, 245, 249, 0.8)' }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
-            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } }
+            y: { beginAtZero: true, max: 12, grid: { color: '#f5f5f5' }, ticks: { font: { size: 10 }, color: '#a3a3a3' } },
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#a3a3a3' } }
           }
         }
       });
@@ -2725,7 +2768,7 @@
         document.getElementById('dash-steps-stat').innerText = '--';
       }
       const stepsDetailEl = document.getElementById('dash-steps-detail');
-      stepsDetailEl.innerHTML = '<span>👆</span><span>点击折线查看当日步数</span>';
+      stepsDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日步数</span>';
       const ctxSteps = document.getElementById('chart-steps').getContext('2d');
       if (stepsChart) stepsChart.destroy();
 
@@ -2740,14 +2783,14 @@
           datasets: [{
             label: '步数',
             data: stepsData,
-            borderColor: '#0ea5e9',
+            borderColor: '#737373',
             borderWidth: 2.2,
             backgroundColor: stepsGrad,
             fill: true,
             tension: 0.35,
             spanGaps: false,
             pointBackgroundColor: '#ffffff',
-            pointBorderColor: '#0ea5e9',
+            pointBorderColor: '#737373',
             pointBorderWidth: 2,
             pointRadius: 3.5,
             pointHoverRadius: 5.5,
@@ -2768,13 +2811,13 @@
             if (!r) return;
             const v = (r.steps === null || r.steps === undefined) ? '--' : `${Number(r.steps).toLocaleString('en-US')} 步`;
             const ml = r.morning_light === true ? ' · 已见晨光' : '';
-            stepsDetailEl.innerHTML = `<span>🚶</span><span><b class="text-slate-700">${r.record_date}</b>　步数 ${v}${ml}</span>`;
+            stepsDetailEl.innerHTML = `<span class="font-mono text-neutral-400">·</span><span><b class="text-neutral-800 font-mono">${r.record_date}</b>　步数 ${v}${ml}</span>`;
           },
           scales: {
             y: {
               beginAtZero: true,
               max: 20000,
-              grid: { color: 'rgba(241, 245, 249, 0.8)' },
+              grid: { color: '#f5f5f5' },
               ticks: {
                 font: { size: 10 },
                 color: '#94a3b8',
@@ -2782,7 +2825,7 @@
                 callback: v => v === 0 ? '0' : `${v / 10000}万`
               }
             },
-            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } }
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#a3a3a3' } }
           }
         }
       });
@@ -2804,14 +2847,14 @@
               } catch(e){}
             }
             if (rowExTypes.length > 0) {
-              tagsHtml += `<span class="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">🏋️ ${rowExTypes.join(' + ')}</span>`;
+              tagsHtml += `<span class="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">${rowExTypes.join(' + ')}</span>`;
             }
             if (r.concerta && r.concerta.taken) {
-              tagsHtml += `<span class="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">💊 专注达${r.concerta.dose}mg</span>`;
+              tagsHtml += `<span class="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">专注达 ${r.concerta.dose}mg</span>`;
             }
             if (r.cold_shower && r.cold_shower.enabled) {
               const csTemp = (r.cold_shower.water_temp === null || r.cold_shower.water_temp === undefined) ? '' : ` ${r.cold_shower.water_temp}℃`;
-              tagsHtml += `<span class="bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">🚿 冷水澡${csTemp}</span>`;
+              tagsHtml += `<span class="bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">冷水澡 ${csTemp}</span>`;
             }
 
             listEl.innerHTML += `
@@ -2836,10 +2879,10 @@
     //  - 置信：1~3 天 → 低置信（空心节点 + 虚线 + tooltip 标注）；>= 4 天 → 正常。
     const TREND_WEEKS = 12;
     const TREND_METRICS = {
-      weight: { label: '体重周均值 (kg)', field: 'weight_am', unit: 'kg', color: '#2563eb', band: 'rgba(37, 99, 235, 0.13)' },
-      waist: { label: '腰围周均值 (cm)', field: 'waist_size', unit: 'cm', color: '#a855f7', band: 'rgba(168, 85, 247, 0.13)' },
+      weight: { label: '体重周均值 (kg)', field: 'weight_am', unit: 'kg', color: '#171717', band: 'rgba(0, 0, 0, 0.06)' },
+      waist: { label: '腰围周均值 (cm)', field: 'waist_size', unit: 'cm', color: '#525252', band: 'rgba(0, 0, 0, 0.04)' },
       sleep: { label: '睡眠周均值 (小时)', field: 'sleep_hours', unit: '小时', color: '#10b981', band: 'rgba(16, 185, 129, 0.13)' },
-      steps: { label: '步数周均值 (步)', field: 'steps', unit: '步', color: '#0ea5e9', band: 'rgba(14, 165, 233, 0.13)', int: true }
+      steps: { label: '步数周均值 (步)', field: 'steps', unit: '步', color: '#737373', band: 'rgba(0, 0, 0, 0.04)', int: true }
     };
     let trendState = { metric: 'weight', records: [], buckets: [], aggs: [] };
     let trendChart = null;
@@ -2889,8 +2932,8 @@
         const el = document.getElementById(`trend-tab-${m}`);
         if (!el) return;
         el.className = m === metric
-          ? 'flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all'
-          : 'flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+          ? 'flex-1 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-neutral-900 text-white transition-all'
+          : 'flex-1 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-300 transition-all';
       });
       if (currentTab === 'trend') renderTrendChart();
     }
@@ -2940,7 +2983,7 @@
 
       const detailEl = document.getElementById('trend-detail');
       detailEl.innerHTML = lastIdx >= 0
-        ? '<span>👆</span><span>点击节点查看该周均值与区间</span>'
+        ? '<span class="font-mono text-[10px] text-neutral-400">↑ 点击节点查看该周均值与区间</span>'
         : '<span>ℹ️</span><span>近 12 周暂无该指标数据，记录几天后再来看看</span>';
 
       const ctx = document.getElementById('chart-trend').getContext('2d');
@@ -3023,7 +3066,7 @@
             if (idx < 0) return;
             const a = aggs[idx], b = buckets[idx];
             if (!a || a.n === 0) return;
-            detailEl.innerHTML = `<span>📅</span><span><b class="text-slate-700">${b.start} ~ ${b.end}</b>　均值 ${a.avg.toFixed(1)} ${cfg.unit} · 区间 ${a.min.toFixed(1)}~${a.max.toFixed(1)} · ${a.n} 天${a.n <= 3 ? '（低置信）' : ''}</span>`;
+            detailEl.innerHTML = `<span class="font-mono text-neutral-400">·</span><span><b class="text-slate-700">${b.start} ~ ${b.end}</b>　均值 ${a.avg.toFixed(1)} ${cfg.unit} · 区间 ${a.min.toFixed(1)}~${a.max.toFixed(1)} · ${a.n} 天${a.n <= 3 ? '（低置信）' : ''}</span>`;
           }
         }
       });
@@ -3040,11 +3083,11 @@
     const TD_PORTRAIT_W = TD_DAYS * TD_POINT_PX;  // 竖屏图宽 1560px
     const TD_FIT_MIN_W = 560;                     // 容器宽于此值即视为「够宽」，60 点压进一屏
     const TD_METRICS = {
-      weight: { label: '体重逐日 (kg)', field: 'weight_am', unit: 'kg', color: '#2563eb' },
-      waist: { label: '腰围逐日 (cm)', field: 'waist_size', unit: 'cm', color: '#a855f7' },
+      weight: { label: '体重逐日 (kg)', field: 'weight_am', unit: 'kg', color: '#171717' },
+      waist: { label: '腰围逐日 (cm)', field: 'waist_size', unit: 'cm', color: '#525252' },
       sleep: { label: '睡眠时长逐日 (小时)', field: 'sleep_hours', unit: '小时', color: '#10b981', avg: true },
       // 步数：纵轴封顶 2 万（特殊情况也够用），缺失日断点
-      steps: { label: '步数逐日 (步)', field: 'steps', unit: '步', color: '#0ea5e9', avg: true, yMax: 20000, yStep: 5000, fmt: v => v.toLocaleString('en-US') }
+      steps: { label: '步数逐日 (步)', field: 'steps', unit: '步', color: '#737373', avg: true, yMax: 20000, yStep: 5000, fmt: v => v.toLocaleString('en-US') }
     };
     let trendDetailState = { metric: 'weight', records: [] };
     let trendDetailChart = null;
@@ -3112,8 +3155,8 @@
         const el = document.getElementById(`td-tab-${m}`);
         if (!el) return;
         el.className = m === metric
-          ? 'flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all'
-          : 'flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+          ? 'flex-1 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-neutral-900 text-white transition-all'
+          : 'flex-1 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-300 transition-all';
       });
       if (currentTab === 'trend-detail') renderTrendDetailChart();
     }
@@ -3174,7 +3217,7 @@
       const labels = days.map(ds => ds.slice(5));
 
       const detailEl = document.getElementById('td-detail');
-      detailEl.innerHTML = '<span>👆</span><span>横向拖动看全 60 天 · 点击节点看当日详情</span>';
+      detailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↔ 拖动看全 60 天 · 点击节点看当日详情</span>';
 
       document.getElementById('td-metric-label').innerText = cfg.label;
       const statEl = document.getElementById('td-metric-stat');
@@ -3250,7 +3293,7 @@
             const ds = days[idx];
             const r = byDate[ds];
             if (!r || values[idx] === null) return;
-            detailEl.innerHTML = `<span>📅</span><span>${tdDetailText(trendDetailState.metric, r)}</span>`;
+            detailEl.innerHTML = `<span class="font-mono text-neutral-400">·</span><span>${tdDetailText(trendDetailState.metric, r)}</span>`;
           }
         }
       });
@@ -3485,7 +3528,7 @@
           fullHTML += `
             <details class="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500" ${isOpen}>
               <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">
-                💭 深度思维链推导 (${thinkingText.length} 字)
+                思维链推导 (${thinkingText.length} 字)
               </summary>
               <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${thinkingText}</div>
             </details>
@@ -3594,7 +3637,7 @@
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
         setInsightPillsDisabled(false);
         // 有产出即说明已自动存档，按钮语义转为「重新生成」（同天同档位为追加保留）
-        btn.innerHTML = (responseText || thinkingText) ? '<span>🔄 重新生成</span>' : originalBtnText;
+        btn.innerHTML = (responseText || thinkingText) ? '<span class="font-mono">重新生成</span>' : originalBtnText;
       }
     }
 
@@ -3764,7 +3807,7 @@
             const think = (full.thinking || '').trim();
             const thinkHtml = think ? `
               <details class="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500">
-                <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">💭 思维链推导 (${think.length} 字)</summary>
+                <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">思维链推导 (${think.length} 字)</summary>
                 <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${escapeHtml(think)}</div>
               </details>` : '';
             detail = `${thinkHtml}
@@ -4044,7 +4087,7 @@
       if (think) {
         html += `
           <details class="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500">
-            <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">💭 深度思维链推导 (${think.length} 字)</summary>
+            <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">思维链推导 (${think.length} 字)</summary>
             <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${escapeHtml(think)}</div>
           </details>`;
       }
@@ -4064,7 +4107,7 @@
       const btn = document.getElementById('btn-generate-insight');
       if (contentEl) contentEl.innerHTML = DEFAULT_INSIGHT_WELCOME;
       if (statusTag) statusTag.innerText = '点击上方按钮开始';
-      if (btn) btn.innerHTML = '<span>🚀 生成阶段深度洞察</span>';
+      if (btn) btn.innerHTML = '<span class="font-mono">生成阶段深度洞察</span>';
     }
 
     // 该窗口已生成的回显态（卡片 + 状态栏 + 按钮三处统一）
@@ -4078,7 +4121,7 @@
       const mm = String(d.getMinutes()).padStart(2, '0');
       if (contentEl) contentEl.innerHTML = renderInsightArchive(content, thinking);
       if (statusTag) statusTag.innerHTML = `近 ${insightDays} 天（截至 ${insightEndDate}）· 生成于 ${hh}:${mm} · <span onclick="openInsightHistory()" class="text-blue-600 cursor-pointer font-bold">点击查看</span>`;
-      if (btn) btn.innerHTML = '<span>🔄 重新生成</span>';
+      if (btn) btn.innerHTML = '<span class="font-mono">重新生成</span>';
     }
 
     // 洞察页回显：按"当前档位 + 截止日"这一分析窗口判断并渲染。
@@ -4125,7 +4168,7 @@
 
     // App 长时间挂在后台（手机端覆盖安装后 WebView/JS 内存状态不会重建）或被系统杀进程前的
     // 页面往返缓存恢复时，时间可能已经跨天。此时必须重新判定一次窗口，
-    // 否则会残留昨天的「🔄 重新生成 + 洞察正文」，被误当成当前窗口已生成过洞察。
+    // 否则会残留昨天的「重新生成 + 洞察正文」，被误当成当前窗口已生成过洞察。
     function refreshInsightOnResume() {
       if (document.visibilityState !== 'visible') return;
       if (currentTab !== 'insight') return;
@@ -6043,7 +6086,7 @@
       const btn = document.getElementById('compare-gen-btn');
       if (contentEl) contentEl.innerHTML = '<p>选择两个月，点击「生成阶段对比综述」，AI 将对两个自然月的体重、腰围、睡眠、运动与服药情况做横向对比与归因分析。</p>';
       if (statusTag) statusTag.innerText = '点击上方按钮开始';
-      if (btn) btn.innerHTML = '<span>🚀 生成阶段对比综述</span>';
+      if (btn) btn.innerHTML = '<span class="font-mono">生成阶段对比综述</span>';
     }
 
     function cmpApplyInsightUI(content, thinking, createdAt) {
@@ -6056,7 +6099,7 @@
       const mm = String(d.getMinutes()).padStart(2, '0');
       if (contentEl) contentEl.innerHTML = renderInsightArchive(content, thinking);
       if (statusTag) statusTag.innerText = `${cmpMonthLabel(cmpState.monthA)} vs ${cmpMonthLabel(cmpState.monthB)} · 生成于 ${hh}:${mm}`;
-      if (btn) btn.innerHTML = '<span>🔄 重新生成阶段对比</span>';
+      if (btn) btn.innerHTML = '<span class="font-mono">重新生成阶段对比</span>';
     }
 
     // 拉取两月指标快照 + 是否已生成（无论是否已生成都先渲染对比表）
@@ -6138,7 +6181,7 @@
           fullHTML += `
             <details class="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500" ${isOpen}>
               <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">
-                💭 深度思维链推导 (${thinkingText.length} 字)
+                思维链推导 (${thinkingText.length} 字)
               </summary>
               <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${thinkingText}</div>
             </details>
@@ -6212,7 +6255,7 @@
         btn.disabled = false;
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
         // 仅在「确实产出且无错误」时才说明已自动存档，按钮语义才转为「重新生成」
-        btn.innerHTML = (!hasError && (responseText || thinkingText)) ? '<span>🔄 重新生成阶段对比</span>' : originalBtnText;
+        btn.innerHTML = (!hasError && (responseText || thinkingText)) ? '<span class="font-mono">重新生成阶段对比</span>' : originalBtnText;
       }
     }
   </script>
