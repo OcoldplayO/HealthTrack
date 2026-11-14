@@ -53,3 +53,10 @@ scripts/build-android.ps1
 
 # 预览分享功能自动生成的打包产物
 .trae-html-share-packages/
+
+# 前端构建依赖与缓存
+node_modules/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
