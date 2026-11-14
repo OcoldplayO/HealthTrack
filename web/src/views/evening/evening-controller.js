@@ -8,6 +8,7 @@ import { store } from '../../services/state.js';
 import { localDateStr } from '../../utils/date.js';
 import { showToast } from '../../components/Toast.js';
 import { appConfirm, appCopyText, appToast } from '../../utils/dialog.js';
+import { escapeHtml, renderMarkdown } from '../../utils/format.js';
 
 export function initEveningView(container) {
   container.insertAdjacentHTML('beforeend', templateHtml);
