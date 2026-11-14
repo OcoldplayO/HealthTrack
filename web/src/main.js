@@ -10,8 +10,17 @@ import { renderSettingsModal } from './components/modals/SettingsModal.js';
 import { renderDataSheetModal } from './components/modals/DataSheetModal.js';
 import { renderOtherModals } from './components/modals/OtherModals.js';
 import { initLogView } from './views/log/log-controller.js';
-import { initDashView, activateDash } from './views/dash/dash-controller.js';
-import { initInsightView, activateInsight } from './views/insight/insight-controller.js';
+import {
+  initDashView,
+  activateDash,
+  activateTrend,
+  activateTrendDetail
+} from './views/dash/dash-controller.js';
+import {
+  initInsightView,
+  activateInsight,
+  activateCompare
+} from './views/insight/insight-controller.js';
 import { initEveningView, activateEvening } from './views/evening/evening-controller.js';
 import { store } from './services/state.js';
 
@@ -37,9 +46,18 @@ export function switchTab(tab) {
     saveBar.classList.toggle('hidden', tab !== 'log');
   }
 
+  // 离开「60天详情」时收回手机框的放宽态
+  const frame = document.getElementById('app-frame');
+  if (frame && tab !== 'trend-detail') {
+    frame.classList.remove('frame-wide');
+  }
+
   // 激活对应视图的数据加载
   if (tab === 'dash') activateDash();
+  else if (tab === 'trend') activateTrend();
+  else if (tab === 'trend-detail') activateTrendDetail();
   else if (tab === 'insight') activateInsight();
+  else if (tab === 'compare') activateCompare();
   else if (tab === 'evening') activateEvening();
 }
 

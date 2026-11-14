@@ -40,6 +40,12 @@ export function activateInsight() {
   }
 }
 
+export function activateCompare() {
+  if (typeof cmpRefreshPeriod === 'function') {
+    cmpRefreshPeriod();
+  }
+}
+
 export function setInsightDays(days) {
   insightDays = days;
   ['7', '30', '60'].forEach((d) => {

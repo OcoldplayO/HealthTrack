@@ -5,12 +5,41 @@
 import templateHtml from './dash-view.html?raw';
 import { api } from '../../services/api.js';
 import { store } from '../../services/state.js';
-import { localDateStr, getPrevDateStr } from '../../utils/date.js';
+import { localDateStr, shiftDateStr, getPrevDateStr } from '../../utils/date.js';
+import { escapeHtml } from '../../utils/format.js';
 
-// Variables managed in legacy block below
+let dashRange = 7;
+let weightChart = null;
+let waistChart = null;
+let sleepChart = null;
+let stepsChart = null;
+
+function initChartDefaults() {
+  if (typeof Chart !== 'undefined' && Chart.defaults) {
+    Chart.defaults.font.family = "'JetBrains Mono', 'Cascadia Code', monospace";
+    Chart.defaults.font.size = 10;
+    Chart.defaults.color = '#a3a3a3';
+    Chart.defaults.plugins.tooltip.backgroundColor = '#171717';
+    Chart.defaults.plugins.tooltip.titleColor = '#ffffff';
+    Chart.defaults.plugins.tooltip.bodyColor = '#d4d4d4';
+    Chart.defaults.plugins.tooltip.padding = 10;
+    Chart.defaults.plugins.tooltip.cornerRadius = 8;
+    Chart.defaults.plugins.tooltip.titleFont = { family: "'JetBrains Mono', monospace", weight: '600', size: 11 };
+    Chart.defaults.plugins.tooltip.bodyFont = { family: "'JetBrains Mono', monospace", size: 10 };
+  }
+}
+
+// 从记录中取出运动类型列表，兼容早期单值 type 字段
+function exerciseTypesOf(ex) {
+  if (!ex) return [];
+  let list = Array.isArray(ex.types) ? ex.types.slice() : [];
+  if (list.length === 0 && ex.type) list = [ex.type];
+  return list.filter(t => t && t !== 'none');
+}
 
 export function initDashView(container) {
   container.insertAdjacentHTML('beforeend', templateHtml);
+  initChartDefaults();
   bindEvents();
 }
 
@@ -21,36 +50,35 @@ function bindEvents() {
 }
 
 export function activateDash() {
-  loadDashboardData(dashRange);
+  switchDashRange(dashRange);
 }
 
-    function switchDashRange(days) {
-      dashRange = days;
-      ['7', '30', '60'].forEach(d => {
-        const btn = document.getElementById('btn-range-' + d);
-        if (!btn) return;
-        btn.className = (Number(d) === days)
-          ? 'px-3 py-1 rounded-md bg-white border border-neutral-200 text-neutral-900 font-mono font-medium shadow-sm transition-all'
-          : 'px-3 py-1 rounded-md text-neutral-500 hover:text-neutral-900 font-mono font-medium transition-all';
-      });
-      loadDashboardData(days);
-    }
+export function switchDashRange(days) {
+  dashRange = days;
+  store.set({ dashRange: days });
+  ['7', '30', '60'].forEach(d => {
+    const btn = document.getElementById('btn-range-' + d);
+    if (!btn) return;
+    btn.className = (Number(d) === days)
+      ? 'px-3 py-1 rounded-md bg-white border border-neutral-200 text-neutral-900 font-mono font-medium shadow-sm transition-all'
+      : 'px-3 py-1 rounded-md text-neutral-500 hover:text-neutral-900 font-mono font-medium transition-all';
+  });
+  loadDashboardData(days);
+}
 
-    async function loadDashboardData(days) {
-      const end = new Date();
-      const start = new Date();
-      start.setDate(end.getDate() - (days - 1));
+export async function loadDashboardData(days = dashRange) {
+  dashRange = days;
+  const endStr = localDateStr(new Date());
+  const startStr = shiftDateStr(endStr, -(days - 1));
 
-      const startStr = start.toISOString().split('T')[0];
-      const endStr = end.toISOString().split('T')[0];
-
-      const res = await fetch(`/api/v1/records/history?start_date=${startStr}&end_date=${endStr}`);
-      const json = await res.json();
-      if (json.code !== 200) return;
-
-      const records = json.data || [];
-      renderDashboardCharts(records);
-    }
+  try {
+    const res = await api.getHistoryRecords(startStr, endStr);
+    const records = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
+    renderDashboardCharts(records);
+  } catch (err) {
+    console.error('加载看板数据失败:', err);
+  }
+}
 
     function renderDashboardCharts(records) {
       const labels = records.map(r => r.record_date.slice(5));
@@ -83,20 +111,28 @@ export function activateDash() {
 
       // 1. 体重趋势图（点击某天查看晨起 / 睡前体重与夜间排水差值）
       const weightDetailEl = document.getElementById('dash-weight-detail');
-      weightDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日晨重 / 睡前重</span>';
-      const ctxWeight = document.getElementById('chart-weight').getContext('2d');
-      if (weightChart) weightChart.destroy();
+      if (weightDetailEl) {
+        weightDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日晨重 / 睡前重</span>';
+      }
+      const canvasWeight = document.getElementById('chart-weight');
+      if (canvasWeight) {
+        if (weightChart) {
+          weightChart.destroy();
+          weightChart = null;
+        }
+        const existingChart = (typeof Chart !== 'undefined' && Chart.getChart) ? Chart.getChart(canvasWeight) : null;
+        if (existingChart) existingChart.destroy();
 
-      // 创建柔和 Apple Health 渐变填充
-      const weightGradAm = ctxWeight.createLinearGradient(0, 0, 0, 160);
-      weightGradAm.addColorStop(0, 'rgba(0, 0, 0, 0.04)');
-      weightGradAm.addColorStop(1, 'rgba(0, 0, 0, 0.00)');
+        const ctxWeight = canvasWeight.getContext('2d');
+        const weightGradAm = ctxWeight.createLinearGradient(0, 0, 0, 160);
+        weightGradAm.addColorStop(0, 'rgba(0, 0, 0, 0.04)');
+        weightGradAm.addColorStop(1, 'rgba(0, 0, 0, 0.00)');
 
-      const weightGradPm = ctxWeight.createLinearGradient(0, 0, 0, 160);
-      weightGradPm.addColorStop(0, 'rgba(0, 0, 0, 0.02)');
-      weightGradPm.addColorStop(1, 'rgba(0, 0, 0, 0.00)');
+        const weightGradPm = ctxWeight.createLinearGradient(0, 0, 0, 160);
+        weightGradPm.addColorStop(0, 'rgba(0, 0, 0, 0.02)');
+        weightGradPm.addColorStop(1, 'rgba(0, 0, 0, 0.00)');
 
-      weightChart = new Chart(ctxWeight, {
+        weightChart = new Chart(ctxWeight, {
         type: 'line',
         data: {
           labels: labels,
@@ -164,6 +200,7 @@ export function activateDash() {
           }
         }
       });
+    }
 
       // 2. 腰围趋势图（点击某天查看当日腰围）
       const validWaists = waistData.filter(v => v !== null && v !== undefined);
@@ -173,15 +210,24 @@ export function activateDash() {
         document.getElementById('dash-waist-stat').innerText = '--';
       }
       const waistDetailEl = document.getElementById('dash-waist-detail');
-      waistDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日腰围</span>';
-      const ctxWaist = document.getElementById('chart-waist').getContext('2d');
-      if (waistChart) waistChart.destroy();
+      if (waistDetailEl) {
+        waistDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日腰围</span>';
+      }
+      const canvasWaist = document.getElementById('chart-waist');
+      if (canvasWaist) {
+        if (waistChart) {
+          waistChart.destroy();
+          waistChart = null;
+        }
+        const existingChart = (typeof Chart !== 'undefined' && Chart.getChart) ? Chart.getChart(canvasWaist) : null;
+        if (existingChart) existingChart.destroy();
 
-      const waistGrad = ctxWaist.createLinearGradient(0, 0, 0, 160);
-      waistGrad.addColorStop(0, 'rgba(0, 0, 0, 0.03)');
-      waistGrad.addColorStop(1, 'rgba(0, 0, 0, 0.00)');
+        const ctxWaist = canvasWaist.getContext('2d');
+        const waistGrad = ctxWaist.createLinearGradient(0, 0, 0, 160);
+        waistGrad.addColorStop(0, 'rgba(0, 0, 0, 0.03)');
+        waistGrad.addColorStop(1, 'rgba(0, 0, 0, 0.00)');
 
-      waistChart = new Chart(ctxWaist, {
+        waistChart = new Chart(ctxWaist, {
         type: 'line',
         data: {
           labels: labels,
@@ -220,13 +266,24 @@ export function activateDash() {
           }
         }
       });
+    }
 
       // 3. 睡眠柱状图（点击某根柱子查看当日就寝 / 起床时间）
       const sleepDetailEl = document.getElementById('dash-sleep-detail');
-      sleepDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击柱图查看就寝 / 起床时间</span>';
-      const ctxSleep = document.getElementById('chart-sleep').getContext('2d');
-      if (sleepChart) sleepChart.destroy();
-      sleepChart = new Chart(ctxSleep, {
+      if (sleepDetailEl) {
+        sleepDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击柱图查看就寝 / 起床时间</span>';
+      }
+      const canvasSleep = document.getElementById('chart-sleep');
+      if (canvasSleep) {
+        if (sleepChart) {
+          sleepChart.destroy();
+          sleepChart = null;
+        }
+        const existingChart = (typeof Chart !== 'undefined' && Chart.getChart) ? Chart.getChart(canvasSleep) : null;
+        if (existingChart) existingChart.destroy();
+
+        const ctxSleep = canvasSleep.getContext('2d');
+        sleepChart = new Chart(ctxSleep, {
         type: 'bar',
         data: {
           labels: labels,
@@ -258,6 +315,7 @@ export function activateDash() {
           }
         }
       });
+    }
 
       // 4. 步数趋势图（缺失日断点，不补 0；纵轴封顶 2 万）
       const stepsData = records.map(r => (r.steps === null || r.steps === undefined) ? null : Number(r.steps));
@@ -269,15 +327,24 @@ export function activateDash() {
         document.getElementById('dash-steps-stat').innerText = '--';
       }
       const stepsDetailEl = document.getElementById('dash-steps-detail');
-      stepsDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日步数</span>';
-      const ctxSteps = document.getElementById('chart-steps').getContext('2d');
-      if (stepsChart) stepsChart.destroy();
+      if (stepsDetailEl) {
+        stepsDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日步数</span>';
+      }
+      const canvasSteps = document.getElementById('chart-steps');
+      if (canvasSteps) {
+        if (stepsChart) {
+          stepsChart.destroy();
+          stepsChart = null;
+        }
+        const existingChart = (typeof Chart !== 'undefined' && Chart.getChart) ? Chart.getChart(canvasSteps) : null;
+        if (existingChart) existingChart.destroy();
 
-      const stepsGrad = ctxSteps.createLinearGradient(0, 0, 0, 160);
-      stepsGrad.addColorStop(0, 'rgba(14, 165, 233, 0.18)');
-      stepsGrad.addColorStop(1, 'rgba(14, 165, 233, 0.00)');
+        const ctxSteps = canvasSteps.getContext('2d');
+        const stepsGrad = ctxSteps.createLinearGradient(0, 0, 0, 160);
+        stepsGrad.addColorStop(0, 'rgba(14, 165, 233, 0.18)');
+        stepsGrad.addColorStop(1, 'rgba(14, 165, 233, 0.00)');
 
-      stepsChart = new Chart(ctxSteps, {
+        stepsChart = new Chart(ctxSteps, {
         type: 'line',
         data: {
           labels: labels,
@@ -330,6 +397,7 @@ export function activateDash() {
           }
         }
       });
+    }
 
       // 5. 活动流水
       const listEl = document.getElementById('dash-activities-list');
@@ -344,27 +412,29 @@ export function activateDash() {
             if (r.activity_tags) {
               try {
                 const tags = JSON.parse(r.activity_tags);
-                tagsHtml += tags.map(t => `<span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">${t}</span>`).join('');
+                if (Array.isArray(tags)) {
+                  tagsHtml += tags.map(t => `<span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">${escapeHtml(t)}</span>`).join('');
+                }
               } catch(e){}
             }
             if (rowExTypes.length > 0) {
-              tagsHtml += `<span class="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">${rowExTypes.join(' + ')}</span>`;
+              tagsHtml += `<span class="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">${rowExTypes.map(t => escapeHtml(t)).join(' + ')}</span>`;
             }
             if (r.concerta && r.concerta.taken) {
-              tagsHtml += `<span class="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">专注达 ${r.concerta.dose}mg</span>`;
+              tagsHtml += `<span class="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">专注达 ${escapeHtml(r.concerta.dose)}mg</span>`;
             }
             if (r.cold_shower && r.cold_shower.enabled) {
               const csTemp = (r.cold_shower.water_temp === null || r.cold_shower.water_temp === undefined) ? '' : ` ${r.cold_shower.water_temp}℃`;
-              tagsHtml += `<span class="bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">冷水澡 ${csTemp}</span>`;
+              tagsHtml += `<span class="bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">冷水澡 ${escapeHtml(csTemp)}</span>`;
             }
 
             listEl.innerHTML += `
               <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
                 <div class="flex justify-between items-center mb-1">
-                  <span class="font-bold text-slate-800">${r.record_date}</span>
+                  <span class="font-bold text-slate-800">${escapeHtml(r.record_date || '')}</span>
                   <div>${tagsHtml}</div>
                 </div>
-                <p class="text-slate-600 line-clamp-2">${r.journal_text || '无文字备注'}</p>
+                <p class="text-slate-600 line-clamp-2">${escapeHtml(r.journal_text || '无文字备注')}</p>
               </div>
             `;
           }
@@ -424,7 +494,7 @@ export function activateDash() {
 
     function openTrendView() {
       setTrendMetric(trendState.metric);
-      switchTab('trend');
+      if (typeof window.switchTab === 'function') window.switchTab('trend');
     }
 
     function setTrendMetric(metric) {
@@ -436,7 +506,7 @@ export function activateDash() {
           ? 'flex-1 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-neutral-900 text-white transition-all'
           : 'flex-1 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-300 transition-all';
       });
-      if (currentTab === 'trend') renderTrendChart();
+      if (store.state.currentTab === 'trend') renderTrendChart();
     }
 
     async function loadTrendData() {
@@ -444,9 +514,8 @@ export function activateDash() {
       const startStr = buckets[0].start;
       const endStr = localDateStr(new Date());
       try {
-        const res = await fetch(`/api/v1/records/history?start_date=${startStr}&end_date=${endStr}`);
-        const json = await res.json();
-        trendState.records = json.code === 200 ? (json.data || []) : [];
+        const res = await api.getHistoryRecords(startStr, endStr);
+        trendState.records = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
       } catch (e) {
         trendState.records = [];
       }
@@ -468,27 +537,37 @@ export function activateDash() {
       const lowConf = aggs.map(a => a.n >= 1 && a.n <= 3);
 
       // 顶部统计：取最近一个有数据的自然周
-      document.getElementById('trend-metric-label').innerText = cfg.label;
+      const labelEl = document.getElementById('trend-metric-label');
+      if (labelEl) labelEl.innerText = cfg.label;
       const statEl = document.getElementById('trend-metric-stat');
       const noteEl = document.getElementById('trend-metric-note');
       let lastIdx = -1;
       for (let i = aggs.length - 1; i >= 0; i--) { if (aggs[i].n > 0) { lastIdx = i; break; } }
       if (lastIdx >= 0) {
         const a = aggs[lastIdx], b = buckets[lastIdx];
-        statEl.innerText = `${fmtTrend(a.avg)} ${cfg.unit}`;
-        noteEl.innerHTML = `${b.start.slice(5)}~${b.end.slice(5)} 周均值<br>${a.n} 天数据${a.n <= 3 ? '（低置信）' : ''}`;
+        if (statEl) statEl.innerText = `${fmtTrend(a.avg)} ${cfg.unit}`;
+        if (noteEl) noteEl.innerHTML = `${b.start.slice(5)}~${b.end.slice(5)} 周均值<br>${a.n} 天数据${a.n <= 3 ? '（低置信）' : ''}`;
       } else {
-        statEl.innerText = '--';
-        noteEl.innerHTML = '近 12 周暂无数据';
+        if (statEl) statEl.innerText = '--';
+        if (noteEl) noteEl.innerHTML = '近 12 周暂无数据';
       }
 
       const detailEl = document.getElementById('trend-detail');
-      detailEl.innerHTML = lastIdx >= 0
-        ? '<span class="font-mono text-[10px] text-neutral-400">↑ 点击节点查看该周均值与区间</span>'
-        : '<span>ℹ️</span><span>近 12 周暂无该指标数据，记录几天后再来看看</span>';
+      if (detailEl) {
+        detailEl.innerHTML = lastIdx >= 0
+          ? '<span class="font-mono text-[10px] text-neutral-400">↑ 点击节点查看该周均值与区间</span>'
+          : '<span>ℹ️</span><span>近 12 周暂无该指标数据，记录几天后再来看看</span>';
+      }
 
-      const ctx = document.getElementById('chart-trend').getContext('2d');
-      if (trendChart) trendChart.destroy();
+      const canvas = document.getElementById('chart-trend');
+      if (!canvas) return;
+      if (trendChart) {
+        trendChart.destroy();
+        trendChart = null;
+      }
+      const existingChart = (typeof Chart !== 'undefined' && Chart.getChart) ? Chart.getChart(canvas) : null;
+      if (existingChart) existingChart.destroy();
+      const ctx = canvas.getContext('2d');
       trendChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -614,7 +693,7 @@ export function activateDash() {
     function tdSyncFrame() {
       const frame = document.getElementById('app-frame');
       if (!frame) return;
-      frame.classList.toggle('frame-wide', currentTab === 'trend-detail' && tdIsPhoneLandscape());
+      frame.classList.toggle('frame-wide', store.state.currentTab === 'trend-detail' && tdIsPhoneLandscape());
     }
 
     // 依当前容器可用宽度设定图表宽度：够宽（手机横屏整屏铺满）→ 60 点压进一屏；
@@ -638,19 +717,19 @@ export function activateDash() {
 
     // 方向变化监听（MediaQueryList.addEventListener 在旧 WebView 上不可用，回退 addListener）
     function tdWatchOrientation() {
-      const handler = () => { if (currentTab === 'trend-detail') tdRelayout(); };
+      const handler = () => { if (store.state.currentTab === 'trend-detail') tdRelayout(); };
       window.addEventListener('resize', handler);
       const mq = window.matchMedia('(orientation: landscape) and (max-height: 600px)');
       if (mq.addEventListener) mq.addEventListener('change', handler);
       else if (mq.addListener) mq.addListener(handler);
     }
 
-    function openTrendDetailView() {
+    export function openTrendDetailView() {
       setTrendDetailMetric(trendDetailState.metric);
-      switchTab('trend-detail');
+      if (typeof window.switchTab === 'function') window.switchTab('trend-detail');
     }
 
-    function setTrendDetailMetric(metric) {
+    export function setTrendDetailMetric(metric) {
       trendDetailState.metric = metric;
       ['weight', 'waist', 'sleep', 'steps'].forEach(m => {
         const el = document.getElementById(`td-tab-${m}`);
@@ -659,17 +738,16 @@ export function activateDash() {
           ? 'flex-1 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-neutral-900 text-white transition-all'
           : 'flex-1 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-300 transition-all';
       });
-      if (currentTab === 'trend-detail') renderTrendDetailChart();
+      if (store.state.currentTab === 'trend-detail') renderTrendDetailChart();
     }
 
-    async function loadTrendDetailData() {
+    export async function loadTrendDetailData() {
       const days = tdBuildDays();
       const startStr = days[0];
       const endStr = days[days.length - 1];
       try {
-        const res = await fetch(`/api/v1/records/history?start_date=${startStr}&end_date=${endStr}`);
-        const json = await res.json();
-        trendDetailState.records = json.code === 200 ? (json.data || []) : [];
+        const res = await api.getHistoryRecords(startStr, endStr);
+        trendDetailState.records = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
       } catch (e) {
         trendDetailState.records = [];
       }
@@ -739,8 +817,15 @@ export function activateDash() {
         noteEl.innerHTML = `近 ${TD_DAYS} 天暂无数据`;
       }
 
-      const ctx = document.getElementById('chart-trend-detail').getContext('2d');
-      if (trendDetailChart) trendDetailChart.destroy();
+      const canvas = document.getElementById('chart-trend-detail');
+      if (!canvas) return;
+      if (trendDetailChart) {
+        trendDetailChart.destroy();
+        trendDetailChart = null;
+      }
+      const existingChart = (typeof Chart !== 'undefined' && Chart.getChart) ? Chart.getChart(canvas) : null;
+      if (existingChart) existingChart.destroy();
+      const ctx = canvas.getContext('2d');
       trendDetailChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -804,6 +889,14 @@ export function activateDash() {
     }
 
     tdWatchOrientation();
+
+export function activateTrend() {
+  loadTrendData();
+}
+
+export function activateTrendDetail() {
+  loadTrendDetailData();
+}
 
 // 导出与全局挂载
 window.switchDashRange = switchDashRange;
