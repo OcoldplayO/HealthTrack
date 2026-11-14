@@ -414,8 +414,16 @@ func (m *DBManager) migrate() error {
 
 ## 四、 前端页面与交互组件规范
 
-文件落盘路径：**`web/static/index.html`**
-交付约束：**原生 HTML5 + 原生 CSS3 + 原生 JavaScript（由 `web/embed.go` 的 `go:embed` 打包进单一二进制；开发模式可读磁盘），严禁引入未经构建的大体积外部框架**。
+* **源码工程目录**：`web/src/`（开发与维护入口，详见根目录 `frontend_modular_refactor_plan.md`）
+* **生产落盘路径**：`web/static/`（由 Vite 构建生成的纯静态 Bundle，供 `web/embed.go` 的 `go:embed` 打包进单二进制或 APK）
+* **设计系统（Design System v3.0）**：
+  * **主字体**：`Inter` / `system-ui`；所有数值、时间、单位与指标对比强制绑定 **`JetBrains Mono`**（开启 `font-feature-settings: "tnum" 1` 等宽对齐）。
+  * **视觉范式**：**Linear / Raycast 1px 工业单线美学**。淘汰夸张大圆角（`rounded-3xl`）与浮夸投影（`shadow-2xl`），统一收敛为精致的 `rounded-xl` + `border border-neutral-200/80`。
+  * **图标规范**：全面淘汰 Emoji，统一采用 1.5px 极细线性内联 SVG（Lucide 规范）。
+  * **色彩体系**：中性灰阶（Neutral 50~900），状态以冷灰与点状微指示呈现；图表调色板全面单色阶化。
+* **交付与构建约束**：
+  * **轻量现代构建**：基于 Vite 构建管道，保持原生 Vanilla JS / ES Modules 模式，严禁引入带有厚重 Virtual DOM 运行时的庞大框架（保持 0 运行时开销）。
+  * **多端离线兼容**：构建基准路径强制采用相对路径 `./`，确保在 Android WebView 本地 `file://` 或本地 HTTP 离线环境下均可秒级无缝加载。
 
 ### 4.1 录入页核心表单（睡眠联动计算）
 
