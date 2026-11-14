@@ -32,16 +32,14 @@ async function request(path, options = {}) {
 
 export const api = {
   // ── 记录相关 (Records) ──
-  getRecordByDate: (dateStr) => request(`/api/v1/records/by-date?date=${encodeURIComponent(dateStr)}`),
+  getHistoryRecords: (startDate, endDate) => request(`/api/v1/records/history?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`),
   saveRecord: (payload) => request('/api/v1/records', { method: 'POST', body: JSON.stringify(payload) }),
-  getHistoryRecords: (startDate, endDate) => request(`/api/v1/records/history?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`),
 
   // ── 配置相关 (Config) ──
   getConfig: () => request('/api/config'),
   saveConfig: (cfg) => request('/api/config', { method: 'POST', body: JSON.stringify(cfg) }),
   testAIConfig: (cfg) => request('/api/config/test', { method: 'POST', body: JSON.stringify(cfg) }),
-  getSleepThresholds: () => request('/api/config/sleep-thresholds'),
-  saveSleepThresholds: (cfg) => request('/api/config/sleep-thresholds', { method: 'POST', body: JSON.stringify(cfg) }),
+  saveSleepThresholds: (thresholds) => request('/api/config/sleep', { method: 'POST', body: JSON.stringify(thresholds) }),
 
   // ── AI 洞察相关 (Insights) ──
   checkInsightPeriod: (days, endDate) => request(`/api/v1/insights/period?days=${days}&end_date=${encodeURIComponent(endDate)}`),

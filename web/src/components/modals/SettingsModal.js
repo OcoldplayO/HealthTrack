@@ -100,7 +100,8 @@ export function closeSettings() {
 
 async function loadConfig() {
   try {
-    const cfg = await api.getConfig();
+    const res = await api.getConfig();
+    const cfg = (res && res.data) ? res.data : (res || {});
     const urlEl = document.getElementById('setting-base-url');
     const modelEl = document.getElementById('setting-model');
     const statusEl = document.getElementById('api-key-status');
@@ -108,14 +109,15 @@ async function loadConfig() {
     if (urlEl) urlEl.value = cfg.base_url || '';
     if (modelEl) modelEl.value = cfg.model || '';
     if (statusEl) {
-      statusEl.innerText = cfg.has_api_key ? '✓ 当前已配置有效 API Key' : '⚠️ 尚未配置 API Key';
+      statusEl.innerText = cfg.api_key_configured
+        ? `✓ 当前 Key: ${cfg.api_key_masked}（留空可保留）`
+        : '⚠️ 尚未配置 API Key';
     }
 
-    const thresholds = await api.getSleepThresholds();
     const greenEl = document.getElementById('setting-sleep-green');
     const yellowEl = document.getElementById('setting-sleep-yellow');
-    if (greenEl) greenEl.value = thresholds.green || '23:30';
-    if (yellowEl) yellowEl.value = thresholds.yellow || '01:00';
+    if (greenEl) greenEl.value = cfg.sleep_green_before || '23:30';
+    if (yellowEl) yellowEl.value = cfg.sleep_yellow_before || '01:00';
   } catch (err) {
     showToast('读取设置失败: ' + err.message, false);
   }
@@ -179,12 +181,14 @@ async function testConfig() {
 async function saveSleepThresholds() {
   const greenEl = document.getElementById('setting-sleep-green');
   const yellowEl = document.getElementById('setting-sleep-yellow');
+  const green = greenEl?.value || '23:30';
+  const yellow = yellowEl?.value || '01:00';
   try {
     await api.saveSleepThresholds({
-      green: greenEl?.value || '23:30',
-      yellow: yellowEl?.value || '01:00',
+      green_before: green,
+      yellow_before: yellow,
     });
-    showToast('熬夜阈值已保存');
+    showToast('熬夜阈值已保存并立即生效');
   } catch (err) {
     showToast('保存阈值失败: ' + err.message, false);
   }

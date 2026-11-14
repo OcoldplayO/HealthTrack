@@ -1,21 +1,25 @@
 /**
  * 记一笔 (Log View) 业务控制器
- * 完全解耦的模块化状态与事件管理
+ * 完整实现：晨起/睡前体重、腰围、睡眠计算、运动、专注达、冷水澡、午餐结构化、草稿及较昨日变化(Δ)
  */
 import templateHtml from './log-view.html?raw';
 import { api } from '../../services/api.js';
-import { store } from '../../services/state.js';
-import { localDateStr, getPrevDateStr, calculateSleepDuration } from '../../utils/date.js';
+import { localDateStr, shiftDateStr, getPrevDateStr } from '../../utils/date.js';
 import { showToast } from '../../components/Toast.js';
+import { appConfirm } from '../../utils/dialog.js';
 
-let state = {
-  date: localDateStr(new Date()),
-  morningLight: null, // 'yes' | 'no' | null
-  steps: null,        // number | null
-  prevSteps: null,    // number | null
-  isDirty: false,
-  hasRecord: false,
-};
+let loadedDate = localDateStr(new Date());
+let logDirty = false;
+let suppressDirty = false;
+let logSavedAt = '';
+let logHasRecord = false;
+let draftTimer = null;
+let yesterdayRecord = null;
+
+let morningLightState = null;
+let stepsState = { value: null, prefilled: null };
+let prevStepsValue = null;
+let lunchState = { touched: false };
 
 let exerciseState = {
   types: [],
@@ -27,285 +31,894 @@ let coldShowerState = {
   feeling: 'refreshed',
 };
 
+let sleepThresholds = {
+  green: '23:30',
+  yellow: '01:00',
+};
+
+const EXERCISE_TYPE_ORDER = ['cardio', 'strength'];
+
+const LUNCH_TEXT = {
+  protein: { chicken: '鸡胸', egg: '蛋', fish: '鱼', beef: '牛肉', soy: '豆制品', yogurt: '酸奶', other: '其他' },
+  staple: { rice: '白米饭', noodle: '面条', grains: '杂粮', potato: '薯类', none: '无主食' },
+  carb: { lt20: '<20g', '20_35': '20–35g', '35_50': '35–50g', gt50: '>50g' },
+  cook: { steam: '蒸煮', stir_fry: '炒', fry: '煎炸', raw: '生食', takeout: '外卖' },
+};
+
 export function initLogView(container) {
   container.insertAdjacentHTML('beforeend', templateHtml);
   bindEvents();
-  loadDateRecord(state.date);
+  loadSleepThresholds();
+  loadRecordForDate(loadedDate);
+}
+
+async function loadSleepThresholds() {
+  try {
+    const res = await api.getConfig();
+    const d = res.data || res;
+    if (d.sleep_green_before) sleepThresholds.green = d.sleep_green_before;
+    if (d.sleep_yellow_before) sleepThresholds.yellow = d.sleep_yellow_before;
+  } catch (_) {}
+}
+
+export async function loadRecordForDate(dateStr) {
+  loadedDate = dateStr;
+  suppressDirty = true;
+  const dateInput = document.getElementById('input-date');
+  if (dateInput) dateInput.value = dateStr;
+
+  let rec = null;
+  try {
+    const weekStart = shiftDateStr(dateStr, -6);
+    const res = await api.getHistoryRecords(weekStart, dateStr);
+    const weekRecords = (res && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+
+    yesterdayRecord = weekRecords.find((r) => r.record_date === getPrevDateStr(dateStr)) || null;
+    rec = weekRecords.find((r) => r.record_date === dateStr) || null;
+
+    applyLogState(rec);
+    updateStepsMeta(weekRecords, dateStr);
+    syncStepsSlider();
+    updateLunchYesterdayNote();
+    logHasRecord = !!rec;
+    logSavedAt = rec ? timeFromRecord(rec) : '';
+  } catch (err) {
+    console.error('加载单日记录失败:', err);
+  } finally {
+    logDirty = false;
+    suppressDirty = false;
+    updateDiffDisplay();
+    updateLogCompleteness();
+    renderSaveBar();
+
+    const draft = readDraft(dateStr);
+    if (draft) {
+      suppressDirty = true;
+      applyLogState(draft);
+      syncStepsSlider();
+      suppressDirty = false;
+      logDirty = true;
+      updateLogCompleteness();
+      renderSaveBar();
+      showToast('已恢复上次未保存的草稿');
+    }
+  }
+}
+
+function timeFromRecord(rec) {
+  if (!rec || !rec.updated_at) return '';
+  const d = new Date(rec.updated_at);
+  if (isNaN(d.getTime()) || d.getFullYear() < 2000) return '';
+  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function applyLogState(s) {
+  s = s || {};
+  const setVal = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.value = v === null || v === undefined ? '' : v;
+  };
+
+  setVal('input-weight-am', s.weight_am);
+  setVal('input-weight-pm', s.weight_pm);
+  setVal('input-waist', s.waist_size);
+  setVal('input-journal', s.journal_text || s.journal || '');
+
+  setVal('sleepBedTime', s.sleep_start_time || s.sleep_bed_time || '00:30');
+  setVal('sleepWakeTime', s.sleep_end_time || s.sleep_wake_time || '07:15');
+  handleSleepCalculation();
+  if (s.sleep_hours !== null && s.sleep_hours !== undefined) {
+    const durEl = document.getElementById('sleepDuration');
+    if (durEl) durEl.value = s.sleep_hours;
+  }
+
+  // 运动
+  const ex = s.exercise || {};
+  const exTypes = Array.isArray(ex.types) ? ex.types.slice() : (ex.type && ex.type !== 'none' ? [ex.type] : []);
+  setExerciseTypes(exTypes);
+  if (exTypes.length > 0) {
+    setExerciseIntensity(ex.intensity || 'light');
+    setVal('exerciseDuration', ex.duration || 40);
+    setVal('exerciseItems', ex.items || '');
+  } else {
+    setVal('exerciseDuration', 40);
+    setVal('exerciseItems', '');
+  }
+
+  // 专注达
+  const con = s.concerta;
+  const conTaken = !!(con && con.taken);
+  const conCheck = document.getElementById('concertaEnabled');
+  if (conCheck) conCheck.checked = conTaken;
+  toggleConcerta(conTaken);
+  if (conTaken) {
+    setVal('concertaTime', con.time || '08:00');
+    setVal('concertaDose', String(con.dose || 36));
+    setVal('focusWork', con.focus_work || 4);
+    const fwEl = document.getElementById('focusWorkText');
+    if (fwEl) fwEl.innerText = (con.focus_work || 4) + '分';
+  }
+  const seKeys = (con && con.side_effects) || [];
+  document.querySelectorAll('#concertaSideEffects .chip').forEach((c) => {
+    c.classList.toggle('active', seKeys.includes(c.getAttribute('data-key')));
+  });
+  const compKeys = (con && con.compensations) || [];
+  document.querySelectorAll('#concertaCompensations .chip').forEach((c) => {
+    c.classList.toggle('active', compKeys.includes(c.getAttribute('data-key')));
+  });
+
+  // 冷水澡
+  const cs = s.cold_shower;
+  const csOn = !!(cs && cs.enabled);
+  const csCheck = document.getElementById('coldShowerEnabled');
+  if (csCheck) csCheck.checked = csOn;
+  toggleColdShower(csOn);
+  setColdShowerTiming((cs && cs.timing) || 'morning');
+  setColdShowerFeeling((cs && cs.feeling) || 'refreshed');
+  setVal('coldShowerDuration', (cs && cs.duration) || 2);
+  setVal('coldShowerWaterTemp', cs && cs.water_temp !== null && cs.water_temp !== undefined ? cs.water_temp : '');
+
+  // 晨光 / 步数 / 午餐
+  morningLightState = s.morning_light === true ? 'yes' : (s.morning_light === false ? 'no' : null);
+  syncMorningLightUI();
+  stepsState.value = s.steps === null || s.steps === undefined ? null : Number(s.steps);
+  syncStepsSlider();
+  applyLunch(s.lunch || null);
+}
+
+function collectLogState() {
+  const dateStr = loadedDate || document.getElementById('input-date')?.value || localDateStr(new Date());
+  const val = (id) => document.getElementById(id)?.value || '';
+  const numOrNull = (v) => (v === '' || v === null || v === undefined || isNaN(parseFloat(v)) ? null : parseFloat(v));
+
+  const sideEffects = [];
+  document.querySelectorAll('#concertaSideEffects .chip.active').forEach((c) => {
+    const k = c.getAttribute('data-key');
+    if (k) sideEffects.push(k);
+  });
+  const compensations = [];
+  document.querySelectorAll('#concertaCompensations .chip.active').forEach((c) => {
+    const k = c.getAttribute('data-key');
+    if (k) compensations.push(k);
+  });
+
+  const concertaTaken = !!document.getElementById('concertaEnabled')?.checked;
+  const concerta = concertaTaken
+    ? {
+        taken: true,
+        time: val('concertaTime') || '08:00',
+        dose: parseInt(val('concertaDose'), 10) || 36,
+        focus_work: parseInt(val('focusWork'), 10) || 4,
+        focus_study: 4,
+        daily_tasks: 4,
+        social: 4,
+        gaming: 4,
+        crash_time: '18:00',
+        side_effects: sideEffects,
+        compensations: compensations,
+      }
+    : { taken: false };
+
+  const tempRaw = val('coldShowerWaterTemp');
+  return {
+    record_date: dateStr,
+    weight_am: numOrNull(val('input-weight-am')),
+    weight_pm: numOrNull(val('input-weight-pm')),
+    waist_size: numOrNull(val('input-waist')),
+    sleep_hours: numOrNull(val('sleepDuration')),
+    sleep_start_time: val('sleepBedTime') || null,
+    sleep_end_time: val('sleepWakeTime') || null,
+    journal_text: val('input-journal') || '',
+    exercise: {
+      types: exerciseState.types.slice(),
+      type: exerciseState.types[0] || 'none',
+      duration: parseInt(val('exerciseDuration'), 10) || 0,
+      intensity: exerciseState.intensity,
+      items: val('exerciseItems') || '',
+    },
+    cold_shower: {
+      enabled: !!document.getElementById('coldShowerEnabled')?.checked,
+      timing: coldShowerState.timing,
+      duration: parseInt(val('coldShowerDuration'), 10) || 2,
+      water_temp: tempRaw === '' ? null : parseFloat(tempRaw),
+      feeling: coldShowerState.feeling,
+    },
+    concerta: concerta,
+    morning_light: morningLightState === 'yes' ? true : (morningLightState === 'no' ? false : null),
+    steps: stepsState.value,
+    lunch: lunchPayload(),
+  };
+}
+
+async function saveCurrentRecord() {
+  const payload = collectLogState();
+  const dateStr = payload.record_date;
+  const btn = document.getElementById('btn-save-log');
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await api.saveRecord(payload);
+    if (res && (res.code === 200 || res.status === 200 || !res.code)) {
+      logDirty = false;
+      logHasRecord = true;
+      logSavedAt = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+      if (draftTimer) {
+        clearTimeout(draftTimer);
+        draftTimer = null;
+      }
+      clearDraft(dateStr);
+      renderSaveBar();
+      showToast('✓ 保存成功');
+      loadRecordForDate(dateStr);
+    } else {
+      showToast((res && res.message) || '保存失败', false);
+    }
+  } catch (err) {
+    showToast('保存失败: ' + err.message, false);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ---------- 晨光 ----------
+function setMorningLight(val) {
+  morningLightState = morningLightState === val ? null : val;
+  syncMorningLightUI();
+  markDirty();
+}
+
+function syncMorningLightUI() {
+  document.querySelectorAll('#morningLightPills button').forEach((p) => {
+    p.classList.toggle('active', p.getAttribute('data-val') === morningLightState);
+  });
+}
+
+// ---------- 步数 ----------
+function onStepsInput(raw) {
+  const v = Number(raw);
+  stepsState.value = isNaN(v) ? null : Math.max(0, Math.min(20000, Math.round(v / 500) * 500));
+  syncStepsSlider();
+  markDirty();
+}
+
+function clearSteps() {
+  stepsState.value = null;
+  syncStepsSlider();
+  markDirty();
+}
+
+function syncStepsSlider() {
+  const slider = document.getElementById('input-steps');
+  if (!slider) return;
+  stepsState.prefilled = stepsState.value === null ? prevStepsValue : null;
+  slider.value = stepsState.value === null ? (prevStepsValue === null ? 0 : prevStepsValue) : stepsState.value;
+  updateStepsDisplay();
+}
+
+function updateStepsDisplay() {
+  const v = stepsState.value;
+  const valueEl = document.getElementById('steps-value');
+  if (valueEl) valueEl.innerText = v === null ? '--' : v.toLocaleString('en-US');
+  const hint = document.getElementById('steps-hint');
+  if (!hint) return;
+  if (v === null && stepsState.prefilled !== null) {
+    hint.innerText = `拖动滑块记录 · 已预置昨天 ${stepsState.prefilled.toLocaleString('en-US')} 步`;
+  } else {
+    hint.innerText = '留空表示当天未记录 · 图表断点';
+  }
+}
+
+function updateStepsMeta(weekRecords, dateStr) {
+  const prev = weekRecords.find((r) => r.record_date === getPrevDateStr(dateStr));
+  prevStepsValue = prev && prev.steps !== null && prev.steps !== undefined ? Number(prev.steps) : null;
+  const valid = weekRecords
+    .filter((r) => r.record_date !== dateStr && r.steps !== null && r.steps !== undefined)
+    .map((r) => Number(r.steps));
+  const avg = valid.length ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length) : null;
+  const meta = document.getElementById('steps-meta');
+  if (meta) {
+    meta.innerText = `前一天 ${prevStepsValue === null ? '--' : prevStepsValue.toLocaleString('en-US')} · 近7天日均 ${avg === null ? '--' : avg.toLocaleString('en-US')}`;
+  }
+}
+
+// ---------- 午餐 ----------
+function toggleLunch() {
+  const body = document.getElementById('lunch-body');
+  const icon = document.getElementById('lunch-icon');
+  if (!body) return;
+  const nowHidden = body.classList.toggle('hidden');
+  if (icon) icon.style.transform = nowHidden ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+
+function setLunchPill(el) {
+  el.parentElement.querySelectorAll('.pill-sm-btn').forEach((p) => p.classList.remove('active'));
+  el.classList.add('active');
+  lunchState.touched = true;
+  afterLunchChange();
+}
+
+function toggleLunchChip(el) {
+  el.classList.toggle('active');
+  lunchState.touched = true;
+  afterLunchChange();
+}
+
+function afterLunchChange() {
+  syncLunchSkipUI();
+  updateLunchSummary();
+  markDirty();
+}
+
+function syncLunchSkipUI() {
+  const skipped = lunchPick('lunch-eaten') === 'skipped';
+  ['lunch-protein-row', 'lunch-protein-g-row', 'lunch-staple-row', 'lunch-carb-row', 'lunch-cook-row'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden', skipped);
+  });
+}
+
+function lunchPick(id) {
+  const el = document.querySelector(`#${id} .pill-sm-btn.active`);
+  return el ? el.getAttribute('data-val') : '';
+}
+
+function updateLunchSummary() {
+  const out = document.getElementById('lunch-summary');
+  if (!out) return;
+  if (!lunchState.touched) {
+    out.innerText = '今天还没记午餐';
+    return;
+  }
+  if (lunchPick('lunch-eaten') === 'skipped') {
+    out.innerText = '今天跳过午餐';
+    return;
+  }
+  const proteins = Array.from(document.querySelectorAll('#lunch-protein .chip.active')).map(
+    (c) => LUNCH_TEXT.protein[c.getAttribute('data-val')] || ''
+  );
+  const proteinG = lunchPick('lunch-protein-g');
+  const parts = [
+    proteins.length ? proteins.join('、') : '未选蛋白',
+    proteinG ? `约${proteinG}g` : '',
+    LUNCH_TEXT.staple[lunchPick('lunch-staple')] || '',
+    LUNCH_TEXT.carb[lunchPick('lunch-carb')] || '',
+    LUNCH_TEXT.cook[lunchPick('lunch-cook')] || '',
+  ].filter(Boolean);
+  out.innerText = parts.join(' · ') || '已记午餐（明细空白）';
+}
+
+function lunchText(d) {
+  if (!d) return '';
+  if (d.eaten === 'skipped') return '跳过';
+  const proteins = (d.protein || []).map((v) => LUNCH_TEXT.protein[v] || v);
+  return [
+    proteins.join('、'),
+    d.protein_g ? `约${d.protein_g}g` : '',
+    LUNCH_TEXT.staple[d.staple] || '',
+    LUNCH_TEXT.carb[d.carb_g] || '',
+    LUNCH_TEXT.cook[d.cooking] || '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function lunchPayload() {
+  if (!lunchState.touched) return null;
+  const proteins = Array.from(document.querySelectorAll('#lunch-protein .chip.active')).map((c) =>
+    c.getAttribute('data-val')
+  );
+  return {
+    eaten: lunchPick('lunch-eaten') || 'eaten',
+    protein: proteins,
+    protein_g: parseInt(lunchPick('lunch-protein-g'), 10) || 0,
+    staple: lunchPick('lunch-staple'),
+    carb_g: lunchPick('lunch-carb'),
+    cooking: lunchPick('lunch-cook'),
+  };
+}
+
+function applyLunch(detail) {
+  document
+    .querySelectorAll(
+      '#lunch-eaten .pill-sm-btn, #lunch-protein-g .pill-sm-btn, #lunch-staple .pill-sm-btn, #lunch-carb .pill-sm-btn, #lunch-cook .pill-sm-btn'
+    )
+    .forEach((p) => p.classList.remove('active'));
+  document.querySelectorAll('#lunch-protein .chip').forEach((c) => c.classList.remove('active'));
+  lunchState.touched = !!detail;
+  if (detail) {
+    const mark = (id, val) => {
+      const el = document.querySelector(`#${id} [data-val="${val}"]`);
+      if (el) el.classList.add('active');
+    };
+    mark('lunch-eaten', detail.eaten || 'eaten');
+    (detail.protein || []).forEach((v) => mark('lunch-protein', v));
+    if (detail.protein_g) mark('lunch-protein-g', String(detail.protein_g));
+    if (detail.staple) mark('lunch-staple', detail.staple);
+    if (detail.carb_g) mark('lunch-carb', detail.carb_g);
+    if (detail.cooking) mark('lunch-cook', detail.cooking);
+  }
+  syncLunchSkipUI();
+  updateLunchSummary();
+}
+
+function applyLunchTemplate() {
+  const prev = yesterdayRecord && yesterdayRecord.lunch;
+  if (!prev) {
+    showToast('昨天没有午餐记录，先手动记一次', false);
+    return;
+  }
+  applyLunch(prev);
+  lunchState.touched = true;
+  markDirty();
+  showToast('已沿用昨天的午餐');
+}
+
+function updateLunchYesterdayNote() {
+  const el = document.getElementById('lunch-yesterday');
+  if (!el) return;
+  const d = yesterdayRecord && yesterdayRecord.lunch;
+  el.innerText = '昨天：' + (d ? lunchText(d) : '--');
+}
+
+// ---------- 睡眠与折叠 ----------
+function parseTimeMinutes(str) {
+  if (!str) return NaN;
+  const [h, m] = str.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function calcSleepTag(bedTime, green, yellow) {
+  const total = parseTimeMinutes(bedTime);
+  if (isNaN(total)) return 'GREEN';
+  let g = parseTimeMinutes(green);
+  let y = parseTimeMinutes(yellow);
+  if (isNaN(g)) g = 23 * 60;
+  if (isNaN(y)) y = 24 * 60;
+  if (total < g) return 'GREEN';
+  if (total < y) return 'YELLOW';
+  return 'RED';
+}
+
+function handleSleepCalculation() {
+  const bedTime = document.getElementById('sleepBedTime')?.value;
+  const wakeTime = document.getElementById('sleepWakeTime')?.value;
+  if (!bedTime || !wakeTime) return;
+
+  const [bH, bM] = bedTime.split(':').map(Number);
+  const [wH, wM] = wakeTime.split(':').map(Number);
+
+  let bedMinutes = bH * 60 + bM;
+  let wakeMinutes = wH * 60 + wM;
+
+  if (wakeMinutes <= bedMinutes) {
+    wakeMinutes += 1440;
+  }
+
+  const hours = ((wakeMinutes - bedMinutes) / 60).toFixed(1);
+  const durEl = document.getElementById('sleepDuration');
+  if (durEl) durEl.value = hours;
+
+  const badge = document.getElementById('sleepTagBadge');
+  if (badge) {
+    const tag = calcSleepTag(bedTime, sleepThresholds.green, sleepThresholds.yellow);
+    badge.classList.remove('badge-green', 'badge-yellow', 'badge-red');
+    if (tag === 'YELLOW') {
+      badge.classList.add('badge-yellow');
+      badge.innerText = '● 轻度熬夜';
+    } else if (tag === 'RED') {
+      badge.classList.add('badge-red');
+      badge.innerText = '● 重度熬夜';
+    } else {
+      badge.classList.add('badge-green');
+      badge.innerText = '● 未熬夜';
+    }
+  }
+
+  updateDiffDisplay();
+}
+
+function toggleBiohackPanel() {
+  const body = document.getElementById('biohackBody');
+  const icon = document.getElementById('accordionIcon');
+  if (!body) return;
+  const hidden = body.classList.toggle('hidden');
+  if (icon) icon.style.transform = hidden ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+
+function setExerciseTypes(types) {
+  exerciseState.types = (types || []).filter((t) => t && t !== 'none');
+  syncExerciseTypeUI();
+}
+
+function toggleExerciseType(val) {
+  if (val === 'none') {
+    setExerciseTypes([]);
+    return;
+  }
+  const i = exerciseState.types.indexOf(val);
+  if (i >= 0) {
+    exerciseState.types.splice(i, 1);
+  } else {
+    exerciseState.types.push(val);
+    exerciseState.types.sort((a, b) => EXERCISE_TYPE_ORDER.indexOf(a) - EXERCISE_TYPE_ORDER.indexOf(b));
+  }
+  syncExerciseTypeUI();
+}
+
+function syncExerciseTypeUI() {
+  const selected = exerciseState.types;
+  document.querySelectorAll('#exerciseTypePills .pill-btn').forEach((p) => {
+    const val = p.getAttribute('data-val');
+    p.classList.toggle('active', val === 'none' ? selected.length === 0 : selected.includes(val));
+  });
+  const sub = document.getElementById('exerciseSubForm');
+  if (sub) sub.classList.toggle('hidden', selected.length === 0);
+}
+
+function setExerciseIntensity(intensity) {
+  exerciseState.intensity = intensity;
+  document.querySelectorAll('#exerciseIntensityPills .pill-sm-btn').forEach((p) => {
+    p.classList.toggle('active', p.getAttribute('data-val') === intensity);
+  });
+}
+
+function toggleConcerta(enabled) {
+  const sub = document.getElementById('concertaSubForm');
+  if (sub) sub.classList.toggle('hidden', !enabled);
+}
+
+function toggleColdShower(enabled) {
+  const sub = document.getElementById('coldShowerSubForm');
+  if (sub) sub.classList.toggle('hidden', !enabled);
+}
+
+function setColdShowerTiming(timing) {
+  coldShowerState.timing = timing;
+  document.querySelectorAll('#csTimingPills .pill-sm-btn').forEach((p) => {
+    p.classList.toggle('active', p.getAttribute('data-val') === timing);
+  });
+}
+
+function setColdShowerFeeling(feeling) {
+  coldShowerState.feeling = feeling;
+  document.querySelectorAll('#csFeelingPills .pill-sm-btn').forEach((p) => {
+    p.classList.toggle('active', p.getAttribute('data-val') === feeling);
+  });
+}
+
+// ---------- 较昨日变化 (Δ) ----------
+function updateDiffDisplay() {
+  // 1. 晨起体重
+  const amVal = parseFloat(document.getElementById('input-weight-am')?.value);
+  const diffAmEl = document.getElementById('diff-weight-am');
+  if (diffAmEl) {
+    if (!isNaN(amVal) && yesterdayRecord && yesterdayRecord.weight_am !== null && yesterdayRecord.weight_am !== undefined) {
+      const diff = Math.round((amVal - yesterdayRecord.weight_am) * 10) / 10;
+      if (diff < 0) {
+        diffAmEl.innerHTML = `<span class="text-emerald-600 font-bold">↓ 较昨日 ${diff.toFixed(1)}</span><span class="text-slate-300">晨测</span>`;
+      } else if (diff > 0) {
+        diffAmEl.innerHTML = `<span class="text-rose-500 font-bold">↑ 较昨日 +${diff.toFixed(1)}</span><span class="text-slate-300">晨测</span>`;
+      } else {
+        diffAmEl.innerHTML = `<span class="text-neutral-800 font-mono font-semibold">较昨日 持平</span><span class="text-neutral-300 font-mono">晨测</span>`;
+      }
+    } else {
+      diffAmEl.innerHTML = `<span>较昨日 --</span><span class="text-slate-300">晨测</span>`;
+    }
+  }
+
+  // 2. 睡前体重
+  const pmVal = parseFloat(document.getElementById('input-weight-pm')?.value);
+  const diffPmEl = document.getElementById('diff-weight-pm');
+  if (diffPmEl) {
+    if (!isNaN(pmVal)) {
+      if (yesterdayRecord && yesterdayRecord.weight_pm !== null && yesterdayRecord.weight_pm !== undefined) {
+        const diff = Math.round((pmVal - yesterdayRecord.weight_pm) * 10) / 10;
+        if (diff < 0) {
+          diffPmEl.innerHTML = `<span class="text-emerald-600 font-bold">↓ 较昨日 ${diff.toFixed(1)}</span><span class="text-slate-300">晚测</span>`;
+        } else if (diff > 0) {
+          diffPmEl.innerHTML = `<span class="text-rose-500 font-bold">↑ 较昨日 +${diff.toFixed(1)}</span><span class="text-slate-300">晚测</span>`;
+        } else {
+          diffPmEl.innerHTML = `<span class="text-neutral-800 font-mono font-semibold">较昨日 持平</span><span class="text-neutral-300 font-mono">晚测</span>`;
+        }
+      } else {
+        diffPmEl.innerHTML = `<span>今晚已记录</span><span class="text-slate-300">晚测</span>`;
+      }
+    } else {
+      diffPmEl.innerHTML = `<span>等待今晚称重</span><span class="text-slate-300">--:--</span>`;
+    }
+  }
+
+  // 3. 晨起腰围
+  const waistVal = parseFloat(document.getElementById('input-waist')?.value);
+  const diffWaistEl = document.getElementById('diff-waist');
+  if (diffWaistEl) {
+    if (!isNaN(waistVal) && yesterdayRecord && yesterdayRecord.waist_size !== null && yesterdayRecord.waist_size !== undefined) {
+      const diff = Math.round((waistVal - yesterdayRecord.waist_size) * 10) / 10;
+      if (diff < 0) {
+        diffWaistEl.innerHTML = `<span class="text-indigo-600 font-bold">较昨日 ${diff.toFixed(1)}</span><span class="text-slate-300">紧实</span>`;
+      } else if (diff > 0) {
+        diffWaistEl.innerHTML = `<span class="text-amber-600 font-bold">较昨日 +${diff.toFixed(1)}</span><span class="text-slate-300">略增</span>`;
+      } else {
+        diffWaistEl.innerHTML = `<span class="text-neutral-800 font-mono font-semibold">较昨日 持平</span><span class="text-neutral-300 font-mono">稳定</span>`;
+      }
+    } else {
+      diffWaistEl.innerHTML = `<span>平稳区间</span><span class="text-slate-300">标准</span>`;
+    }
+  }
+
+  // 4. 睡眠时长
+  const sleepVal = parseFloat(document.getElementById('sleepDuration')?.value);
+  const diffSleepEl = document.getElementById('diff-sleep');
+  if (diffSleepEl) {
+    if (!isNaN(sleepVal) && yesterdayRecord && yesterdayRecord.sleep_hours !== null && yesterdayRecord.sleep_hours !== undefined) {
+      const diff = Math.round((sleepVal - yesterdayRecord.sleep_hours) * 10) / 10;
+      if (diff < 0) {
+        diffSleepEl.innerHTML = `<span class="text-amber-600 font-bold">较前日 ${diff.toFixed(1)}h</span><span class="text-slate-300">偏短</span>`;
+      } else if (diff > 0) {
+        diffSleepEl.innerHTML = `<span class="text-emerald-600 font-bold">较前日 +${diff.toFixed(1)}h</span><span class="text-slate-300">充足</span>`;
+      } else {
+        diffSleepEl.innerHTML = `<span class="text-neutral-800 font-mono font-semibold">较前日 持平</span><span class="text-neutral-300 font-mono">规律</span>`;
+      }
+    } else {
+      diffSleepEl.innerHTML = `<span>较昨日 --</span><span class="text-slate-300">节律</span>`;
+    }
+  }
+}
+
+function updateLogCompleteness() {
+  const has = (id) => String(document.getElementById(id)?.value || '').trim() !== '';
+  let n = 0;
+  if (has('input-weight-am') || has('input-weight-pm')) n++;
+  if (has('input-waist')) n++;
+  if (has('sleepDuration')) n++;
+  if (morningLightState !== null) n++;
+  if (stepsState.value !== null) n++;
+  if (lunchState.touched) n++;
+
+  const el = document.getElementById('log-count');
+  if (el) {
+    el.innerText = `${n}/6`;
+    el.className = n >= 6 ? 'text-emerald-600' : 'text-slate-600';
+  }
+}
+
+function markDirty() {
+  if (suppressDirty) return;
+  logDirty = true;
+  updateLogCompleteness();
+  renderSaveBar();
+  if (draftTimer) clearTimeout(draftTimer);
+  const draftDate = loadedDate;
+  draftTimer = setTimeout(() => {
+    draftTimer = null;
+    saveDraftNow(draftDate);
+  }, 400);
+}
+
+function flushDraft() {
+  if (draftTimer) {
+    clearTimeout(draftTimer);
+    draftTimer = null;
+  }
+  if (logDirty) saveDraftNow(loadedDate);
+}
+
+function renderSaveBar() {
+  const saveText = document.getElementById('save-text');
+  const saveDot = document.getElementById('save-dot');
+  if (!saveText || !saveDot) return;
+  if (logDirty) {
+    saveDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+    saveText.innerText = '未保存';
+  } else if (logHasRecord) {
+    saveDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+    saveText.innerText = `已同步落库${logSavedAt ? ' (' + logSavedAt + ')' : ''}`;
+  } else {
+    saveDot.className = 'w-2 h-2 rounded-full bg-neutral-300';
+    saveText.innerText = '未修改';
+  }
+}
+
+function draftKey(dateStr) {
+  return `ht_log_draft_${dateStr}`;
+}
+
+function saveDraftNow(dateStr) {
+  dateStr = dateStr || loadedDate;
+  if (!dateStr) return;
+  try {
+    localStorage.setItem(draftKey(dateStr), JSON.stringify(collectLogState()));
+  } catch (_) {}
+}
+
+function readDraft(dateStr) {
+  try {
+    const raw = localStorage.getItem(draftKey(dateStr));
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    return obj && obj.record_date === dateStr ? obj : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function clearDraft(dateStr) {
+  try {
+    localStorage.removeItem(draftKey(dateStr));
+  } catch (_) {}
+}
+
+async function handleDateChange(target) {
+  if (!target) return;
+  if (target === loadedDate) return;
+  if (logDirty) {
+    const ok = await appConfirm(`当前日期还有未保存的改动（草稿已自动保存），确定切换到 ${target}？`, {
+      title: '未保存改动',
+      confirmText: '仍然切换',
+      danger: false,
+    });
+    if (!ok) {
+      const input = document.getElementById('input-date');
+      if (input) input.value = loadedDate;
+      return;
+    }
+    flushDraft();
+  }
+  await loadRecordForDate(target);
 }
 
 function bindEvents() {
   const dateInput = document.getElementById('input-date');
   if (dateInput) {
-    dateInput.value = state.date;
-    dateInput.addEventListener('change', (e) => {
-      loadDateRecord(e.target.value);
-    });
+    dateInput.addEventListener('change', (e) => handleDateChange(e.target.value));
   }
 
   document.getElementById('btn-today-date')?.addEventListener('click', () => {
     const today = localDateStr(new Date());
-    if (dateInput) dateInput.value = today;
-    loadDateRecord(today);
+    handleDateChange(today);
   });
 
   // 晨光
   document.getElementById('morningLightPills')?.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-val]');
     if (!btn) return;
-    const val = btn.getAttribute('data-val');
-    state.morningLight = state.morningLight === val ? null : val;
-    syncMorningLightUI();
-    markDirty();
+    setMorningLight(btn.getAttribute('data-val'));
   });
 
   // 步数
-  const stepsInput = document.getElementById('input-steps');
-  stepsInput?.addEventListener('input', (e) => {
-    const raw = Number(e.target.value);
-    state.steps = isNaN(raw) ? null : Math.max(0, Math.min(20000, Math.round(raw / 500) * 500));
-    syncStepsDisplay();
-    markDirty();
+  document.getElementById('input-steps')?.addEventListener('input', (e) => onStepsInput(e.target.value));
+  document.getElementById('btn-clear-steps')?.addEventListener('click', clearSteps);
+
+  // 输入监听标记脏状态
+  const inputIds = [
+    'input-weight-am',
+    'input-weight-pm',
+    'input-waist',
+    'sleepBedTime',
+    'sleepWakeTime',
+    'sleepDuration',
+    'input-journal',
+    'exerciseDuration',
+    'exerciseItems',
+    'concertaTime',
+    'concertaDose',
+    'focusWork',
+    'coldShowerDuration',
+    'coldShowerWaterTemp',
+  ];
+  inputIds.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', () => {
+        if (id === 'sleepBedTime' || id === 'sleepWakeTime') handleSleepCalculation();
+        else updateDiffDisplay();
+        markDirty();
+      });
+    }
   });
 
-  document.getElementById('btn-clear-steps')?.addEventListener('click', () => {
-    state.steps = null;
-    syncStepsDisplay();
-    markDirty();
+  // 午餐折叠与选择
+  document.getElementById('lunch-toggle')?.addEventListener('click', (e) => {
+    if (e.target.closest('#btn-lunch-template')) return;
+    toggleLunch();
   });
-
-  // 体重与腰围输入
-  ['input-weight-pm', 'input-weight-am', 'input-waist', 'sleepDuration'].forEach((id) => {
-    document.getElementById(id)?.addEventListener('input', () => {
-      updateDiffDisplay();
-      markDirty();
+  document.getElementById('btn-lunch-template')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    applyLunchTemplate();
+  });
+  document.getElementById('lunch-eaten')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.pill-sm-btn');
+    if (btn) setLunchPill(btn);
+  });
+  document.getElementById('lunch-protein')?.addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (chip) toggleLunchChip(chip);
+  });
+  ['lunch-protein-g', 'lunch-staple', 'lunch-carb', 'lunch-cook'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('click', (e) => {
+      const btn = e.target.closest('.pill-sm-btn');
+      if (btn) setLunchPill(btn);
     });
   });
 
-  // 睡眠时间联动
-  ['sleepBedTime', 'sleepWakeTime'].forEach((id) => {
-    document.getElementById(id)?.addEventListener('input', () => {
-      handleSleepCalc();
-      markDirty();
-    });
-  });
-
-  // 午餐折叠
-  document.getElementById('lunch-toggle')?.addEventListener('click', () => {
-    const body = document.getElementById('lunch-body');
-    const icon = document.getElementById('lunch-icon');
-    body?.classList.toggle('hidden');
-    icon?.classList.toggle('rotate-180');
-  });
-
-  // 专项打卡折叠
-  document.getElementById('biohack-toggle')?.addEventListener('click', () => {
-    const body = document.getElementById('biohackBody');
-    const icon = document.getElementById('accordionIcon');
-    body?.classList.toggle('hidden');
-    icon?.classList.toggle('rotate-180');
-  });
-
-  // 运动多选
+  // 生物黑客折叠与多选
+  document.getElementById('biohack-toggle')?.addEventListener('click', toggleBiohackPanel);
   document.getElementById('exerciseTypePills')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-val]');
-    if (!btn) return;
-    const val = btn.getAttribute('data-val');
-    toggleExerciseType(val);
-    markDirty();
+    const btn = e.target.closest('.pill-btn');
+    if (btn) {
+      toggleExerciseType(btn.getAttribute('data-val'));
+      markDirty();
+    }
+  });
+  document.getElementById('exerciseIntensityPills')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.pill-sm-btn');
+    if (btn) {
+      setExerciseIntensity(btn.getAttribute('data-val'));
+      markDirty();
+    }
   });
 
-  // 专注达开关
+  // 专注达
   document.getElementById('concertaEnabled')?.addEventListener('change', (e) => {
-    document.getElementById('concertaSubForm')?.classList.toggle('hidden', !e.target.checked);
+    toggleConcerta(e.target.checked);
     markDirty();
   });
-
-  // 冷水澡开关
-  document.getElementById('coldShowerEnabled')?.addEventListener('change', (e) => {
-    document.getElementById('coldShowerSubForm')?.classList.toggle('hidden', !e.target.checked);
+  document.getElementById('focusWork')?.addEventListener('input', (e) => {
+    const fwEl = document.getElementById('focusWorkText');
+    if (fwEl) fwEl.innerText = e.target.value + '分';
     markDirty();
+  });
+  ['concertaSideEffects', 'concertaCompensations'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if (chip) {
+        chip.classList.toggle('active');
+        markDirty();
+      }
+    });
+  });
+
+  // 冷水澡
+  document.getElementById('coldShowerEnabled')?.addEventListener('change', (e) => {
+    toggleColdShower(e.target.checked);
+    markDirty();
+  });
+  document.getElementById('csTimingPills')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.pill-sm-btn');
+    if (btn) {
+      setColdShowerTiming(btn.getAttribute('data-val'));
+      markDirty();
+    }
+  });
+  document.getElementById('csFeelingPills')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.pill-sm-btn');
+    if (btn) {
+      setColdShowerFeeling(btn.getAttribute('data-val'));
+      markDirty();
+    }
   });
 
   // 保存与重置
-  document.getElementById('btn-save-log')?.addEventListener('click', saveRecord);
-  document.getElementById('btn-reset-log')?.addEventListener('click', () => loadDateRecord(state.date));
-
-  // 自由文本日记
-  document.getElementById('input-journal')?.addEventListener('input', markDirty);
-}
-
-export async function loadDateRecord(dateStr) {
-  state.date = dateStr;
-  store.set({ currentDate: dateStr });
-  setDirty(false);
-
-  try {
-    const res = await api.getRecordByDate(dateStr);
-    const r = res.record || {};
-    state.hasRecord = !!res.record;
-
-    // 回显基础字段
-    const amEl = document.getElementById('input-weight-am');
-    const pmEl = document.getElementById('input-weight-pm');
-    const waistEl = document.getElementById('input-waist');
-    const journalEl = document.getElementById('input-journal');
-
-    if (amEl) amEl.value = r.weight_am !== null && r.weight_am !== undefined ? r.weight_am : '';
-    if (pmEl) pmEl.value = r.weight_pm !== null && r.weight_pm !== undefined ? r.weight_pm : '';
-    if (waistEl) waistEl.value = r.waist_size !== null && r.waist_size !== undefined ? r.waist_size : '';
-    if (journalEl) journalEl.value = r.journal || '';
-
-    // 晨光
-    state.morningLight = r.morning_light === true ? 'yes' : (r.morning_light === false ? 'no' : null);
-    syncMorningLightUI();
-
-    // 步数
-    state.steps = (r.steps !== null && r.steps !== undefined) ? Number(r.steps) : null;
-    syncStepsDisplay();
-
-    // 睡眠
-    const bedEl = document.getElementById('sleepBedTime');
-    const wakeEl = document.getElementById('sleepWakeTime');
-    const durEl = document.getElementById('sleepDuration');
-
-    if (bedEl) bedEl.value = r.sleep_start_time || r.sleep_bed_time || '00:30';
-    if (wakeEl) wakeEl.value = r.sleep_end_time || r.sleep_wake_time || '07:15';
-    if (durEl) durEl.value = r.sleep_hours !== null && r.sleep_hours !== undefined ? r.sleep_hours : '6.8';
-
-    handleSleepCalc();
-    updateDiffDisplay();
-    updateCountBadge();
-  } catch (err) {
-    console.error('加载记录失败:', err);
-  }
-}
-
-function syncMorningLightUI() {
-  document.querySelectorAll('#morningLightPills button').forEach((btn) => {
-    btn.classList.toggle('active', btn.getAttribute('data-val') === state.morningLight);
-  });
-}
-
-function syncStepsDisplay() {
-  const valueEl = document.getElementById('steps-value');
-  const slider = document.getElementById('input-steps');
-  const hintEl = document.getElementById('steps-hint');
-
-  if (valueEl) valueEl.innerText = state.steps === null ? '--' : state.steps.toLocaleString('en-US');
-  if (slider) slider.value = state.steps === null ? 0 : state.steps;
-  if (hintEl) {
-    hintEl.innerText = state.steps === null ? '留空 = 断点（不补 0）' : `已设定 ${state.steps.toLocaleString('en-US')} 步`;
-  }
-}
-
-function handleSleepCalc() {
-  const bed = document.getElementById('sleepBedTime')?.value;
-  const wake = document.getElementById('sleepWakeTime')?.value;
-  if (!bed || !wake) return;
-
-  const { duration } = calculateSleepDuration(bed, wake);
-  const durEl = document.getElementById('sleepDuration');
-  if (durEl && document.activeElement !== durEl) {
-    durEl.value = duration;
-  }
-}
-
-function updateDiffDisplay() {
-  // 极简对比文字更新
-  const am = parseFloat(document.getElementById('input-weight-am')?.value);
-  const pm = parseFloat(document.getElementById('input-weight-pm')?.value);
-  const diffPm = document.getElementById('diff-weight-pm');
-
-  if (diffPm) {
-    if (!isNaN(pm) && !isNaN(am)) {
-      const d = (pm - am).toFixed(1);
-      diffPm.innerHTML = `<span>较晨重 ${d >= 0 ? '+' : ''}${d}kg</span><span class="text-neutral-400">已测</span>`;
-    } else {
-      diffPm.innerHTML = `<span>等待今晚称重</span><span class="text-neutral-300">--:--</span>`;
-    }
-  }
-}
-
-function toggleExerciseType(val) {
-  if (val === 'none') {
-    exerciseState.types = [];
-  } else {
-    const idx = exerciseState.types.indexOf(val);
-    if (idx >= 0) exerciseState.types.splice(idx, 1);
-    else exerciseState.types.push(val);
-  }
-
-  document.querySelectorAll('#exerciseTypePills button').forEach((btn) => {
-    const v = btn.getAttribute('data-val');
-    if (v === 'none') {
-      btn.classList.toggle('active', exerciseState.types.length === 0);
-    } else {
-      btn.classList.toggle('active', exerciseState.types.includes(v));
-    }
-  });
-
-  document.getElementById('exerciseSubForm')?.classList.toggle('hidden', exerciseState.types.length === 0);
-}
-
-function updateCountBadge() {
-  let count = 0;
-  if (document.getElementById('input-weight-am')?.value) count++;
-  if (document.getElementById('input-weight-pm')?.value) count++;
-  if (document.getElementById('input-waist')?.value) count++;
-  if (state.morningLight !== null) count++;
-  if (state.steps !== null) count++;
-  if (document.getElementById('input-journal')?.value) count++;
-
-  const badge = document.getElementById('log-count');
-  if (badge) badge.innerText = `${count}/6`;
-}
-
-function markDirty() {
-  setDirty(true);
-  updateCountBadge();
-}
-
-function setDirty(isDirty) {
-  state.isDirty = isDirty;
-  store.set({ isDirty });
-
-  const dot = document.getElementById('save-dot');
-  const text = document.getElementById('save-text');
-  if (dot && text) {
-    if (isDirty) {
-      dot.className = 'w-2 h-2 rounded-full bg-neutral-900';
-      text.innerText = '有未保存改动';
-    } else {
-      dot.className = 'w-2 h-2 rounded-full bg-neutral-300';
-      text.innerText = '已同步落库';
-    }
-  }
-}
-
-async function saveRecord() {
-  const am = parseFloat(document.getElementById('input-weight-am')?.value);
-  const pm = parseFloat(document.getElementById('input-weight-pm')?.value);
-  const waist = parseFloat(document.getElementById('input-waist')?.value);
-  const dur = parseFloat(document.getElementById('sleepDuration')?.value);
-
-  const payload = {
-    record_date: state.date,
-    weight_am: isNaN(am) ? null : am,
-    weight_pm: isNaN(pm) ? null : pm,
-    waist_size: isNaN(waist) ? null : waist,
-    sleep_hours: isNaN(dur) ? null : dur,
-    sleep_start_time: document.getElementById('sleepBedTime')?.value || null,
-    sleep_end_time: document.getElementById('sleepWakeTime')?.value || null,
-    morning_light: state.morningLight === 'yes' ? true : (state.morningLight === 'no' ? false : null),
-    steps: state.steps,
-    journal: document.getElementById('input-journal')?.value || '',
-  };
-
-  try {
-    await api.saveRecord(payload);
-    setDirty(false);
-    showToast('记录已保存');
-  } catch (err) {
-    showToast('保存失败: ' + err.message, false);
-  }
+  document.getElementById('btn-save-log')?.addEventListener('click', saveCurrentRecord);
+  document.getElementById('btn-reset-log')?.addEventListener('click', () => loadRecordForDate(loadedDate));
 }
