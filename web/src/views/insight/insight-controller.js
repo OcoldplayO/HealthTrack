@@ -51,13 +51,7 @@ export function setInsightDays(days) {
   ['7', '30', '60'].forEach((d) => {
     const el = document.getElementById(`pill-${d}`);
     if (!el) return;
-    if (parseInt(d) === days) {
-      el.className =
-        'flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all';
-    } else {
-      el.className =
-        'flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
-    }
+    el.className = (parseInt(d) === days) ? 'ht-seg-btn active' : 'ht-seg-btn';
   });
   // 三档彼此独立：先同步清掉上一档位残留内容，避免切换瞬间串档，再按新档位回显
   applyEmptyInsightUI();
@@ -70,8 +64,8 @@ export function setInsightDays(days) {
       return localDateStr(new Date());
     }
 
-    const INSIGHT_PILL_ON  = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all';
-    const INSIGHT_PILL_OFF = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+    const INSIGHT_PILL_ON  = 'ht-seg-btn active';
+    const INSIGHT_PILL_OFF = 'ht-seg-btn';
 
     // 同步截止日控件的选中态；日期框上限恒为本地今天（不允许选未来日期）
     function syncInsightEndUI() {
@@ -85,8 +79,7 @@ export function setInsightDays(days) {
       if (!input) return;
       input.max = today;
       input.value = insightEndDate || today;
-      input.classList.toggle('ring-2', insightEndMode === 'custom');
-      input.classList.toggle('ring-blue-500/40', insightEndMode === 'custom');
+      input.classList.toggle('border-neutral-900', insightEndMode === 'custom');
     }
 
     function setInsightEndMode(mode) {
@@ -332,17 +325,15 @@ export function setInsightDays(days) {
       [0, 7, 30, 60].forEach(d => {
         const el = document.getElementById(`hfilter-${d}`);
         if (!el) return;
-        if (d === days) {
-          el.className = 'flex-1 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white transition-all';
-        } else {
-          el.className = 'flex-1 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
-        }
+        el.className = (d === days)
+          ? 'flex-1 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-neutral-900 text-white transition-all'
+          : 'flex-1 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all';
       });
       const cEl = document.getElementById('hfilter-compare');
       if (cEl) {
-        cEl.className = days === 'compare'
-          ? 'flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-blue-600 text-white transition-all'
-          : 'flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+        cEl.className = (days === 'compare')
+          ? 'flex-1 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-neutral-900 text-white transition-all'
+          : 'flex-1 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all';
       }
     }
 
@@ -433,21 +424,21 @@ export function setInsightDays(days) {
 
         const head = `
           <div class="flex justify-between items-center mb-1.5">
-            <span class="text-xs font-bold text-slate-800">${headTitle}</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-bold">${headBadge}</span>
+            <span class="text-xs font-bold text-neutral-900 font-mono">${headTitle}</span>
+            <span class="text-[9px] px-1.5 py-0.5 rounded border border-neutral-200 text-neutral-600 font-mono font-medium">${headBadge}</span>
           </div>
-          <p class="text-xs text-slate-500 leading-relaxed ${(isOpen && !historyState.manageMode) ? '' : 'line-clamp-2'}">${escapeHtml(preview)}</p>
-          <div class="flex justify-between items-center mt-2">
-            <span class="text-[10px] text-slate-400">${timeStr}${it.model ? ' · ' + escapeHtml(it.model) : ''}</span>
-            ${historyState.manageMode ? '' : (isCompare ? '<span class="text-[10px] text-blue-600 font-bold">查看对比 ›</span>' : `<span class="text-[10px] text-blue-600 font-bold">${isOpen ? '收起 ▴' : '展开 ▾'}</span>`)}
+          <p class="text-xs text-neutral-500 leading-relaxed ${(isOpen && !historyState.manageMode) ? '' : 'line-clamp-2'}">${escapeHtml(preview)}</p>
+          <div class="flex justify-between items-center mt-2.5 pt-2 border-t border-neutral-100 font-mono text-[10px]">
+            <span class="text-neutral-400">${timeStr}${it.model ? ' · ' + escapeHtml(it.model) : ''}</span>
+            ${historyState.manageMode ? '' : (isCompare ? '<span class="text-neutral-900 font-medium hover:underline">查看对比 ›</span>' : `<span class="text-neutral-900 font-medium hover:underline">${isOpen ? '收起 ▴' : '展开 ▾'}</span>`)}
           </div>`;
 
         // 管理模式：整卡作为勾选热区，不展开详情
         if (historyState.manageMode) {
           return `
-            <div data-hp-id="${it.id}" onclick="onHistoryItemClick(${it.id})" class="cursor-pointer select-none flex items-start space-x-3 bg-white border rounded-2xl p-3.5 shadow-sm transition-colors ${selected ? 'border-blue-400 ring-1 ring-blue-300' : 'border-slate-100'}">
-              <div class="mt-0.5 w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-colors ${selected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}">
-                ${selected ? '<svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>' : ''}
+            <div data-hp-id="${it.id}" onclick="onHistoryItemClick(${it.id})" class="cursor-pointer select-none flex items-start space-x-3 ht-card transition-colors ${selected ? 'border-neutral-900 ring-1 ring-neutral-900' : ''}">
+              <div class="mt-0.5 w-4 h-4 shrink-0 rounded border flex items-center justify-center transition-colors ${selected ? 'bg-neutral-900 border-neutral-900 text-white' : 'border-neutral-300 bg-white'}">
+                ${selected ? '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
               </div>
               <div class="flex-1 min-w-0">${head}</div>
             </div>`;
@@ -457,21 +448,21 @@ export function setInsightDays(days) {
         if (isOpen) {
           const full = historyState.details[it.id];
           if (!full) {
-            detail = '<p class="text-[11px] text-slate-400 mt-2">加载全文…</p>';
+            detail = '<p class="text-[11px] font-mono text-neutral-400 mt-2">加载全文…</p>';
           } else {
             const think = (full.thinking || '').trim();
             const thinkHtml = think ? `
-              <details class="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500">
-                <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">思维链推导 (${think.length} 字)</summary>
-                <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${escapeHtml(think)}</div>
+              <details class="mt-2.5 bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 text-xs text-neutral-600">
+                <summary class="cursor-pointer font-mono font-medium text-neutral-700 select-none hover:text-neutral-900 transition-colors">思维链推导 (${think.length} 字)</summary>
+                <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-neutral-200 pt-2 text-neutral-600 text-[11px]">${escapeHtml(think)}</div>
               </details>` : '';
             detail = `${thinkHtml}
-              <div class="mt-2 text-sm text-slate-700 leading-relaxed markdown-body">${renderMarkdown(full.content || '')}</div>`;
+              <div class="mt-2 text-xs text-neutral-700 leading-relaxed markdown-body">${renderMarkdown(full.content || '')}</div>`;
           }
         }
 
         return `
-          <div data-hp-id="${it.id}" class="bg-white border border-slate-100 rounded-2xl p-3.5 shadow-sm">
+          <div data-hp-id="${it.id}" class="ht-card">
             <div class="cursor-pointer select-none" onclick="onHistoryItemClick(${it.id})">${head}</div>
             ${detail}
           </div>`;
@@ -883,18 +874,18 @@ export function setInsightDays(days) {
       const d = cmpDeltaVal(a, b);
       if (d === null) return '<span class="text-slate-300">—</span>';
       const txt = (d > 0 ? '+' : '') + d.toFixed(digits);
-      let cls = 'text-slate-500';
-      if (dir === 'down') cls = d < 0 ? 'text-emerald-600' : (d > 0 ? 'text-red-500' : 'text-slate-400');
-      else if (dir === 'up') cls = d > 0 ? 'text-emerald-600' : (d < 0 ? 'text-red-500' : 'text-slate-400');
-      return `<span class="font-bold ${cls}">${txt}</span>`;
+      let cls = 'text-neutral-500';
+      if (dir === 'down') cls = d < 0 ? 'text-emerald-600' : (d > 0 ? 'text-red-500' : 'text-neutral-400');
+      else if (dir === 'up') cls = d > 0 ? 'text-emerald-600' : (d < 0 ? 'text-red-500' : 'text-neutral-400');
+      return `<span class="font-bold font-mono ${cls}">${txt}</span>`;
     }
 
     function cmpMetricRow(label, aHtml, bHtml, deltaHtml) {
-      return `<tr class="border-b border-slate-50 last:border-0">
-        <td class="py-2 pr-2 text-slate-500 align-top">${label}</td>
-        <td class="py-2 text-right font-bold text-slate-800 tabular-nums">${aHtml}</td>
-        <td class="py-2 text-right font-bold text-slate-800 tabular-nums">${bHtml}</td>
-        <td class="py-2 text-right whitespace-nowrap">${deltaHtml}</td>
+      return `<tr class="border-b border-neutral-100 last:border-0">
+        <td class="py-2 pr-2 text-neutral-500 font-sans align-top">${label}</td>
+        <td class="py-2 text-right font-bold text-neutral-900 font-mono tabular-nums">${aHtml}</td>
+        <td class="py-2 text-right font-bold text-neutral-900 font-mono tabular-nums">${bHtml}</td>
+        <td class="py-2 text-right font-mono whitespace-nowrap">${deltaHtml}</td>
       </tr>`;
     }
 
