@@ -30,9 +30,9 @@
           <div class="flex justify-between items-center">
             <span class="text-[10px] font-mono uppercase tracking-wider text-neutral-400">分析周期</span>
             <div class="flex gap-1">
-              <button onclick="setInsightDays(7)" id="pill-7" class="ht-seg-btn">7D</button>
-              <button onclick="setInsightDays(30)" id="pill-30" class="ht-seg-btn active">30D</button>
-              <button onclick="setInsightDays(60)" id="pill-60" class="ht-seg-btn">60D</button>
+              <button onclick="setInsightDays(7)" id="pill-7" class="ht-seg-btn">近7天</button>
+              <button onclick="setInsightDays(30)" id="pill-30" class="ht-seg-btn active">近30天</button>
+              <button onclick="setInsightDays(60)" id="pill-60" class="ht-seg-btn">近60天</button>
             </div>
           </div>
           <div class="pt-2.5 border-t border-neutral-100 flex items-center justify-between">
@@ -41,7 +41,7 @@
               <button onclick="setInsightEndMode('today')" id="endpill-today" class="ht-seg-btn active">今日</button>
               <button onclick="setInsightEndMode('yesterday')" id="endpill-yesterday" class="ht-seg-btn">昨日</button>
               <input type="date" id="insight-end-date" onchange="setInsightEndDate(this.value)"
-                     class="bg-white border border-neutral-200 text-[11px] font-mono text-neutral-700 rounded-lg px-2.5 py-1 outline-none w-[116px] focus:border-neutral-800 transition-colors" />
+                     class="bg-white border border-neutral-200 text-[11px] font-mono text-neutral-700 rounded-lg px-2 py-1 outline-none w-[136px] focus:border-neutral-800 transition-colors" />
             </div>
           </div>
         </div>

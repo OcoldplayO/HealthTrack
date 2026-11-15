@@ -364,7 +364,8 @@ function evResetBands() {
 
 function evoRefreshScoreChips() {
   document.querySelectorAll('#ev-history-list .evo-score-chip').forEach(el => {
-    const b = evoBandOf(Number(el.dataset.score));
+    const s = Number(el.dataset.score) || 7;
+    const b = evoBandOf(s);
     el.className = 'evo-score-chip font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border ' + evoTone(b.tone).chip;
   });
 }
@@ -691,10 +692,11 @@ async function evCopyEntry(date, ev) {
 }
 
 function evoEntryHTML(r, idx) {
-  const tone = evoTone(evoBandOf(r.score || 0).tone);
+  const scoreVal = (r.score != null && r.score > 0) ? r.score : 7;
+  const tone = evoTone(evoBandOf(scoreVal).tone);
   const thumb = r.photo_id
-    ? `<img src="/api/v1/evening/photo/${r.photo_id}" alt="${evoMmdd(r.record_date)}" onclick="event.stopPropagation(); evoOpenPhoto(this.src, '${evoMmdd(r.record_date)} 小结图片')" class="w-13 h-13 rounded-lg object-cover shrink-0 border border-neutral-200 bg-neutral-100 cursor-zoom-in">`
-    : `<span class="w-13 h-13 rounded-lg shrink-0 border border-dashed border-neutral-200 bg-neutral-50 flex items-center justify-center text-[10px] text-neutral-400 font-mono font-bold">无图</span>`;
+    ? `<img src="/api/v1/evening/photo/${r.photo_id}" alt="${evoMmdd(r.record_date)}" onclick="event.stopPropagation(); evoOpenPhoto(this.src, '${evoMmdd(r.record_date)} 小结图片')" class="rounded-lg object-cover shrink-0 border border-neutral-200 bg-neutral-100 cursor-zoom-in" style="width:40px;height:40px;min-width:40px;min-height:40px;max-width:40px;max-height:40px;">`
+    : `<span class="rounded-lg shrink-0 border border-dashed border-neutral-200 bg-neutral-50 flex items-center justify-center text-[10px] text-neutral-400 font-mono font-bold" style="width:40px;height:40px;min-width:40px;min-height:40px;max-width:40px;max-height:40px;">无图</span>`;
   const items = (r.done_items || []).filter(d => d && d.trim());
   const preview = items.length ? items[0] : '（未填完成事项）';
   const doneHtml = [0, 1, 2].map(i => {
@@ -715,19 +717,23 @@ function evoEntryHTML(r, idx) {
       </div>
       <div class="evo-swipe-panel">
         <div class="ht-card p-0 overflow-hidden">
-          <div class="evo-entry-head p-3 flex items-center space-x-3 cursor-pointer hover:bg-neutral-50/70 active:bg-neutral-100 transition-colors">
+          <div class="evo-entry-head p-2 px-3 flex items-center gap-2.5 cursor-pointer hover:bg-neutral-50/70 active:bg-neutral-100 transition-colors">
             ${thumb}
             <div class="flex-1 min-w-0">
-              <div class="flex items-center space-x-2">
-                <span class="text-xs font-bold font-mono text-neutral-900 tabular-nums">${evoMmdd(r.record_date)}</span>
-                <span class="text-[10px] text-neutral-400 font-mono">${evoWeekday(r.record_date)}</span>
-                <span class="evo-score-chip font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border ${tone.chip}" data-score="${r.score}">${r.score} 分</span>
+              <div class="flex items-center justify-between gap-1.5">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="text-xs font-bold font-mono text-neutral-900 tabular-nums">${evoMmdd(r.record_date)}</span>
+                  <span class="text-[10px] text-neutral-400 font-mono">${evoWeekday(r.record_date)}</span>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span class="evo-score-chip font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border ${tone.chip}" data-score="${scoreVal}">${scoreVal} 分</span>
+                  <span class="evo-entry-arrow text-neutral-400 transform transition-transform duration-300">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                  </span>
+                </div>
               </div>
-              <p class="text-xs text-neutral-500 truncate mt-1 font-sans">${escapeHtml(preview)}</p>
+              <p class="text-xs text-neutral-500 truncate mt-0.5 font-sans">${escapeHtml(preview)}</p>
             </div>
-            <span class="evo-entry-arrow text-neutral-400 transform transition-transform duration-300">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-            </span>
           </div>
           <div class="evo-collapsible">
             <div class="px-3 pb-3 pt-2.5 border-t border-neutral-100 space-y-2.5">
@@ -742,7 +748,10 @@ function evoEntryHTML(r, idx) {
                 <ol class="space-y-1 evo-selectable">${doneHtml}</ol>
               </div>
               <div class="bg-neutral-50 border border-neutral-200/60 rounded-lg p-2.5">
-                <p class="text-[10px] font-mono uppercase tracking-wider text-neutral-400 mb-1">当时的感想</p>
+                <div class="flex items-center justify-between mb-1">
+                  <p class="text-[10px] font-mono uppercase tracking-wider text-neutral-400">当时的感想</p>
+                  <span class="font-mono text-[10px] text-neutral-500">自评：${scoreVal} / 10 分</span>
+                </div>
                 <p class="text-xs text-neutral-600 leading-relaxed evo-selectable">${r.note_text ? escapeHtml(r.note_text) : '（未填写）'}</p>
               </div>
             </div>

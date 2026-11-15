@@ -14,7 +14,7 @@
             </div>
           </div>
           <div class="flex items-center gap-1.5 shrink-0 font-mono">
-            <input type="date" id="summary-date" class="bg-white border border-neutral-200 text-neutral-800 text-xs font-mono font-medium rounded-lg px-2.5 py-1 w-[116px] outline-none focus:border-neutral-800 transition-colors" onchange="evOnDateChange(this.value)">
+            <input type="date" id="summary-date" class="bg-white border border-neutral-200 text-neutral-800 text-xs font-mono font-medium rounded-lg px-2 py-1 w-[138px] outline-none focus:border-neutral-800 transition-colors" onchange="evOnDateChange(this.value)">
             <button onclick="evSetToday()" class="h-8 px-2.5 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 rounded-lg text-[11px] text-neutral-600 font-medium transition-all active:scale-95">今日</button>
           </div>
         </div>
@@ -153,8 +153,8 @@
           <div class="flex items-center justify-between">
             <span class="text-[10px] font-mono uppercase tracking-wider text-neutral-400">关联生理数据</span>
             <div class="flex gap-1" id="ev-insight-range">
-              <button class="ht-seg-btn active" data-val="7" onclick="evSetInsightRange(this)">7D</button>
-              <button class="ht-seg-btn" data-val="30" onclick="evSetInsightRange(this)">30D</button>
+              <button class="ht-seg-btn active" data-val="7" onclick="evSetInsightRange(this)">近7天</button>
+              <button class="ht-seg-btn" data-val="30" onclick="evSetInsightRange(this)">近30天</button>
             </div>
           </div>
 
