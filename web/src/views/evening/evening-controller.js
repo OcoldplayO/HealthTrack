@@ -520,7 +520,7 @@ async function evGenerateInsight() {
   if (btn) {
     btn.disabled = true;
     btn.classList.add('opacity-60');
-    btn.innerHTML = '<span>⏳ 正在生成…</span>';
+    btn.innerHTML = '<span>AI正在全盘深度分析中...</span>';
   }
 
   emptyEl?.classList.add('hidden');
@@ -610,7 +610,7 @@ async function evGenerateInsight() {
     if (btn) {
       btn.disabled = false;
       btn.classList.remove('opacity-60');
-      btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>GENERATE SUMMARY INSIGHT</span>';
+      btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>生成小结深度洞察</span>';
     }
   }
 }

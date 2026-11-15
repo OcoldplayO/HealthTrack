@@ -150,7 +150,7 @@ export function setInsightDays(days) {
       const originalBtnText = btn.innerHTML;
       btn.disabled = true;
       btn.classList.add('opacity-50', 'cursor-not-allowed');
-      btn.innerHTML = `<span>⏳ AI 正在全盘深度分析中...</span>`;
+      btn.innerHTML = `<span>AI正在全盘深度分析中...</span>`;
 
       // 作废可能在途的回显请求，防止其覆盖本次流式内容；并锁定档位胶囊
       insightLoadSeq++;
@@ -539,8 +539,8 @@ export function setInsightDays(days) {
       if (btn) {
         btn.innerText = historyState.manageMode ? '完成' : '管理';
         btn.className = historyState.manageMode
-          ? 'text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl transition-colors'
-          : 'text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl transition-colors';
+          ? 'text-xs font-mono font-medium text-white bg-neutral-900 hover:bg-neutral-800 px-2.5 py-1 rounded-lg transition-colors'
+          : 'text-xs font-mono font-medium text-neutral-700 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 px-2.5 py-1 rounded-lg transition-colors';
       }
       updateHistoryDeleteBar();
     }
@@ -585,8 +585,8 @@ export function setInsightDays(days) {
         delBtn.disabled = count === 0;
         delBtn.innerText = count > 0 ? `删除所选 (${count})` : '删除所选';
         delBtn.className = count > 0
-          ? 'text-xs font-bold bg-red-500 hover:bg-red-600 px-3.5 py-1.5 rounded-xl transition-colors'
-          : 'text-xs font-bold bg-slate-600/60 text-slate-300 px-3.5 py-1.5 rounded-xl cursor-not-allowed transition-colors';
+          ? 'text-xs font-mono font-medium bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-1.5 rounded-lg transition-colors'
+          : 'text-xs font-mono font-medium bg-neutral-700 text-neutral-400 px-3.5 py-1.5 rounded-lg cursor-not-allowed transition-colors';
       }
     }
 
@@ -1053,7 +1053,7 @@ export function setInsightDays(days) {
       cmpState.busy = true;
       btn.disabled = true;
       btn.classList.add('opacity-50', 'cursor-not-allowed');
-      btn.innerHTML = '<span>⏳ AI 正在对比分析中...</span>';
+      btn.innerHTML = '<span>AI正在全盘深度分析中...</span>';
       cmpSetControlsDisabled(true);
 
       cmpState.loadSeq++; // 作废在途回显请求，防止覆盖本次流式内容
@@ -1164,6 +1164,9 @@ window.loadHistory = loadHistory;
 window.toggleHistoryManage = toggleHistoryManage;
 window.toggleHistorySelectAll = toggleHistorySelectAll;
 window.deleteSelectedInsights = deleteSelectedInsights;
+window.onHistoryItemClick = onHistoryItemClick;
+window.toggleHistorySelect = toggleHistorySelect;
+window.toggleHistoryItem = toggleHistoryItem;
 window.openCompareView = openCompareView;
 window.cmpBack = cmpBack;
 window.cmpStepMonth = cmpStepMonth;

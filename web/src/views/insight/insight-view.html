@@ -49,7 +49,7 @@
         <!-- 主操作按钮：高质感深色极客大按钮 -->
         <button onclick="generateInsightStream()" id="btn-generate-insight" class="w-full h-11 bg-neutral-900 hover:bg-neutral-800 text-white font-mono text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99] shadow-sm">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          <span>GENERATE DEEP INSIGHT</span>
+          <span>生成阶段深度洞察</span>
         </button>
 
         <!-- 洞察渲染卡片 (SSE 流式输出，纯净中性单线卡片) -->
@@ -76,7 +76,7 @@
             <span class="text-xs font-mono font-medium">返回</span>
           </button>
           <h2 class="text-sm font-bold text-neutral-900 font-mono">洞察历史存档</h2>
-          <button onclick="toggleHistoryManage()" id="history-manage-btn" class="text-xs font-mono font-medium text-neutral-600 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 px-2.5 py-1 rounded-lg transition-colors">管理</button>
+          <button onclick="toggleHistoryManage()" id="history-manage-btn" class="text-xs font-mono font-medium text-neutral-700 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 px-2.5 py-1 rounded-lg transition-colors">管理</button>
         </div>
 
         <!-- 关键词搜索 -->
@@ -89,9 +89,9 @@
         <!-- 档位筛选 -->
         <div class="flex gap-1.5 font-mono">
           <button onclick="setHistoryFilter(0)" id="hfilter-0" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-900 text-white transition-all">全部</button>
-          <button onclick="setHistoryFilter(7)" id="hfilter-7" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">7D</button>
-          <button onclick="setHistoryFilter(30)" id="hfilter-30" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">30D</button>
-          <button onclick="setHistoryFilter(60)" id="hfilter-60" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">60D</button>
+          <button onclick="setHistoryFilter(7)" id="hfilter-7" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">近7天</button>
+          <button onclick="setHistoryFilter(30)" id="hfilter-30" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">近30天</button>
+          <button onclick="setHistoryFilter(60)" id="hfilter-60" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">近60天</button>
           <button onclick="setHistoryFilterCompare()" id="hfilter-compare" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">对比</button>
         </div>
 
