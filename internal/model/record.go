@@ -187,7 +187,7 @@ func parseSleepTimeMinutes(s string) (int, bool) {
 		return 0, false
 	}
 	total := hour*60 + minute
-	if hour >= 0 && hour <= 4 {
+	if hour >= 0 && hour <= 6 {
 		total += 24 * 60
 	}
 	return total, true

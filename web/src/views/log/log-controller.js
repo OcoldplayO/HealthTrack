@@ -45,11 +45,11 @@ const LUNCH_TEXT = {
   cook: { steam: '蒸煮', stir_fry: '炒', fry: '煎炸', raw: '生食', takeout: '外卖' },
 };
 
-export function initLogView(container) {
+export async function initLogView(container) {
   container.insertAdjacentHTML('beforeend', templateHtml);
   bindEvents();
-  loadSleepThresholds();
-  loadRecordForDate(loadedDate);
+  await loadSleepThresholds();
+  await loadRecordForDate(loadedDate);
 }
 
 async function loadSleepThresholds() {
@@ -58,8 +58,17 @@ async function loadSleepThresholds() {
     const d = res.data || res;
     if (d.sleep_green_before) sleepThresholds.green = d.sleep_green_before;
     if (d.sleep_yellow_before) sleepThresholds.yellow = d.sleep_yellow_before;
+    handleSleepCalculation();
   } catch (_) {}
 }
+
+window.addEventListener('sleep-thresholds-updated', (e) => {
+  if (e.detail) {
+    if (e.detail.green) sleepThresholds.green = e.detail.green;
+    if (e.detail.yellow) sleepThresholds.yellow = e.detail.yellow;
+    handleSleepCalculation();
+  }
+});
 
 export async function loadRecordForDate(dateStr) {
   loadedDate = dateStr;
@@ -123,6 +132,8 @@ function applyLogState(s) {
   setVal('input-weight-pm', s.weight_pm);
   setVal('input-waist', s.waist_size);
   setVal('input-journal', s.journal_text || s.journal || '');
+  autoResizeJournal();
+  syncJournalClearBtn();
 
   setVal('sleepBedTime', s.sleep_start_time || s.sleep_bed_time || '00:30');
   setVal('sleepWakeTime', s.sleep_end_time || s.sleep_wake_time || '07:15');
@@ -480,11 +491,40 @@ function updateLunchYesterdayNote() {
   el.innerText = '昨天：' + (d ? lunchText(d) : '--');
 }
 
+// ---------- 身体感受输入框交互增强 ----------
+function syncJournalClearBtn() {
+  const journalEl = document.getElementById('input-journal');
+  const btnClear = document.getElementById('btn-clear-journal');
+  if (!journalEl || !btnClear) return;
+  if (journalEl.value && journalEl.value.trim().length > 0) {
+    btnClear.classList.remove('hidden');
+  } else {
+    btnClear.classList.add('hidden');
+  }
+}
+
+function autoResizeJournal() {
+  const journalEl = document.getElementById('input-journal');
+  if (!journalEl) return;
+  journalEl.style.height = 'auto';
+  const newH = Math.min(Math.max(journalEl.scrollHeight, 68), 240);
+  journalEl.style.height = `${newH}px`;
+}
+
 // ---------- 睡眠与折叠 ----------
 function parseTimeMinutes(str) {
   if (!str) return NaN;
-  const [h, m] = str.split(':').map(Number);
-  return h * 60 + m;
+  const parts = str.trim().split(':');
+  if (parts.length !== 2) return NaN;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return NaN;
+  let total = h * 60 + m;
+  // 跨日归一化：凌晨 00:00 - 06:00 入睡按跨日（+24h）算，如 00:30 -> 24:30
+  if (h >= 0 && h <= 6) {
+    total += 24 * 60;
+  }
+  return total;
 }
 
 function calcSleepTag(bedTime, green, yellow) {
@@ -492,8 +532,8 @@ function calcSleepTag(bedTime, green, yellow) {
   if (isNaN(total)) return 'GREEN';
   let g = parseTimeMinutes(green);
   let y = parseTimeMinutes(yellow);
-  if (isNaN(g)) g = 23 * 60;
-  if (isNaN(y)) y = 24 * 60;
+  if (isNaN(g)) g = 23 * 60 + 30; // 默认 23:30
+  if (isNaN(y)) y = 25 * 60;      // 默认 01:00 (跨日 25:00)
   if (total < g) return 'GREEN';
   if (total < y) return 'YELLOW';
   return 'RED';
@@ -834,6 +874,40 @@ function bindEvents() {
         else updateDiffDisplay();
         markDirty();
       });
+    }
+  });
+
+  // 身体感受增强事件（防软键盘遮挡 + 自动高度 + 快捷清空）
+  const journalEl = document.getElementById('input-journal');
+  const mainContent = document.getElementById('main-content');
+  if (journalEl) {
+    journalEl.addEventListener('focus', () => {
+      if (mainContent) {
+        mainContent.style.paddingBottom = '320px';
+      }
+      setTimeout(() => {
+        journalEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 120);
+    });
+    journalEl.addEventListener('blur', () => {
+      if (mainContent) {
+        mainContent.style.paddingBottom = '';
+      }
+    });
+    journalEl.addEventListener('input', () => {
+      autoResizeJournal();
+      syncJournalClearBtn();
+    });
+  }
+
+  document.getElementById('btn-clear-journal')?.addEventListener('click', () => {
+    const jEl = document.getElementById('input-journal');
+    if (!jEl || !jEl.value) return;
+    if (confirm('确定清空自由记录吗？')) {
+      jEl.value = '';
+      autoResizeJournal();
+      syncJournalClearBtn();
+      markDirty();
     }
   });
 

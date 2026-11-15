@@ -87,9 +87,9 @@ export async function loadDashboardData(days = dashRange) {
       const waistData = records.map(r => r.waist_size);
       const sleepHoursData = records.map(r => r.sleep_hours);
       const sleepColors = records.map(r => {
-        if (r.sleep_tag === 'RED') return '#d4d4d4';
-        if (r.sleep_tag === 'YELLOW') return '#737373';
-        return '#171717';
+        if (r.sleep_tag === 'RED') return '#f43f5e';
+        if (r.sleep_tag === 'YELLOW') return '#fbbf24';
+        return '#34c759';
       });
 
       // 统计均值
@@ -109,10 +109,10 @@ export async function loadDashboardData(days = dashRange) {
         document.getElementById('dash-sleep-stat').innerText = '--';
       }
 
-      // 1. 体重趋势图（点击某天查看晨起 / 睡前体重与夜间排水差值）
+      // 1. 体重趋势图（点击某天查看睡前 / 晨起体重与夜间排水差值）
       const weightDetailEl = document.getElementById('dash-weight-detail');
       if (weightDetailEl) {
-        weightDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日晨重 / 睡前重</span>';
+        weightDetailEl.innerHTML = '<span class="font-mono text-[10px] text-neutral-400">↑ 点击折线查看当日睡前重 / 晨重</span>';
       }
       const canvasWeight = document.getElementById('chart-weight');
       if (canvasWeight) {
@@ -124,35 +124,19 @@ export async function loadDashboardData(days = dashRange) {
         if (existingChart) existingChart.destroy();
 
         const ctxWeight = canvasWeight.getContext('2d');
-        const weightGradAm = ctxWeight.createLinearGradient(0, 0, 0, 160);
-        weightGradAm.addColorStop(0, 'rgba(0, 0, 0, 0.04)');
-        weightGradAm.addColorStop(1, 'rgba(0, 0, 0, 0.00)');
-
         const weightGradPm = ctxWeight.createLinearGradient(0, 0, 0, 160);
-        weightGradPm.addColorStop(0, 'rgba(0, 0, 0, 0.02)');
-        weightGradPm.addColorStop(1, 'rgba(0, 0, 0, 0.00)');
+        weightGradPm.addColorStop(0, 'rgba(245, 158, 11, 0.08)');
+        weightGradPm.addColorStop(1, 'rgba(245, 158, 11, 0.00)');
+
+        const weightGradAm = ctxWeight.createLinearGradient(0, 0, 0, 160);
+        weightGradAm.addColorStop(0, 'rgba(30, 41, 59, 0.06)');
+        weightGradAm.addColorStop(1, 'rgba(30, 41, 59, 0.00)');
 
         weightChart = new Chart(ctxWeight, {
         type: 'line',
         data: {
           labels: labels,
           datasets: [
-            {
-              label: '晨起体重',
-              data: weightAmData,
-              borderColor: '#171717',
-              borderWidth: 2.2,
-              backgroundColor: weightGradAm,
-              fill: true,
-              tension: 0.35,
-              spanGaps: true,
-              pointBackgroundColor: '#ffffff',
-              pointBorderColor: '#171717',
-              pointBorderWidth: 2,
-              pointRadius: 3.5,
-              pointHoverRadius: 5.5,
-              pointHitRadius: 16
-            },
             {
               label: '睡前体重',
               data: weightPmData,
@@ -168,6 +152,22 @@ export async function loadDashboardData(days = dashRange) {
               pointRadius: 3.5,
               pointHoverRadius: 5.5,
               pointHitRadius: 16
+            },
+            {
+              label: '晨起体重',
+              data: weightAmData,
+              borderColor: '#1e293b',
+              borderWidth: 2.2,
+              backgroundColor: weightGradAm,
+              fill: true,
+              tension: 0.35,
+              spanGaps: true,
+              pointBackgroundColor: '#ffffff',
+              pointBorderColor: '#1e293b',
+              pointBorderWidth: 2,
+              pointRadius: 3.5,
+              pointHoverRadius: 5.5,
+              pointHitRadius: 16
             }
           ]
         },
@@ -175,7 +175,12 @@ export async function loadDashboardData(days = dashRange) {
           responsive: true,
           maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
-          plugins: { legend: { display: false } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              itemSort: (a, b) => a.datasetIndex - b.datasetIndex
+            }
+          },
           onClick: (evt, elements) => {
             if (!elements || !elements.length) return;
             const r = records[elements[0].index];
@@ -192,7 +197,7 @@ export async function loadDashboardData(days = dashRange) {
               else note = '偏高';
               diffHtml = ` · 夜间排水 <b class="text-slate-700">${d.toFixed(1)} kg</b>（${note}）`;
             }
-            weightDetailEl.innerHTML = `<span class="font-mono text-neutral-400">·</span><span><b class="text-neutral-800 font-mono">${r.record_date}</b>　晨起 ${fmtW(am)} · 睡前 ${fmtW(pm)}${diffHtml}</span>`;
+            weightDetailEl.innerHTML = `<span class="font-mono text-neutral-400">·</span><span><b class="text-neutral-800 font-mono">${r.record_date}</b>　睡前 ${fmtW(pm)} · 晨起 ${fmtW(am)}${diffHtml}</span>`;
           },
           scales: {
             y: { beginAtZero: false, grid: { color: '#f5f5f5' }, ticks: { font: { size: 10 }, color: '#a3a3a3' } },
@@ -224,8 +229,8 @@ export async function loadDashboardData(days = dashRange) {
 
         const ctxWaist = canvasWaist.getContext('2d');
         const waistGrad = ctxWaist.createLinearGradient(0, 0, 0, 160);
-        waistGrad.addColorStop(0, 'rgba(0, 0, 0, 0.03)');
-        waistGrad.addColorStop(1, 'rgba(0, 0, 0, 0.00)');
+        waistGrad.addColorStop(0, 'rgba(124, 58, 237, 0.10)');
+        waistGrad.addColorStop(1, 'rgba(124, 58, 237, 0.00)');
 
         waistChart = new Chart(ctxWaist, {
         type: 'line',
@@ -234,14 +239,14 @@ export async function loadDashboardData(days = dashRange) {
           datasets: [{
             label: '腰围',
             data: waistData,
-            borderColor: '#525252',
+            borderColor: '#7c3aed',
             borderWidth: 2.2,
             backgroundColor: waistGrad,
             fill: true,
             tension: 0.35,
             spanGaps: true,
             pointBackgroundColor: '#ffffff',
-            pointBorderColor: '#525252',
+            pointBorderColor: '#7c3aed',
             pointBorderWidth: 2,
             pointRadius: 3.5,
             pointHoverRadius: 5.5,
@@ -341,8 +346,8 @@ export async function loadDashboardData(days = dashRange) {
 
         const ctxSteps = canvasSteps.getContext('2d');
         const stepsGrad = ctxSteps.createLinearGradient(0, 0, 0, 160);
-        stepsGrad.addColorStop(0, 'rgba(14, 165, 233, 0.18)');
-        stepsGrad.addColorStop(1, 'rgba(14, 165, 233, 0.00)');
+        stepsGrad.addColorStop(0, 'rgba(234, 88, 12, 0.16)');
+        stepsGrad.addColorStop(1, 'rgba(234, 88, 12, 0.00)');
 
         stepsChart = new Chart(ctxSteps, {
         type: 'line',
@@ -351,14 +356,14 @@ export async function loadDashboardData(days = dashRange) {
           datasets: [{
             label: '步数',
             data: stepsData,
-            borderColor: '#737373',
+            borderColor: '#ea580c',
             borderWidth: 2.2,
             backgroundColor: stepsGrad,
             fill: true,
             tension: 0.35,
             spanGaps: false,
             pointBackgroundColor: '#ffffff',
-            pointBorderColor: '#737373',
+            pointBorderColor: '#ea580c',
             pointBorderWidth: 2,
             pointRadius: 3.5,
             pointHoverRadius: 5.5,
@@ -418,21 +423,30 @@ export async function loadDashboardData(days = dashRange) {
               } catch(e){}
             }
             if (rowExTypes.length > 0) {
-              tagsHtml += `<span class="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">${rowExTypes.map(t => escapeHtml(t)).join(' + ')}</span>`;
-            }
-            if (r.concerta && r.concerta.taken) {
-              tagsHtml += `<span class="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">专注达 ${escapeHtml(r.concerta.dose)}mg</span>`;
+              if (rowExTypes.includes('strength')) {
+                tagsHtml += '<span class="bg-amber-50 text-amber-700 border border-amber-200/60 px-1.5 py-0.5 rounded text-[10px] font-medium font-mono">无氧</span>';
+              }
+              if (rowExTypes.includes('cardio')) {
+                tagsHtml += '<span class="bg-sky-50 text-sky-700 border border-sky-200/60 px-1.5 py-0.5 rounded text-[10px] font-medium font-mono">有氧</span>';
+              }
+              rowExTypes.filter(t => t !== 'strength' && t !== 'cardio').forEach(t => {
+                tagsHtml += `<span class="bg-slate-100 text-slate-700 border border-slate-200/60 px-1.5 py-0.5 rounded text-[10px] font-medium font-mono">${escapeHtml(t)}</span>`;
+              });
             }
             if (r.cold_shower && r.cold_shower.enabled) {
               const csTemp = (r.cold_shower.water_temp === null || r.cold_shower.water_temp === undefined) ? '' : ` ${r.cold_shower.water_temp}℃`;
-              tagsHtml += `<span class="bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">冷水澡 ${escapeHtml(csTemp)}</span>`;
+              tagsHtml += `<span class="bg-teal-50 text-teal-700 border border-teal-200/60 px-1.5 py-0.5 rounded text-[10px] font-medium font-mono">冷水澡${escapeHtml(csTemp)}</span>`;
+            }
+            if (r.concerta && r.concerta.taken) {
+              const cDose = r.concerta.dose ? ` ${escapeHtml(r.concerta.dose)}mg` : '';
+              tagsHtml += `<span class="bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-1.5 py-0.5 rounded text-[10px] font-medium font-mono">专注达${cDose}</span>`;
             }
 
             listEl.innerHTML += `
               <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                <div class="flex justify-between items-center mb-1">
-                  <span class="font-bold text-slate-800">${escapeHtml(r.record_date || '')}</span>
-                  <div>${tagsHtml}</div>
+                <div class="flex justify-between items-start gap-2 mb-1.5">
+                  <span class="font-bold text-slate-800 font-mono text-xs shrink-0">${escapeHtml(r.record_date || '')}</span>
+                  <div class="flex flex-wrap gap-1 items-center justify-end">${tagsHtml}</div>
                 </div>
                 <p class="text-slate-600 line-clamp-2">${escapeHtml(r.journal_text || '无文字备注')}</p>
               </div>
@@ -450,10 +464,10 @@ export async function loadDashboardData(days = dashRange) {
     //  - 置信：1~3 天 → 低置信（空心节点 + 虚线 + tooltip 标注）；>= 4 天 → 正常。
     const TREND_WEEKS = 12;
     const TREND_METRICS = {
-      weight: { label: '体重周均值 (kg)', field: 'weight_am', unit: 'kg', color: '#171717', band: 'rgba(0, 0, 0, 0.06)' },
-      waist: { label: '腰围周均值 (cm)', field: 'waist_size', unit: 'cm', color: '#525252', band: 'rgba(0, 0, 0, 0.04)' },
-      sleep: { label: '睡眠周均值 (小时)', field: 'sleep_hours', unit: '小时', color: '#10b981', band: 'rgba(16, 185, 129, 0.13)' },
-      steps: { label: '步数周均值 (步)', field: 'steps', unit: '步', color: '#737373', band: 'rgba(0, 0, 0, 0.04)', int: true }
+      weight: { label: '体重周均值 (kg)', field: 'weight_am', unit: 'kg', color: '#1e293b', band: 'rgba(30, 41, 59, 0.08)' },
+      waist: { label: '腰围周均值 (cm)', field: 'waist_size', unit: 'cm', color: '#7c3aed', band: 'rgba(124, 58, 237, 0.08)' },
+      sleep: { label: '睡眠周均值 (小时)', field: 'sleep_hours', unit: '小时', color: '#4f46e5', band: 'rgba(79, 70, 229, 0.12)' },
+      steps: { label: '步数周均值 (步)', field: 'steps', unit: '步', color: '#ea580c', band: 'rgba(234, 88, 12, 0.08)', int: true }
     };
     let trendState = { metric: 'weight', records: [], buckets: [], aggs: [] };
     let trendChart = null;
@@ -663,11 +677,11 @@ export async function loadDashboardData(days = dashRange) {
     const TD_PORTRAIT_W = TD_DAYS * TD_POINT_PX;  // 竖屏图宽 1560px
     const TD_FIT_MIN_W = 560;                     // 容器宽于此值即视为「够宽」，60 点压进一屏
     const TD_METRICS = {
-      weight: { label: '体重逐日 (kg)', field: 'weight_am', unit: 'kg', color: '#171717' },
-      waist: { label: '腰围逐日 (cm)', field: 'waist_size', unit: 'cm', color: '#525252' },
-      sleep: { label: '睡眠时长逐日 (小时)', field: 'sleep_hours', unit: '小时', color: '#10b981', avg: true },
+      weight: { label: '体重逐日 (kg)', field: 'weight_am', unit: 'kg', color: '#1e293b' },
+      waist: { label: '腰围逐日 (cm)', field: 'waist_size', unit: 'cm', color: '#7c3aed' },
+      sleep: { label: '睡眠时长逐日 (小时)', field: 'sleep_hours', unit: '小时', color: '#4f46e5', avg: true },
       // 步数：纵轴封顶 2 万（特殊情况也够用），缺失日断点
-      steps: { label: '步数逐日 (步)', field: 'steps', unit: '步', color: '#737373', avg: true, yMax: 20000, yStep: 5000, fmt: v => v.toLocaleString('en-US') }
+      steps: { label: '步数逐日 (步)', field: 'steps', unit: '步', color: '#ea580c', avg: true, yMax: 20000, yStep: 5000, fmt: v => v.toLocaleString('en-US') }
     };
     let trendDetailState = { metric: 'weight', records: [] };
     let trendDetailChart = null;
@@ -764,7 +778,7 @@ export async function loadDashboardData(days = dashRange) {
           const d = Math.round((pm - am) * 10) / 10;
           diffHtml = ` · 夜间排水 <b class="text-slate-700">${d.toFixed(1)} kg</b>`;
         }
-        return `<b class="text-slate-700">${r.record_date}</b>　晨起 ${fmtW(am)} · 睡前 ${fmtW(pm)}${diffHtml}`;
+        return `<b class="text-slate-700">${r.record_date}</b>　睡前 ${fmtW(pm)} · 晨起 ${fmtW(am)}${diffHtml}`;
       }
       if (metric === 'waist') {
         const w = (r.waist_size === null || r.waist_size === undefined) ? '--' : `${r.waist_size} cm`;

@@ -26,30 +26,35 @@
     </div>
   </div>
 
-  <!-- 步数：极客风卡，1.5px 步行 SVG，巨大等宽数字，极细滑轨 -->
-  <div class="ht-card space-y-2.5">
-    <div class="flex items-center justify-between gap-2">
-      <div class="flex items-center gap-2.5 min-w-0">
-        <div class="w-8 h-8 rounded-lg border border-neutral-200 flex items-center justify-center shrink-0 text-neutral-500">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><path d="M9 12l2 2 4-4"/><path d="M14 8l-2 4-3 2-2 4"/><path d="M10 8l3 1 2-2"/></svg>
+  <!-- 昨晚睡眠卡：通栏单线，时长等宽大数字 -->
+  <div class="ht-card">
+    <div class="flex justify-between items-center mb-3">
+      <div class="flex items-center gap-2">
+        <div class="w-6 h-6 rounded-md border border-neutral-200 flex items-center justify-center text-neutral-400">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </div>
-        <div class="min-w-0">
-          <p class="text-xs font-medium text-neutral-800">步数</p>
-          <p id="steps-meta" class="text-[10px] text-neutral-400 truncate font-mono">昨 -- · 7d均 --</p>
-        </div>
+        <span class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest">昨晚睡眠</span>
       </div>
+      <span id="sleepTagBadge" class="badge-green text-[9px] px-1.5 py-0.5">● 未熬夜</span>
+    </div>
+    <div class="flex items-center gap-4">
       <div class="flex items-baseline gap-1 shrink-0">
-        <span id="steps-value" class="text-2xl font-bold text-neutral-900 leading-none font-mono tracking-tighter tabular-nums">--</span>
-        <span class="text-[10px] font-medium text-neutral-400 font-mono">步</span>
+        <input type="number" step="0.1" id="sleepDuration" value="6.8" class="text-3xl font-bold font-mono text-neutral-900 w-[72px] outline-none bg-transparent border-b border-neutral-200 focus:border-neutral-800 pb-0.5 transition-colors tabular-nums">
+        <span class="text-sm font-mono font-medium text-neutral-400">h</span>
+      </div>
+      <div class="flex-1 min-w-0 flex flex-col gap-1.5">
+        <label class="flex items-center gap-2 text-[10px] font-mono text-neutral-400">
+          <span class="shrink-0 w-7">入睡</span>
+          <input type="time" id="sleepBedTime" value="00:30" class="flex-1 min-w-0 w-0 border-b border-neutral-200 focus:border-neutral-800 py-0.5 text-[11px] font-mono font-medium text-neutral-700 outline-none bg-transparent transition-colors">
+        </label>
+        <label class="flex items-center gap-2 text-[10px] font-mono text-neutral-400">
+          <span class="shrink-0 w-7">起床</span>
+          <input type="time" id="sleepWakeTime" value="07:15" class="flex-1 min-w-0 w-0 border-b border-neutral-200 focus:border-neutral-800 py-0.5 text-[11px] font-mono font-medium text-neutral-700 outline-none bg-transparent transition-colors">
+        </label>
       </div>
     </div>
-    <input type="range" id="input-steps" min="0" max="20000" step="500" value="0" class="ht-range w-full cursor-pointer">
-    <div class="flex justify-between text-[9px] font-mono text-neutral-300">
-      <span>0</span><span>5k</span><span>10k</span><span>15k</span><span>20k</span>
-    </div>
-    <div class="pt-2 border-t border-neutral-100 flex items-center justify-between">
-      <span id="steps-hint" class="text-[10px] text-neutral-400 truncate font-mono">留空 = 断点（不补 0）</span>
-      <button type="button" id="btn-clear-steps" class="text-[10px] font-medium text-neutral-400 hover:text-neutral-700 px-2 py-0.5 rounded border border-neutral-200 hover:border-neutral-400 ml-2 shrink-0 transition-colors">留空</button>
+    <div id="diff-sleep" class="mt-2.5 pt-2 border-t border-neutral-100 flex items-center justify-between text-[9px] text-neutral-400 font-mono font-medium">
+      <span>较昨日 --</span><span class="text-neutral-300">节律</span>
     </div>
   </div>
 
@@ -110,35 +115,17 @@
     </div>
   </div>
 
-  <!-- 昨晚睡眠卡：通栏单线，时长等宽大数字 -->
-  <div class="ht-card">
-    <div class="flex justify-between items-center mb-3">
+  <!-- 身体感受自由记录 -->
+  <div class="space-y-1.5" id="journal-section">
+    <div class="flex justify-between items-center text-xs">
+      <span class="font-medium text-neutral-700">身体感受与自由记录</span>
       <div class="flex items-center gap-2">
-        <div class="w-6 h-6 rounded-md border border-neutral-200 flex items-center justify-center text-neutral-400">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        </div>
-        <span class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest">昨晚睡眠</span>
-      </div>
-      <span id="sleepTagBadge" class="badge-green text-[9px] px-1.5 py-0.5">● 未熬夜</span>
-    </div>
-    <div class="flex items-center gap-4">
-      <div class="flex items-baseline gap-1 shrink-0">
-        <input type="number" step="0.1" id="sleepDuration" value="6.8" class="text-3xl font-bold font-mono text-neutral-900 w-[72px] outline-none bg-transparent border-b border-neutral-200 focus:border-neutral-800 pb-0.5 transition-colors tabular-nums">
-        <span class="text-sm font-mono font-medium text-neutral-400">h</span>
-      </div>
-      <div class="flex-1 min-w-0 flex flex-col gap-1.5">
-        <label class="flex items-center gap-2 text-[10px] font-mono text-neutral-400">
-          <span class="shrink-0 w-7">入睡</span>
-          <input type="time" id="sleepBedTime" value="00:30" class="flex-1 min-w-0 w-0 border-b border-neutral-200 focus:border-neutral-800 py-0.5 text-[11px] font-mono font-medium text-neutral-700 outline-none bg-transparent transition-colors">
-        </label>
-        <label class="flex items-center gap-2 text-[10px] font-mono text-neutral-400">
-          <span class="shrink-0 w-7">起床</span>
-          <input type="time" id="sleepWakeTime" value="07:15" class="flex-1 min-w-0 w-0 border-b border-neutral-200 focus:border-neutral-800 py-0.5 text-[11px] font-mono font-medium text-neutral-700 outline-none bg-transparent transition-colors">
-        </label>
+        <button type="button" id="btn-clear-journal" class="text-[10px] font-mono text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 px-2 py-0.5 rounded border border-neutral-200 transition-colors hidden" title="清空内容">清空</button>
+        <span class="text-[10px] font-mono text-neutral-500 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded">饮食已结构化</span>
       </div>
     </div>
-    <div id="diff-sleep" class="mt-2.5 pt-2 border-t border-neutral-100 flex items-center justify-between text-[9px] text-neutral-400 font-mono font-medium">
-      <span>较昨日 --</span><span class="text-neutral-300">节律</span>
+    <div class="relative">
+      <textarea id="input-journal" rows="3" class="w-full ht-card text-xs text-neutral-800 placeholder-neutral-400 outline-none focus:border-neutral-700 transition-all resize-none leading-relaxed" placeholder="如：今天状态还行，下午 3 点有点困，喝了杯水走动一下缓过来了…"></textarea>
     </div>
   </div>
 
@@ -222,13 +209,31 @@
     </div>
   </div>
 
-  <!-- 身体感受自由记录 -->
-  <div class="space-y-1.5">
-    <div class="flex justify-between items-center text-xs">
-      <span class="font-medium text-neutral-700">身体感受与自由记录</span>
-      <span class="text-[10px] font-mono text-neutral-500 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded">饮食已结构化</span>
+  <!-- 步数：极客风卡，1.5px 步行 SVG，巨大等宽数字，极细滑轨 -->
+  <div class="ht-card space-y-2.5">
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 rounded-lg border border-neutral-200 flex items-center justify-center shrink-0 text-neutral-500">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><path d="M9 12l2 2 4-4"/><path d="M14 8l-2 4-3 2-2 4"/><path d="M10 8l3 1 2-2"/></svg>
+        </div>
+        <div class="min-w-0">
+          <p class="text-xs font-medium text-neutral-800">步数</p>
+          <p id="steps-meta" class="text-[10px] text-neutral-400 truncate font-mono">昨 -- · 7d均 --</p>
+        </div>
+      </div>
+      <div class="flex items-baseline gap-1 shrink-0">
+        <span id="steps-value" class="text-2xl font-bold text-neutral-900 leading-none font-mono tracking-tighter tabular-nums">--</span>
+        <span class="text-[10px] font-medium text-neutral-400 font-mono">步</span>
+      </div>
     </div>
-    <textarea id="input-journal" rows="3" class="w-full ht-card text-xs text-neutral-800 placeholder-neutral-400 outline-none focus:border-neutral-700 transition-all resize-none leading-relaxed" placeholder="如：今天状态还行，下午 3 点有点困，喝了杯水走动一下缓过来了…"></textarea>
+    <input type="range" id="input-steps" min="0" max="20000" step="500" value="0" class="ht-range w-full cursor-pointer">
+    <div class="flex justify-between text-[9px] font-mono text-neutral-300">
+      <span>0</span><span>5k</span><span>10k</span><span>15k</span><span>20k</span>
+    </div>
+    <div class="pt-2 border-t border-neutral-100 flex items-center justify-between">
+      <span id="steps-hint" class="text-[10px] text-neutral-400 truncate font-mono">留空 = 断点（不补 0）</span>
+      <button type="button" id="btn-clear-steps" class="text-[10px] font-medium text-neutral-400 hover:text-neutral-700 px-2 py-0.5 rounded border border-neutral-200 hover:border-neutral-400 ml-2 shrink-0 transition-colors">留空</button>
+    </div>
   </div>
 
   <!-- 专项生理打卡折叠面板 -->

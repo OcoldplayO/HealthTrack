@@ -188,6 +188,9 @@ async function saveSleepThresholds() {
       green_before: green,
       yellow_before: yellow,
     });
+    window.dispatchEvent(new CustomEvent('sleep-thresholds-updated', {
+      detail: { green, yellow }
+    }));
     showToast('熬夜阈值已保存并立即生效');
   } catch (err) {
     showToast('保存阈值失败: ' + err.message, false);
