@@ -1,69 +1,62 @@
 # HealthTrack 智能健康洞察追踪系统
 
-## 统一系统设计与工程实施规范 (Unified System Architecture & Engineering Spec)
+## 统一系统架构与工程实施规范 (Unified System Architecture & Engineering Spec)
 
-| 文档版本               | 状态                             | 适用角色                                    | 效力说明                                                  |
-| :--------------------- | :------------------------------- | :------------------------------------------ | :-------------------------------------------------------- |
-| **v3.3.0 (Reconciled)** | **Approved & Frozen (最高权威)** | AI Agent / 全栈工程师                       | **项目全局唯一事实源 (SSOT)**，所有代码实现与重构以此为准 |
-| **v3.2.0 (Reconciled)** | **Approved & Frozen**            | AI Agent / 全栈工程师                       | 上一版快照（运动多选 + 自选截止日）                       |
-| **v3.1.0 (Reconciled)** | **Approved & Frozen**            | AI Agent / 全栈工程师                       | 上一版快照（睡前小结模块落地）                            |
+| 文档版本 | 状态 | 适用角色 | 效力说明 |
+| :--- | :--- | :--- | :--- |
+| **v3.4.0 (Current SSOT)** | **Approved & Frozen (最高权威)** | AI Agent / 全栈工程师 | **项目全局唯一事实源 (SSOT)**，所有代码实现与重构以此为准 |
+| **v3.3.0 (Reconciled)** | Archived | AI Agent / 全栈工程师 | 趋势看板周平均 + 60 天横滑详情 |
+| **v3.2.0 (Reconciled)** | Archived | AI Agent / 全栈工程师 | 运动类型独立多选 + AI 洞察自选截止日 |
+| **v3.1.0 (Reconciled)** | Archived | AI Agent / 全栈工程师 | 睡前小结独立模块落地 |
+| **v3.0.0 (Reconciled)** | Archived | AI Agent / 全栈工程师 | 纯 Go SQLite 免 CGO 架构重构 |
 
-> **v3.3.0 修订说明**：2026-10-14 完成三项新需求的评审定稿（**⑦ 周平均、⑥ 60 天详情已完成并双端验收通过；⑧ 阶段对比待实施**，⑧ 相关正文段落仍以【规划】标注）：① 【看板 60 天视图】档位扩展 + 「全屏详情 + 横滑」交互（§4.4 / §10.1 ⑥，已实施）；② 【趋势分析页 · 周平均】独立视图（方案 Y）+ 自然周 12 周 + 均值/min-max 区间带（§4.4 / §10.1 ⑦，已实施）；③ 【洞察 · 阶段对比】自然月双窗口 + 7 项指标口径 + 新 `scope=compare`（§3.2 / §4.4 / §5.2 / §6.5 / §7.3 / §10.1 ⑧）。本版同时固化两条全局原则：**看板与洞察的范围各自独立、互不联动**；**测量类指标缺失周一律断点，严禁以 0 填充**。已于 2026-10-15 将 ⑧ 的入口形态由「洞察页内区块」改定为「洞察页头部按钮 → 独立视图」（方案 B，§4.4.3）。
->
-> **v3.2.0 修订说明**：① 【运动训练多选】由单值 `type` 扩展为多选 `types`（有氧 + 抗阻可同时记录，兼容旧单值），补齐 §2.6 / §3.1 / §4.2 / §6.1，并将原 §10.2 第 1 条移入 §10.1 ✅⑤；② 【AI 洞察自选截止日】生成窗口改为「档位 + 截止日」周期模型，允许自选分析截止日（不允许未来日期），存在性判定接口由 `/api/v1/insights/today` 改为 `/api/v1/insights/period`，补齐 §3.2 / §5.2 / §6.2 / §10.1 ②。本版将 §10.2 待办重编号，相关交叉引用已同步。
->
-> **v3.1.0 修订说明**：新增【睡前小结】模块（第 4 个底部导航）与侧重心理解读的小结洞察（独立提示词模板、思维链展示、图片存取、评分文案可配置、左滑删除），补齐正文 §3.4 / §4.3 / §5.2 / §5.3 / §6.3 / §7.2 / §8.1 / §8.2；并回填【第十章】Backlog 状态（原 10.2 的第 1~4、6 项已实现，移入 10.1 归档）。
->
-> **v3.0.0 修订说明**：本节版对齐了工程实际实现（表名、字段、驱动、接口、构建方式），修正了 v2.0.0 中已失效的内容，并新增【第十章 待办需求清单 (Backlog)】。凡本文档与代码冲突之处，以本文档为准；如发现新的偏差，须更新本文档而非放任代码偏离。
+> **v3.4.0 修订说明**：
+> 1. **全站极简极客设计体系（Design System v3.0）**：记一笔、数据看板、AI 深度洞察、睡前小结全站收敛至 Linear / Raycast 1px 工业单线风格（`.ht-card`、`.ht-seg-btn`、`.ht-range`），彻底淘汰彩色 Emoji 与浮夸深色渐变卡片，全站等宽数字排版（`JetBrains Mono` + `.tabular-nums`）。
+> 2. **前端工程架构演进**：正式确立 `web/src/`（Vite + 原生 ES Modules）为唯一源码开发入口，`web/static/` 仅作为生产打包产物，严禁直接手改 `web/static/`。
+> 3. **功能闭环归档**：阶段对比（`view-compare`，双月自然月对比 + 7 项预计算指标快照 + 阶段综述）与批量数据导入（CSV/JSON/备忘录预检 + 单事务提交 + 批次重试）全链路已实现并完成双端验收，正式从待办移入已完成归档。
+> 4. **睡前小结与洞察细节调优**：往期回顾统一 40x40px 紧凑防拉伸微缩略图；操作按钮全面中文化；彻底移除违和的沙漏等待图标；顶部日期输入框扩宽适配移动端防截断。
 
 ---
 
 ## 目录（全景索引）
 
-* 1. [项目愿景、核心痛点与产品定位](#一-项目愿景核心痛点与产品定位)
-* 2. [核心业务逻辑与生理算法规范](#二-核心业务逻辑与生理算法规范)
-* 3. [数据模型与持久层规范（对齐真实工程）](#三-数据模型与持久层规范)
-* 4. [前端页面与交互组件规范](#四-前端页面与交互组件规范)
-* 5. [API 契约、统一响应与 SSE 流式协议](#五-api-契约统一响应与-sse-流式协议)
-* 6. [后端特征工程与 AI 模块实现](#六-后端特征工程与-ai-模块实现)
-* 7. [提示词模板契约](#七-提示词模板契约)
-* 8. [工程构建、配置与交付规范](#八-工程构建配置与交付规范)
-* 9. [Agent 实施约束与"不确定即暂停提问"熔断机制](#九-agent-实施约束与不确定即暂停提问熔断机制)
-* 10. [**待办需求清单 (Backlog)**](#十-待办需求清单-backlog)
-* 附录：[版本控制与提交规范](#附录版本控制与提交规范)
+1. [项目愿景、核心痛点与产品定位](#一-项目愿景核心痛点与产品定位)
+2. [核心业务逻辑与生理算法规范](#二-核心业务逻辑与生理算法规范)
+3. [数据模型与持久层规范](#三-数据模型与持久层规范)
+4. [前端工程与 HealthTrack 3.0 设计规范](#四-前端工程与-healthtrack-30-设计规范)
+5. [API 契约、统一响应与 SSE 流式协议](#五-api-契约统一响应与-sse-流式协议)
+6. [后端特征工程与 AI 模块实现](#六-后端特征工程与-ai-模块实现)
+7. [提示词模板契约](#七-提示词模板契约)
+8. [工程构建、配置与交付规范](#八-工程构建配置与交付规范)
+9. [Agent 实施约束与熔断机制](#九-agent-实施约束与熔断机制)
+10. [需求状态清单 (Backlog)](#十-需求状态清单-backlog)
+附录：[语义化提交规范](#附录-语义化提交规范)
 
 ---
 
 ## 一、 项目愿景、核心痛点与产品定位
 
 ### 1.1 核心痛点
-
 * **市面产品的数据孤岛**：传统健身 App 将睡眠、饮食、体重、运动完全隔离开，无法建立有机因果联动。
 * **精细化称重算卡路里反人性**：商业软件强迫用户称重食材、搜索食物库计算三大营养素，生熟重与烹饪油误差巨大（实际误差常超 30%），执行阻力极高，导致用户迅速弃坑。
 * **纯备忘录记录的局限**：备忘录纯文本输入门槛虽低，但长期趋势难以可视化，月末人工复盘成本极高，无法洞察深层生理关联。
 
 ### 1.2 产品定位与生物黑客闭环
-
 一款**极简录入、开箱即用、以 AI 深度因果归因为核心**的个人健康管理 Web 系统：
-
 * **零称重负担**：顺应备忘录自由文本习惯，引入 **NOVA 食品加工程度与 8:2 弹性评估**，抓大放小；
 * **生理学真实归因**：引入抗阻训练引起的肌肉微创伤水肿（Water Retention）、高钠渗透压水滞留识别，消除虚假减脂焦虑；
 * **神经与药物动力学追踪**：专设专注达（Concerta）服药多维效能、晚间多巴胺断崖（Crash）代偿机制与冷水澡神经唤醒追踪。
 
-### 1.3 产品形态（双端同构）
-
-* **电脑端**：Go 单二进制约 `bin/HealthTrack.exe`，内嵌前端静态资源，监听 `127.0.0.1:8080`。
+### 1.3 产品形态（双端同构与本地优先）
+* **电脑端**：Go 单一二进制 `bin/HealthTrack.exe`，内嵌前端静态资源，监听 `127.0.0.1:8080`。
 * **手机端**：Android WebView 外壳 APK（包名 `com.healthtrack.app`），同样加载本机 `http://127.0.0.1:8080`；Go 服务端以交叉编译的 `libhealthtrack.so` 形式随 APK 分发。
-* **数据本地优先**：所有数据存放于本地 `data/health.db`（桌面）或 App 私有 `filesDir`（Android），不上传云端。
+* **数据本地优先**：所有数据存放于本地 `data/health.db`（桌面）或 App 私有 `filesDir`（Android），不上传云端，无中心化数据库。
 
 ---
 
 ## 二、 核心业务逻辑与生理算法规范
 
 ### 2.1 核心生理指标与差值定义
-
-> 字段名以第三章实体模型为准（`weight_am` / `weight_pm` / `waist_size`）。
-
 * **晨起空腹体重 (weight_am)**：清晨排便后空腹测量，单位 kg，保留 1 位小数。反映基础身体质量与长期脂肪/肌肉趋势。
 * **睡前体重 (weight_pm)**：就寝前测量，单位 kg。
 * **夜间呼吸排水差值 ($\Delta W_{sleep}$)**：
@@ -74,15 +67,12 @@
 * **腰围 (waist_size)**：单位 cm，保留 1 位小数。排除水分干扰，作为核心内脏脂肪趋势校验器。
 
 ### 2.2 跨日睡眠 04:00 截断法则 (Cutoff Rule)
-
 * **截断边界**：以每日**凌晨 04:00** 为业务日切换界限。
 * **归属判定**：凡入睡时间处于 `当日 18:00 ~ 次日 04:00` 之间的睡眠，其所有的生理指标（睡眠时长、就寝时间、睡眠评级）**一律归属于入睡前所处的业务日期**。
-* 工程实现：时间解析统一走 `model.parseSleepTimeMinutes`，对 `00:00~04:00` 的小时数 `+24h` 归一化，避免跨日比较出错。
+* **工程实现**：时间解析统一走 `model.parseSleepTimeMinutes`，对 `00:00~04:00` 的小时数 `+24h` 归一化，避免跨日比较出错。
 
-### 2.3 睡眠时长双时间点自动联动算法
-
+### 2.3 睡眠时长双时间点自动联动推导算法
 前端废弃繁琐的人工心算时长输入，改为**输入就寝时间与起床时间自动推导**：
-
 * 设就寝时间为 $T_{bed}$，起床时间为 $T_{wake}$（格式均为 `HH:mm`）。
 * 将时间转换为当日累计分钟数：
   $$M_{bed} = H_{bed} \times 60 + m_{bed}, \quad M_{wake} = H_{wake} \times 60 + m_{wake}$$
@@ -92,573 +82,328 @@
 * 系统自动回填计算值，但依然保留用户直接在输入框中手动覆盖修改的自由。
 
 ### 2.4 熬夜三色分级标准（阈值可配置，读时实时计算）
-
-> ⚠️ **重要变更（对齐实际实现）**：熬夜阈值**不再是硬编码的 24:00 / 01:00**，而是通过配置文件 `config.yaml` 的 `sleep` 段落自定义；且 `sleep_tag` **在接口返回前按当前阈值实时计算**，而非依赖数据库历史存储值——修改阈值后，历史数据无需重算即按新规则显示。
-
+熬夜阈值通过配置文件 `config.yaml` 的 `sleep` 段落自定义；`sleep_tag` **在接口返回前按当前阈值实时计算**，而非依赖数据库历史存储值——修改阈值后，历史数据无需重算即按新规则显示。
 * 配置项（`internal/config/config.go` 的 `SleepConfig`）：
-
-  | 配置键                    | 默认值   | 含义                                                         |
-  | :------------------------ | :------- | :----------------------------------------------------------- |
-  | `sleep.green_before`      | `23:00`  | 就寝时间早于该值为未熬夜(绿)                                 |
-  | `sleep.yellow_before`     | `00:00`  | 就寝时间在 `[green_before, yellow_before)` 为轻度熬夜(黄)；`>= yellow_before` 为重度熬夜(红) |
-
+  * `sleep.green_before`（默认 `23:00`）：早于该值为未熬夜（绿灯项）。
+  * `sleep.yellow_before`（默认 `00:00`）：在 `[green_before, yellow_before)` 为轻度熬夜（黄灯项）；`>= yellow_before` 为重度熬夜（红灯项）。
 * 判定函数：`model.CalculateSleepTagWithThresholds(startTime, greenBefore, yellowBefore) string`
-  * `total < green` → `GREEN`
-  * `green <= total < yellow` → `YELLOW`
-  * `total >= yellow` → `RED`
-  * 阈值与就寝时间均按 `HH:mm` 解析，凌晨 `00:00~04:00` 按跨日 `+24h` 归一化；阈值解析失败时回退 `green=23:00`、`yellow=24:00`。
+  * 阈值与就寝时间均按 `HH:mm` 解析，凌晨 `00:00~04:00` 按跨日 `+24h` 归一化；解析失败时回退 `green=23:00`、`yellow=24:00`。
 
 ### 2.5 饮食 NOVA 加工分级与 8:2 弹性评估
-
 用户饮食记录为纯文本（落库字段 `journal_text`），允许包含粗略预估克重（允许 $\pm 30\%$ 误差），**坚决不推算微观卡路里**。系统与 AI 基于国际 NOVA 标准识别：
-
-* 🟢 **绿灯项（原生/微加工食材，Clean Foods）**：纯肉、蛋、水产、原生米饭、土豆、燕麦、天然蔬果。
-* 🟡 **黄灯项（常规烹饪加工品）**：带油盐炒菜、调味米粉、板栗、复合主食。
-* 🔴 **红灯项（超加工食品 UPF / 精制糖油混合物 / 高钠）**：月饼、含糖饮料（可乐）、糕点、深加工膨化、极高钠霉豆腐、薯片、辣条、汉堡等。
+* **绿灯项（原生/微加工食材，Clean Foods）**：纯肉、蛋、水产、原生米饭、土豆、燕麦、天然蔬果。
+* **黄灯项（常规烹饪加工品）**：带油盐炒菜、调味米粉、板栗、复合主食。
+* **红灯项（超加工食品 UPF / 精制糖油混合物 / 高钠）**：糕点、含糖饮料、深加工膨化、极高钠调味品、薯片、炸鸡等。
 * **8:2 弹性维持原则**：若周期内绿灯原生食材摄入频次与体积占比达到 **$70\% \sim 80\%$**，红灯安慰性食物维持在 **$20\% \sim 30\%$**，系统判定为健康度优秀且可持续，消除断糖心理焦虑。
 
-### 2.6 运动分类与次日肌肉水肿归因机制
-
+### 2.6 运动分类与次日肌肉微创伤水肿归因机制
 * **极简运动量化**（`ExerciseDetail`）：
-  * 类型 `types`（**多选**）：`cardio` (有氧) 与 `strength` (抗阻/力量) **可同时选中**；空数组表示无运动。兼容字段 `type` 保留（写入时同步为首个类型，读取旧记录时回退使用）
-  * 强度 `intensity`（主观疲劳度 RPE）：`light` (轻松), `medium` (中等), `failure` (力竭/高负荷)
-  * 时长 `duration`：分钟数（如 40）
-  * 备注 `items`：自由文本，如 "骑行 3km" 或 "腿部深蹲"
+  * 类型 `types`（**多选**）：`cardio` (有氧) 与 `strength` (力量抗阻) **可同时选中**；空数组表示无运动。兼容旧单值字段 `type`（写入时同步为首个类型，读取旧记录时回退解析）。
+  * 强度 `intensity`（主观疲劳度 RPE）：`light` (轻松), `medium` (中等), `failure` (力竭/高负荷)。
+  * 时长 `duration`：分钟数。
+  * 备注 `items`：自由文本，如 "骑行 10km" 或 "腿部力量"。
 * **水肿归因锚点**：
-  抗阻力量训练（尤其包含力竭大肌群训练如腿部）会引发肌纤维微损伤与急性充血修复，导致**皮质醇脉冲与炎症性水分潴留 (Water Retention)**。若次日 $\Delta W_{day}$ 暴增 $0.5 \sim 1.5\text{kg}$，系统与 AI 必须优先解释为肌肉修复储水，严禁误判为脂肪增长。
-* **说明**：运动类型已支持「有氧 + 抗阻」同时记录（详见 §3.1 / §4.2 / §6.1，实现记录见 §10.1 ✅⑤）。
+  抗阻力量训练（尤其包含力竭大肌群训练）会引发肌纤维微损伤与急性充血修复，导致**皮质醇脉冲与炎症性水分潴留 (Water Retention)**。若次日 $\Delta W_{day}$ 突增 $0.5 \sim 1.5\text{kg}$，系统与 AI 必须优先解释为肌肉修复储水，严禁误判为脂肪增长。
 
 ### 2.7 专注达 (Concerta) 多维药效与晚间断崖代偿
-
 * **药动学特征**：OROS 渗透泵胶囊释放曲线维持约 10~12 小时（如 08:00 服药，17:30 药效衰退）。
 * **五维自评打卡（1~5 分）**：
   1. `focus_work`：深度工作与执行力（是否克服启动拖延、沉浸编程）；
-  2. `focus_study`：长文本/论文阅读工作记忆；
+  2. `focus_study`：长文本/阅读工作记忆；
   3. `daily_tasks`：低多巴胺琐事耐受度（洗衣服、收桌子）；
   4. `social`：情绪平稳与倾听耐心；
-  5. `gaming`：竞技反应速度与抗挫败心态。
-* **晚间断崖代偿追踪**：药效消退后多巴胺受体骤降易引发 Crash，表现为极度疲劳与神经代偿。系统追踪用户是否使用 `[monster_energy / 魔爪/咖啡因]` 续航，或诱发 `[sugar_craving / 高糖高脂暴食冲动]`（解释晚餐月饼/可乐的生理根源）。
+  5. `gaming`：反应速度与抗挫败心态。
+* **晚间断崖代偿追踪**：药效消退后多巴胺受体骤降易引发 Crash，表现为极度疲劳与神经代偿。系统追踪用户是否使用魔爪/高咖啡因续航，或诱发高糖高脂暴食冲动。
 
 ### 2.8 冷水澡神经激活与昼夜节律影响
-
 * **记录维度**（`ColdShowerDetail`）：
-  * `enabled`：是否打卡
-  * `timing`：`morning` (晨起), `post_workout` (训练后), `evening` (睡前)
-  * `duration`：时长（分钟，1~5m）
-  * `feeling`：`refreshed` (神经清爽唤醒), `neutral` (无感), `shivering` (发抖/回温困难)
+  * `enabled`：是否打卡；
+  * `timing`：`morning` (晨起), `post_workout` (训练后), `evening` (睡前)；
+  * `duration`：时长（分钟）；
+  * `feeling`：`refreshed` (清爽唤醒), `neutral` (无明显感), `shivering` (轻微发抖/回温迟缓)；
+  * `water_temp`：预估体感水温（℃，可空，范围 `0~40`）。
 * **关联分析**：
-  晨起冷水澡促发去甲肾上腺素与多巴胺平缓释放，缩短专注达起效潜伏期；睡前冷水澡激活交感神经，关联分析其对入睡潜伏期及深睡时长的负面干扰。
-* **预估体感水温 `water_temp`（已实现）**：单位 ℃，可空，录入范围 `0~40`。10 月天气转凉、持续降雨，水温较夏季大幅下降，冷刺激强度显著提升（主观上接近短效专注达）。记录水温后，AI 可建立"水温变化 → 唤醒强度 → 时长需求"的量化关联，据此给出冷水澡时长调整建议；`BuildPromptContext` 输出的冷水澡明细形如 `morning(16.0℃/2分钟/refreshed)`。
+  水温下降时冷刺激强度指数级提升，AI 建立「水温变化 → 唤醒强度 → 时长建议」量化关联。晨起冷水澡促发多巴胺平缓释放，睡前冷水澡激活交感神经可能干扰深睡，需结合睡眠曲线对比。
 
-### 2.9 低负担行为三项（晨光 / 步数 / 午餐，2026-10-28 实施）
-
-* **设计目标**：ADHD 场景下把每日摩擦降到最低——单项 ≤ 2 次点击，允许“今天没记”，缺项不产生补录压力。
-* **晨光 `morning_light`**：布尔三态（`true` 已见 / `false` 未见 / `NULL` 未记录），默认不打卡。语义 = 起床后 1 小时内接触自然光，用于关联当天情绪与当晚入睡时间。
-* **步数 `steps`**：整数，**`NULL` = 当天未记录（断点），严禁以 0 填充**。录入范围 `0 ~ 20000`（500 一档，便于单手定位）；卡片显示前一天值与近 7 天日均。
-* **午餐 `lunch_detail`**：结构化 JSON，**只记午饭、不记全天**。字段：`eaten`（`eaten` / `skipped`）、`protein`（多选：`chicken` / `egg` / `fish` / `beef` / `soy` / `yogurt` / `other`）、`protein_g`（15 / 25 / 35）、`staple`（`rice` / `noodle` / `grains` / `potato` / `none`）、`carb_g`（`lt20` / `20_35` / `35_50` / `gt50`）、`cooking`（`steam` / `stir_fry` / `fry` / `raw` / `takeout`）。点「跳过」时只落 `eaten=skipped`，其余字段留空。
-* **分析口径**：三项都是“观察 13:00–15:00 状态”的辅助变量，不做热量推算（延续 §2.5 的 NOVA / 8:2 原则）；午餐结构化字段仅用于与午后困倦、夜间睡眠做关联，不替代自由日记。
+### 2.9 低负担行为三项（晨光 / 步数 / 午餐）
+* **设计目标**：ADHD 场景下每日打卡摩擦降到最低——单项 $\le 2$ 次点击，允许留空，缺项不产生补录压力。
+* **晨光 `morning_light`**：布尔三态（`true` / `false` / `NULL` 未记录），默认不打卡。语义为起床后 1 小时内接触自然光。
+* **步数 `steps`**：整数，**`NULL` = 当天未记录（图表必须断点，严禁补 0）**。录入范围 `0 ~ 20000`（500 一档极细滑块）。
+* **午餐 `lunch_detail`**：结构化点选，**只记午饭、不记全天**。包含 `eaten`、`protein`（多选）、`protein_g`、`staple`、`carb_g`、`cooking`，支持一键「沿用昨天」与「跳过」。
 
 ---
 
 ## 三、 数据模型与持久层规范
 
-> ⚠️ **强制声明（对齐真实工程）**：
-> * 真实工程核心表名**唯一确定为 `health_records`**（v2.0.0 中记载的 `records` 已作废）。
-> * SQLite 驱动使用**纯 Go 实现 `modernc.org/sqlite`**（非 CGO 的 `mattn/go-sqlite3`），这是 Android `CGO_ENABLED=0` 交叉编译与单二进制交付的前提。
-> * 持久层统一由 `internal/repository/db.go` 与 `internal/repository/record_repo.go` 实现，**严禁新建 `migration/` 包**。
-
-### 3.1 实体模型定义（`internal/model/record.go`）
-
-> 注意：Go 模块名为 `healthtrack`（见 `go.mod`），导入路径为 `healthtrack/internal/...`。
-
+### 3.1 实体模型定义（`internal/model/`）
 ```go
 package model
 
 import "time"
 
 // ExerciseDetail 运动明细
-// 运动类型支持多选：Types 为主用字段（cardio / strength 的子集，不含 none）；
-// Type 为早期单值字段，仅作向后兼容——写入前由 SyncLegacyType 同步为首个类型，
-// 读取旧记录时由 NormalizeTypes 回退使用（剔除 none、去重）。
 type ExerciseDetail struct {
 	Types     []string `json:"types,omitempty"` // 运动类型（多选）：cardio / strength
 	Type      string   `json:"type"`            // 兼容旧数据：none, cardio, strength
 	Duration  int      `json:"duration"`        // 时长 (分钟)
 	Intensity string   `json:"intensity"`       // light, medium, failure
-	Items     string   `json:"items"`           // 备注，如 "骑行 3km" 或 "腿部深蹲"
+	Items     string   `json:"items"`           // 备注
 }
 
 // ColdShowerDetail 冷水澡记录
 type ColdShowerDetail struct {
-	Enabled   bool     `json:"enabled"`    // 是否打卡
+	Enabled   bool     `json:"enabled"`
 	Timing    string   `json:"timing"`     // morning, post_workout, evening
-	Duration  int      `json:"duration"`   // 时长 (分钟)
-	WaterTemp *float64 `json:"water_temp"` // 预估体感水温 (℃)，可空，0~40
+	Duration  int      `json:"duration"`   // 分钟
+	WaterTemp *float64 `json:"water_temp"` // 预估水温 (℃)，可空，0~40
 	Feeling   string   `json:"feeling"`    // refreshed, neutral, shivering
 }
 
 // ConcertaDetail 专注达服药与多维效能记录
 type ConcertaDetail struct {
-	Taken          bool     `json:"taken"`        // 今日是否服药
-	Time           string   `json:"time"`         // 服药时间点 (HH:mm)
-	Dose           int      `json:"dose"`         // 剂量 (18, 36, 54)
-	FocusWork      int      `json:"focus_work"`   // 工作启动力与心流 (1-5)
-	FocusStudy     int      `json:"focus_study"`  // 阅读与工作记忆 (1-5)
-	DailyTasks     int      `json:"daily_tasks"`  // 琐事耐受度 (1-5)
-	SocialPatience int      `json:"social"`       // 社交情绪平稳度 (1-5)
-	GamingReaction int      `json:"gaming"`       // 竞技反应度 (1-5)
-	CrashTime      string   `json:"crash_time"`   // 断崖疲劳点 (HH:mm)
-	SideEffects    []string `json:"side_effects"` // ["appetite_loss", "thirst", "palpitation"]
-	Compensations  []string `json:"compensations"`// ["monster_energy", "sugar_craving"]
+	Taken          bool     `json:"taken"`
+	Time           string   `json:"time"`         // HH:mm
+	Dose           int      `json:"dose"`         // 18, 36, 54
+	FocusWork      int      `json:"focus_work"`   // 1-5
+	FocusStudy     int      `json:"focus_study"`  // 1-5
+	DailyTasks     int      `json:"daily_tasks"`  // 1-5
+	SocialPatience int      `json:"social"`       // 1-5
+	GamingReaction int      `json:"gaming"`       // 1-5
+	CrashTime      string   `json:"crash_time"`   // HH:mm
+	SideEffects    []string `json:"side_effects"`
+	Compensations  []string `json:"compensations"`
 }
 
-// LunchDetail 午餐结构化记录（只记午饭，NULL 表示当天未记录）
+// LunchDetail 午餐结构化记录
 type LunchDetail struct {
 	Eaten    string   `json:"eaten"`               // eaten / skipped
-	Protein  []string `json:"protein,omitempty"`   // 多选：chicken / egg / fish / beef / soy / yogurt / other
+	Protein  []string `json:"protein,omitempty"`   // 多选: chicken, egg, fish, beef, soy, yogurt, other
 	ProteinG int      `json:"protein_g,omitempty"` // 15 / 25 / 35
 	Staple   string   `json:"staple,omitempty"`    // rice / noodle / grains / potato / none
 	CarbG    string   `json:"carb_g,omitempty"`    // lt20 / 20_35 / 35_50 / gt50
 	Cooking  string   `json:"cooking,omitempty"`   // steam / stir_fry / fry / raw / takeout
 }
 
-// HealthRecord 核心健康记录实体（对齐 SQLite health_records 表）
+// HealthRecord 核心健康记录实体 (对齐 health_records 表)
 type HealthRecord struct {
 	ID             int64    `json:"id"`
 	UserID         int64    `json:"user_id"`
-	RecordDate     string   `json:"record_date"`      // 业务日期 YYYY-MM-DD
-	WeightAM       *float64 `json:"weight_am"`        // 晨起空腹体重 (kg)，可空
-	WeightPM       *float64 `json:"weight_pm"`        // 睡前体重 (kg)，可空
-	WaistSize      *float64 `json:"waist_size"`       // 腰围 (cm)，可空
-	SleepStartTime *string  `json:"sleep_start_time"` // 昨晚就寝时间 "HH:mm"，可空
-	SleepEndTime   *string  `json:"sleep_end_time"`   // 今晨起床时间 "HH:mm"，可空
-	SleepHours     *float64 `json:"sleep_hours"`      // 睡眠总时长 (h)，可空
+	RecordDate     string   `json:"record_date"`      // YYYY-MM-DD
+	WeightAM       *float64 `json:"weight_am"`        // 晨起空腹体重 (kg)
+	WeightPM       *float64 `json:"weight_pm"`        // 睡前体重 (kg)
+	WaistSize      *float64 `json:"waist_size"`       // 腰围 (cm)
+	SleepStartTime *string  `json:"sleep_start_time"` // 昨晚就寝 "HH:mm"
+	SleepEndTime   *string  `json:"sleep_end_time"`   // 今晨起床 "HH:mm"
+	SleepHours     *float64 `json:"sleep_hours"`      // 睡眠总时长 (h)
 	SleepTag       string   `json:"sleep_tag"`        // GREEN / YELLOW / RED（读时重算）
-	JournalText    string   `json:"journal_text"`     // 饮食与运动自由日记
-	ActivityTags   string   `json:"activity_tags"`    // 由日记提取的标签 JSON
+	JournalText    string   `json:"journal_text"`     // 自由记录
+	ActivityTags   string   `json:"activity_tags"`
 
-	// 生物黑客结构化对象（落盘为 TEXT JSON）
 	Exercise   *ExerciseDetail   `json:"exercise,omitempty"`
 	ColdShower *ColdShowerDetail `json:"cold_shower,omitempty"`
 	Concerta   *ConcertaDetail   `json:"concerta,omitempty"`
 
-	// 低负担行为三项（2026-10-28）
-	MorningLight *bool       `json:"morning_light,omitempty"` // true 已见 / false 未见 / nil 未记录
-	Steps        *int        `json:"steps,omitempty"`         // 每日步数；nil = 未记录（图表断点）
-	Lunch        *LunchDetail `json:"lunch,omitempty"`        // 午餐结构化；nil = 未记录
+	MorningLight *bool        `json:"morning_light,omitempty"` // true/false/nil
+	Steps        *int         `json:"steps,omitempty"`         // 步数，nil 为断点
+	Lunch        *LunchDetail `json:"lunch,omitempty"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
-
-// Record 别名，历史文档/代码中沿用的旧名，等价于 HealthRecord
-type Record = HealthRecord
-
-// SaveRecordDTO 前端提交的请求载荷（指针字段语义：nil = 不修改）
-type SaveRecordDTO struct {
-	RecordDate     string            `json:"record_date"`
-	WeightAM       *float64          `json:"weight_am"`
-	WeightPM       *float64          `json:"weight_pm"`
-	WaistSize      *float64          `json:"waist_size"`
-	SleepStartTime *string           `json:"sleep_start_time"`
-	SleepEndTime   *string           `json:"sleep_end_time"`
-	SleepHours     *float64          `json:"sleep_hours"`
-	JournalText    *string           `json:"journal_text"`
-	Exercise       *ExerciseDetail   `json:"exercise"`
-	ColdShower     *ColdShowerDetail `json:"cold_shower"`
-	Concerta       *ConcertaDetail   `json:"concerta"`
-	MorningLight   *bool             `json:"morning_light"`
-	Steps          *int              `json:"steps"`
-	Lunch          *LunchDetail      `json:"lunch"`
-}
 ```
-
-**参数边界校验**（`SaveRecordDTO.Validate()`）：
-* `record_date` 必须为 `YYYY-MM-DD`；
-* `weight_am` / `weight_pm` ∈ `[30.0, 250.0]` kg；
-* `waist_size` ∈ `[30.0, 200.0]` cm；
-* `sleep_hours` ∈ `[0.0, 24.0]` h；
-* `steps` 为空或 ∈ `[0, 20000]`（**空 = 当天未记录，不写 0**）；
-* `journal_text` ≤ 2000 字符。
 
 ### 3.2 数据库表结构与平滑升级（`internal/repository/db.go`）
+系统初始化时执行幂等升级，**严禁使用可能破坏现有数据库的 `DROP` 或 `TRUNCATE` 语句**。SQLite 驱动使用**纯 Go 实现 `modernc.org/sqlite`**（非 CGO），这是 Android `CGO_ENABLED=0` 交叉编译与单二进制交付的前提。
 
-系统初始化时执行幂等升级，**严禁使用可能破坏现有数据库的 `DROP` 或 `TRUNCATE` 语句**（见第九章红线）。
+```sql
+-- 核心生理数据表
+CREATE TABLE IF NOT EXISTS health_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL DEFAULT 1,
+    record_date TEXT NOT NULL,
+    weight_am REAL,
+    weight_pm REAL,
+    waist_size REAL,
+    sleep_start_time TEXT,
+    sleep_end_time TEXT,
+    sleep_hours REAL,
+    sleep_tag TEXT DEFAULT 'GREEN',
+    journal_text TEXT,
+    activity_tags TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, record_date)
+);
+CREATE INDEX IF NOT EXISTS idx_records_user_date ON health_records(user_id, record_date);
 
-```go
-package repository
+-- AI 洞察存档表
+CREATE TABLE IF NOT EXISTS ai_insights (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL DEFAULT 1,
+    range_days INTEGER NOT NULL DEFAULT 30,
+    start_date TEXT,
+    end_date TEXT,
+    content TEXT,        -- Markdown 正文
+    thinking TEXT,       -- 大模型思维链 (reasoning_content)
+    model TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_insights_user_id ON ai_insights(user_id, id DESC);
 
-import (
-	"database/sql"
-	_ "modernc.org/sqlite" // 纯 Go SQLite 驱动，支持 CGO_ENABLED=0
-)
+-- 睡前小结表
+CREATE TABLE IF NOT EXISTS evening_summaries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL DEFAULT 1,
+    record_date TEXT NOT NULL,
+    done_1 TEXT DEFAULT '',
+    done_2 TEXT DEFAULT '',
+    done_3 TEXT DEFAULT '',
+    note_text TEXT DEFAULT '',
+    score INTEGER NOT NULL DEFAULT 0,
+    photo_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, record_date)
+);
+CREATE INDEX IF NOT EXISTS idx_evening_summaries_user_date ON evening_summaries(user_id, record_date DESC);
 
-func InitDB(dbPath, backupDir string) (*DBManager, error) {
-	// 1) 确保数据库目录存在
-	// 2) 启动时执行一次当日冷备份 runAutoBackup(dbPath, backupDir)
-	// 3) sql.Open("sqlite", dbPath)；因 SQLite 单写特性，连接池固定为 1
-	// 4) Ping + migrate()
-}
+-- 小结照片 BLOB 存储表
+CREATE TABLE IF NOT EXISTS evening_photos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL DEFAULT 1,
+    record_date TEXT NOT NULL,
+    mime TEXT DEFAULT '',
+    data BLOB,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_evening_photos_user_date ON evening_photos(user_id, record_date);
 
-func (m *DBManager) migrate() error {
-	schema := `
-	CREATE TABLE IF NOT EXISTS health_records (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		user_id INTEGER NOT NULL DEFAULT 1,
-		record_date TEXT NOT NULL,
-		weight_am REAL,
-		weight_pm REAL,
-		waist_size REAL,
-		sleep_start_time TEXT,
-		sleep_end_time TEXT,
-		sleep_hours REAL,
-		sleep_tag TEXT DEFAULT 'GREEN',
-		journal_text TEXT,
-		activity_tags TEXT,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		UNIQUE(user_id, record_date)
-	);
-	CREATE INDEX IF NOT EXISTS idx_records_user_date ON health_records(user_id, record_date);
-
-	CREATE TABLE IF NOT EXISTS ai_insights (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		user_id INTEGER NOT NULL DEFAULT 1,
-		range_days INTEGER NOT NULL DEFAULT 30,
-		start_date TEXT,
-		end_date TEXT,
-		content TEXT,        -- 洞察正文 (Markdown)
-		thinking TEXT,       -- 大模型思维链 (reasoning_content) 原文
-		model TEXT,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);
-	CREATE INDEX IF NOT EXISTS idx_insights_user_id ON ai_insights(user_id, id DESC);
-
-	CREATE TABLE IF NOT EXISTS evening_summaries (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		user_id INTEGER NOT NULL DEFAULT 1,
-		record_date TEXT NOT NULL,
-		done_1 TEXT DEFAULT '',
-		done_2 TEXT DEFAULT '',
-		done_3 TEXT DEFAULT '',
-		note_text TEXT DEFAULT '',
-		score INTEGER NOT NULL DEFAULT 0,
-		photo_id INTEGER,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		UNIQUE(user_id, record_date)
-	);
-	CREATE INDEX IF NOT EXISTS idx_evening_summaries_user_date ON evening_summaries(user_id, record_date DESC);
-
-	CREATE TABLE IF NOT EXISTS evening_photos (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		user_id INTEGER NOT NULL DEFAULT 1,
-		record_date TEXT NOT NULL,
-		mime TEXT DEFAULT '',
-		data BLOB,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);
-	CREATE INDEX IF NOT EXISTS idx_evening_photos_user_date ON evening_photos(user_id, record_date);
-	`
-
-	// 平滑增量扩展字段（忽略"列已存在"错误，保证向后兼容）
-	alterStatements := []string{
-		`ALTER TABLE health_records ADD COLUMN sleep_bed_time TEXT DEFAULT '';`,
-		`ALTER TABLE health_records ADD COLUMN sleep_wake_time TEXT DEFAULT '';`,
-		`ALTER TABLE health_records ADD COLUMN exercise_json TEXT DEFAULT '{}';`,
-		`ALTER TABLE health_records ADD COLUMN cold_shower_json TEXT DEFAULT '{}';`,
-		`ALTER TABLE health_records ADD COLUMN concerta_json TEXT DEFAULT '{}';`,
-		// 2026-10-28 低负担行为三项：晨光 / 步数 / 午餐（仅增列，历史行保持 NULL = 未记录）
-		`ALTER TABLE health_records ADD COLUMN morning_light INTEGER;`,
-		`ALTER TABLE health_records ADD COLUMN steps INTEGER;`,
-		`ALTER TABLE health_records ADD COLUMN lunch_json TEXT;`,
-		// scope 区分洞察归属：health（生理周期洞察）/ evening（睡前小结洞察）
-		`ALTER TABLE ai_insights ADD COLUMN scope TEXT NOT NULL DEFAULT 'health';`,
-	}
-	// ...
-}
+-- 数据导入批次记录表
+CREATE TABLE IF NOT EXISTS import_batches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL DEFAULT 1,
+    source_type TEXT NOT NULL DEFAULT 'csv',
+    file_name TEXT DEFAULT '',
+    file_hash TEXT DEFAULT '',
+    file_size INTEGER NOT NULL DEFAULT 0,
+    total_rows INTEGER NOT NULL DEFAULT 0,
+    inserted INTEGER NOT NULL DEFAULT 0,
+    updated INTEGER NOT NULL DEFAULT 0,
+    skipped INTEGER NOT NULL DEFAULT 0,
+    warnings INTEGER NOT NULL DEFAULT 0,
+    errors INTEGER NOT NULL DEFAULT 0,
+    conflict_mode TEXT NOT NULL DEFAULT 'merge',
+    skip_errors INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pending',
+    error_message TEXT DEFAULT '',
+    detail_json TEXT DEFAULT '{}',
+    cache_path TEXT DEFAULT '',
+    root_batch_id INTEGER,
+    attempt_no INTEGER NOT NULL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    finished_at DATETIME
+);
+CREATE INDEX IF NOT EXISTS idx_import_batches_user_id ON import_batches(user_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_import_batches_hash ON import_batches(user_id, file_hash);
 ```
 
-**关键约束与说明**：
-
-* **多用户预留**：所有读写均带 `user_id` 条件，当前单机版固定 `userID = 1`；唯一键为 `UNIQUE(user_id, record_date)`。
-* **历史遗留列**：`sleep_start_time` / `sleep_end_time` 为主用字段；`sleep_bed_time` / `sleep_wake_time` 为兼容早期前端而保留的冗余列，写入时二者同步维护，读取时若主用字段为空则回退读取遗留列。
-* **结构化对象 JSON 列**：`exercise_json` / `cold_shower_json` / `concerta_json` / `lunch_json` 存 `TEXT`，空值约定为 `"{}"`，读取时忽略空对象。`lunch_json` 为**空串/NULL 均表示未记录**（与 `"{}"` 的空对象等价处理），不做默认值填充。
-* **三态与断点列**：`morning_light` 为 `INTEGER`，读取时映射为 `*bool`（`1`/`0`/`NULL`）；`steps` 为 `INTEGER`，`NULL` = 当天未记录，**图表侧必须断点、严禁补 0**（见 §2.9 与 §4.4）。两列均**无默认值**，避免历史数据被误填。
-* **AI 洞察存档表 `ai_insights`**：独立于 `health_records`，持久化每次生成的洞察。`content` 存正文 Markdown、`thinking` 存思维链原文，`range_days` 记录档位（7/30/60），`start_date` / `end_date` 为**分析窗口边界**（`start_date = end_date - (range_days - 1)`）。窗口身份 = 「档位 + 截止日」，存在性判定同时校验 `scope` + `range_days` + `start_date` + `end_date`，取 `id DESC` 最新一条；游标分页按 `id DESC`。
-  * **`scope` 列区分归属**：`health`（生理周期洞察，默认值）与 `evening`（睡前小结洞察）。列表查询默认只取 `health`，两类洞察互不串页；`evening` 洞察按 `record_date` 唯一，重新生成时先删除同日旧条。
-  * **【规划】阶段对比扩展（v3.3.0 定稿，未实现）**：需求 3（§10.1 ⑧）计划 `scope` 增加取值 `compare`；并追加列 `ALTER TABLE ai_insights ADD COLUMN meta_json TEXT DEFAULT '{}'`——**仅增列、不删列、不改既有列**（严格遵守本文档"只允许 ADD COLUMN"红线）。`meta_json` 保存两个对比自然月的边界（月 A / 月 B 的起止日）与七项聚合指标快照，供「阶段对比」独立视图（§4.4.3）与历史页卡片回显"对比的是哪两个月"。`compare` 记录的 `range_days` 固定写 `0`（不参与 7/30/60 档位筛选），其时间边界以 `meta_json` 为准而非 `start_date`/`end_date`。
-* **睡前小结两表**：`evening_summaries` 存小结主体（`done_1` / `done_2` / `done_3` 三列在模型层聚合为 `done_items` 数组，`score` 为 1~10 自评，`photo_id` 可空）；`evening_photos` 以 `BLOB` 直接存图并记录 `mime`（不经文件系统，规避 Android 路径与权限问题）。
-* **自动冷备份**：每次启动若当日尚无备份，则复制一份到 `data/backups/health_backup_YYYYMMDD.db`。
-
-### 3.3 数据访问层交互契约（`internal/repository/record_repo.go`）
-
-`RecordRepository` 对外方法（实际签名）：
-
-* **`GetByDate(userID int64, dateStr string) (*model.HealthRecord, error)`**：查询单日记录；不存在时返回 `nil, nil`。
-* **`SaveOrMerge(userID int64, dto *model.SaveRecordDTO, sleepTag, activityTags string) (*model.HealthRecord, error)`**：
-  * 记录不存在 → `INSERT`；
-  * 记录已存在 → **增量合并更新**：数值/时间/文本字段"非空覆盖、空保留旧值"，`sleep_tag` 仅在提交了就寝时间时重算覆盖。
-* **`GetRange(userID int64, startDate, endDate string) ([]*model.HealthRecord, error)`**：按日期升序取区间记录，供看板画图与 AI 上下文组装。
-* **`GetAll(userID int64)`**：等价于 `GetRange(userID, "1970-01-01", "2099-12-31")`，用于全量导出。
-
-上层 `internal/service/record_service.go` 负责在返回前用当前配置阈值**实时重算** `sleep_tag`。
-
-### 3.4 睡前小结数据层（`internal/model/evening.go`、`internal/repository/evening_repo.go`）
-
-* **实体**：`EveningSummary`（`record_date` 唯一、`done_items` 最多 3 条、`note_text`、`score` 1~10、`photo_id` 可空）与 `SaveEveningDTO`（入参校验：日期格式、评分区间、三件事条数上限）。
-* **图片 MIME 校验**：服务端对上传字节做**魔数嗅探**，仅接受 jpeg / png / webp / gif；上传体积上限 9 MB（`http.MaxBytesReader`），响应经 `GET /api/v1/evening/photo/{id}` 回吐并携带正确 `Content-Type`。
-* **引用一致性（严禁悬空引用）**：`DeleteByDate` 同步删除该日图片；`SavePhoto` 在事务内先删旧图、再插新图并回填 `photo_id`；`DeletePhoto` 删除图片记录并将引用它的 `photo_id` 置 `NULL`。
+**平滑增量扩展字段清单（`alterStatements`）**：
+```sql
+ALTER TABLE health_records ADD COLUMN sleep_bed_time TEXT DEFAULT '';
+ALTER TABLE health_records ADD COLUMN sleep_wake_time TEXT DEFAULT '';
+ALTER TABLE health_records ADD COLUMN exercise_json TEXT DEFAULT '{}';
+ALTER TABLE health_records ADD COLUMN cold_shower_json TEXT DEFAULT '{}';
+ALTER TABLE health_records ADD COLUMN concerta_json TEXT DEFAULT '{}';
+ALTER TABLE health_records ADD COLUMN morning_light INTEGER;
+ALTER TABLE health_records ADD COLUMN steps INTEGER;
+ALTER TABLE health_records ADD COLUMN lunch_json TEXT DEFAULT '{}';
+ALTER TABLE ai_insights ADD COLUMN scope TEXT NOT NULL DEFAULT 'health';
+ALTER TABLE ai_insights ADD COLUMN meta_json TEXT DEFAULT '{}';
+```
 
 ---
 
-## 四、 前端页面与交互组件规范
+## 四、 前端工程与 HealthTrack 3.0 设计规范
 
-* **源码工程目录**：`web/src/`（开发与维护入口，详见根目录 `frontend_modular_refactor_plan.md`）
-* **生产落盘路径**：`web/static/`（由 Vite 构建生成的纯静态 Bundle，供 `web/embed.go` 的 `go:embed` 打包进单二进制或 APK）
-* **设计系统（Design System v3.0）**：
-  * **主字体**：`Inter` / `system-ui`；所有数值、时间、单位与指标对比强制绑定 **`JetBrains Mono`**（开启 `font-feature-settings: "tnum" 1` 等宽对齐）。
-  * **视觉范式**：**Linear / Raycast 1px 工业单线美学**。淘汰夸张大圆角（`rounded-3xl`）与浮夸投影（`shadow-2xl`），统一收敛为精致的 `rounded-xl` + `border border-neutral-200/80`。
-  * **图标规范**：全面淘汰 Emoji，统一采用 1.5px 极细线性内联 SVG（Lucide 规范）。
-  * **色彩体系**：中性灰阶（Neutral 50~900），状态以冷灰与点状微指示呈现；图表调色板全面单色阶化。
-* **交付与构建约束**：
-  * **轻量现代构建**：基于 Vite 构建管道，保持原生 Vanilla JS / ES Modules 模式，严禁引入带有厚重 Virtual DOM 运行时的庞大框架（保持 0 运行时开销）。
-  * **多端离线兼容**：构建基准路径强制采用相对路径 `./`，确保在 Android WebView 本地 `file://` 或本地 HTTP 离线环境下均可秒级无缝加载。
+### 4.1 现代前端工程架构
+* **源码工程目录**：`web/src/`（开发与功能重构的唯一入口）。
+* **生产落盘路径**：`web/static/`（由 Vite 构建生成的纯静态 Bundle，供 Go `embed.go` 打包）。
+* **开发约束红线**：**严禁直接修改 `web/static/` 目录下的任何产物**。每次前端源码或样式变更后，必须在 `web/` 目录下执行 `npm run build` 重新编译，确保 Go 二进制与 Android APK 包含最新前端代码。
+* **工程架构分层**：
+  * `web/src/views/`：4 大业务页面控制器（`log-view.js`、`dash-view.js`、`insight-view.js`、`evening-view.js`、`compare-view.js`、`history-view.js` 等）；
+  * `web/src/components/`：通用交互组件（`BottomNav.js`、`Header.js`、`Toast.js`、`modals/` 等）；
+  * `web/src/services/`：API 请求与轻量状态管理（`api.js` 等）；
+  * `web/src/utils/`：日期处理、弹窗确认、Markdown 渲染与格式化函数；
+  * `web/src/css/app.css`：HealthTrack 3.0 极简极客 Design Tokens。
 
-### 4.1 录入页核心表单（睡眠联动计算）
+### 4.2 HealthTrack 3.0 Linear 1px 工业单线设计系统
+* **视觉范式**：**Linear / Raycast 1px 工业单线极简极客美学**。淘汰夸张大圆角（`rounded-3xl`）、粗笨投影（`shadow-2xl`）与深色渐变卡片，全站统一收敛至标准 12px 圆角单线容器（`.ht-card`：`rounded-xl border border-neutral-200/80 bg-white`）。
+* **排版系统**：
+  * **主字体**：`Inter`, `-apple-system`, `system-ui`, sans-serif。
+  * **等宽数字体系**：所有测量数值、差值、时间点、百分比与单位微标签强制绑定 **`JetBrains Mono`**（`.font-mono` + `.tabular-nums`），保障跨端数值严整对齐。
+* **图标规范**：全面淘汰原生彩色 Emoji，全站统一采用 1.5px 极细线性内联 SVG（Lucide 规范）。
+* **通用交互原子 Tokens**：
+  * **单线分段切换胶囊（`.ht-seg-btn`）**：灰白底色配 1px 微边框，选态纯净加亮，替代过时的浮夸圆钮；
+  * **极细交互滑轨（`.ht-range`）**：2px 极细轨道配 14px 紧凑圆滑块，支持步数（0~20000）与自评分（1~10）；
+  * **非阻塞交互反馈**：弹窗一律走 Promise 化应用内弹窗 `#app-confirm-modal`（`appConfirm()`）与轻量提示 `#app-toast`，**严禁使用原生 `confirm()` / `alert()`**。
 
-将原先的单输入框替换为双时间选择器与自动计算卡片（就寝 / 起床 / 自动时长 / 三色标签）：
+### 4.3 记一笔 Tab (`view-log`) 规范
+* **指标录入顺序**：顺应生理称重逻辑，排布为「睡前体重 $\to$ 晨起空腹 $\to$ 腰围」。
+* **睡眠智能联动**：输入昨晚就寝时间与今晨起床时间，自动推导睡眠时长；结合服务端动态配置的熬夜阈值，实时渲染状态徽章（未熬夜 / 轻度熬夜 / 重度熬夜）。
+* **低负担行为三项**：
+  * **晨光**：一键 YES/NO 点选，默认留空；
+  * **步数**：0~20000 极细滑块（500 一档），支持一键「留空」保持断点；
+  * **午餐**：独立折叠卡，支持「沿用昨天」与 6 行极简结构化点选。
+* **生物黑客折叠卡**：
+  * **运动**：`types` 独立多选（有氧 / 抗阻可同时勾选，「无运动」互斥清空），记录疲劳强度与时长；
+  * **专注达**：服药时间、剂量（18/36/54mg）、1~5 分启动力打卡与晚间 Crash 追踪；
+  * **冷水澡**：刺激时机、预估体感水温（0~40℃）与神经唤醒体感。
+* **吸底保存条**：固定在底部 Tab 上方，具备本地草稿自动缓存与切页/离开未保存确认拦截防护。
 
-```html
-<div class="metric-card sleep-card">
-  <div class="time-picker-row">
-    <div class="picker-item">
-      <label class="field-label">🌙 昨晚就寝</label>
-      <input type="time" id="sleepBedTime" class="standard-time-input" value="00:30">
-    </div>
-    <div class="picker-item">
-      <label class="field-label">☀️ 今晨起床</label>
-      <input type="time" id="sleepWakeTime" class="standard-time-input" value="07:15">
-    </div>
-  </div>
-  <div class="duration-result-row">
-    <span class="calc-label">睡眠时长 (自动核算):</span>
-    <div class="duration-input-wrapper">
-      <input type="number" step="0.1" id="sleepDuration" class="duration-number-input">
-      <span class="unit">小时</span>
-    </div>
-    <span id="sleepTagBadge" class="badge-green">未熬夜</span>
-  </div>
-</div>
-```
+### 4.4 数据趋势看板 Tab (`view-dash`) 规范
+* **核心看板卡片**：体重、腰围、睡眠时长、每日步数 4 张核心趋势图。
+* **全局测量断点铁律**：**测量类缺失一律以断点呈现（`spanGaps: false`），严禁以 0 填充**；计数类指标缺失即 0。
+* **独立周期档位**：`近7天 / 近30天 / 近60天`，看板档位与 AI 洞察档位完全独立，互不联动。
+* **独立周平均视图 (`view-trend-weekly`)**：
+  * 分桶口径：自然周（周一至周日），展示最近 12 周；
+  * 曲线特征：周均值折线 + 周内 min/max 波动区间带；
+  * 置信度规则：当周 0 天记录断点留空；1~3 天标记低置信（虚线/空心点）；$\ge 4$ 天为正常置信。
+* **独立 60 天详情横滑视图 (`view-trend-detail`)**：
+  * 竖屏/窄窗口：固定日宽横向滚动（约 26px/点），不压缩节点；
+  * 横屏自适应：容器宽 $\ge 560\text{px}$ 时自适应整屏铺满，x 轴每 3 天一刻度，紧凑布局。
 
-```javascript
-// 跨日时长计算 + 按当前配置阈值渲染三色标签
-function handleSleepCalculation() {
-  const bedTime = document.getElementById('sleepBedTime').value;
-  const wakeTime = document.getElementById('sleepWakeTime').value;
-  if (!bedTime || !wakeTime) return;
+### 4.5 AI 深度洞察 Tab (`view-insight`) 规范
+* **分析周期与自选截止日**：周期档位（`近7天`、`近30天`、`近60天`、`全部`），支持自选分析截止日（不允许未来日期），存在性判定收归后端精确匹配。
+* **极简交互流**：主操作按钮纯中文化（「生成阶段深度洞察」），彻底去除沙漏等待 Emoji；打字机流式输出，思维链在上、正文在下。
+* **阶段对比独立视图 (`view-compare`，已实现)**：
+  * 入口：洞察页头部「阶段对比」按钮进入独立全屏视图；
+  * 窗口模型：两个自然月双窗口（`对比月 A` vs `对比月 B`），互不重叠；
+  * 聚合先行：Go 后端直接预计算 7 项聚合指标快照并在页面渲染对比表，AI 模型只负责趋势解读与阶段综述。
+* **洞察历史与管理模式 (`view-history`)**：
+  * 游标分页（10条/批），关键词搜索，全周期筛选（近7天、近30天、近60天、全部、对比）；
+  * 管理模式：头部中性工业风「管理」按钮，展开批量勾选框与底部删除操作条。
 
-  const [bH, bM] = bedTime.split(':').map(Number);
-  const [wH, wM] = wakeTime.split(':').map(Number);
-
-  let bedMinutes = bH * 60 + bM;
-  let wakeMinutes = wH * 60 + wM;
-  if (wakeMinutes <= bedMinutes) wakeMinutes += 1440; // 跨过午夜
-
-  document.getElementById('sleepDuration').value = ((wakeMinutes - bedMinutes) / 60).toFixed(1);
-  renderSleepTag(bedMinutes); // 阈值取自 /api/config 返回的 sleep_green_before / sleep_yellow_before
-}
-```
-
-> ⚠️ 前端**不得硬编码** 24:00 / 01:00 阈值，须使用接口下发的 `sleep_green_before` / `sleep_yellow_before`，与后端 2.4 章的可配置规则保持一致。
-
-### 4.2 高级生理与生物黑客追踪卡片（折叠交互）
-
-在自由日记文本框下方，默认折叠、点击展开，**全部交互为点选胶囊与滑动条，15 秒内完成录入**。三大模块：**运动训练 / 专注达（Concerta）/ 冷水澡**。
-
-```html
-<div class="biohack-accordion">
-  <div class="accordion-toggle" onclick="toggleBiohackPanel()">
-    <span>🧬 高级生理与习惯打卡 (运动 / 专注达 / 冷水澡)</span>
-    <span id="accordionIcon">▼</span>
-  </div>
-
-  <div id="biohackBody" class="accordion-body" style="display:none;">
-    <!-- 1. 运动 -->
-    <div class="tracker-block">
-      <div class="block-title">🏋️ 运动训练</div>
-      <div class="pill-group" id="exerciseTypePills">
-        <button type="button" class="pill-btn active" data-val="none" onclick="toggleExerciseType('none')">无运动</button>
-        <button type="button" class="pill-btn" data-val="cardio" onclick="toggleExerciseType('cardio')">有氧运动</button>
-        <button type="button" class="pill-btn" data-val="strength" onclick="toggleExerciseType('strength')">力量抗阻</button>
-      </div>
-      <p class="hint">有氧与力量可同时选中；点「无运动」清空其他选择</p>
-      <div class="sub-row">
-        <label>强度: </label>
-        <div class="pill-group-sm" id="exerciseIntensityPills">
-          <button type="button" class="pill-sm-btn active" data-val="light">轻松</button>
-          <button type="button" class="pill-sm-btn" data-val="medium">中等</button>
-          <button type="button" class="pill-sm-btn" data-val="failure">力竭/过载</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. 专注达 -->
-    <div class="tracker-block">
-      <div class="switch-row">
-        <span class="block-title">💊 专注达服药追踪</span>
-        <input type="checkbox" id="concertaEnabled" onchange="toggleConcerta(this.checked)">
-      </div>
-      <div id="concertaSubForm" style="display:none;">
-        <div class="inline-inputs">
-          <label>服药时间: <input type="time" id="concertaTime" value="08:00"></label>
-          <label>剂量:
-            <select id="concertaDose">
-              <option value="18">18mg</option>
-              <option value="36" selected>36mg</option>
-              <option value="54">54mg</option>
-            </select>
-          </label>
-        </div>
-        <div class="slider-row">
-          <span>深度工作启动力:</span>
-          <input type="range" id="focusWork" min="1" max="5" value="4">
-          <span id="focusWorkText">4分</span>
-        </div>
-        <div class="chip-selector">
-          <span class="chip-label">副作用:</span>
-          <span class="chip" data-key="appetite_loss" onclick="toggleChip(this)">食欲抑制</span>
-          <span class="chip" data-key="thirst" onclick="toggleChip(this)">口干</span>
-        </div>
-        <div class="chip-selector">
-          <span class="chip-label">晚间代偿:</span>
-          <span class="chip chip-warn" data-key="monster_energy" onclick="toggleChip(this)">魔爪/高咖啡因</span>
-          <span class="chip chip-warn" data-key="sugar_craving" onclick="toggleChip(this)">高糖暴食冲动</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 3. 冷水澡 -->
-    <div class="tracker-block">
-      <div class="switch-row">
-        <span class="block-title">🚿 冷水澡刺激</span>
-        <input type="checkbox" id="coldShowerEnabled" onchange="toggleColdShower(this.checked)">
-      </div>
-      <div id="coldShowerSubForm" style="display:none;">
-        <div class="pill-group-sm" id="csTimingPills">
-          <button type="button" class="pill-sm-btn active" data-val="morning">晨起即刻</button>
-          <button type="button" class="pill-sm-btn" data-val="post_workout">训练后</button>
-          <button type="button" class="pill-sm-btn" data-val="evening">睡前</button>
-        </div>
-        <div class="pill-group-sm" id="csFeelingPills">
-          <button type="button" class="pill-sm-btn active" data-val="refreshed">🟢 神清气爽</button>
-          <button type="button" class="pill-sm-btn" data-val="neutral">🟡 无明显感觉</button>
-          <button type="button" class="pill-sm-btn" data-val="shivering">🔴 寒冷后轻微困倦感</button>
-        </div>
-        <!-- 预估体感水温：number 输入 (id=coldShowerWaterTemp，单位 ℃，0~40，可空)，随 cold_shower.water_temp 提交 -->
-      </div>
-    </div>
-  </div>
-</div>
-```
-
-> **运动类型多选（有氧 + 抗阻）**：运动胶囊为**独立多选**——点「有氧运动 / 力量抗阻」各自切换勾选，可同时选中；点「无运动」为互斥清空项（清掉其他选择）。状态为 `exerciseState.types`（数组），交互函数 `toggleExerciseType()` / `syncExerciseTypeUI()`；回显用 `exerciseTypesOf()`（兼容旧单值 `type`）。提交载荷同时带主用 `types` 与兼容字段 `type`（= 首个类型，无运动为 `none`）。历史列表标签形如 `🏋️ cardio + strength`。
-
----
-
-### 4.3 睡前小结 Tab（第 4 个底部导航）
-
-* **今日填写**：自评分滑块（1~10，实时联动分档文案徽章）、今日完成的三件事（最多 3 条，带序号圆点）、那一刻的感想、当日照片（`<input type="file">` 选取 → canvas 压缩 → 以图片原始二进制 POST，`Content-Type` 为图片类型；安卓端由 `MainActivity.onShowFileChooser` 走 SAF 选文件，Android 10+ 免存储权限）。
-* **往期回顾**：`GET /api/v1/evening/summaries` 一次拉全量，**前端本地**做「日期（全部 / 近 7 天 / 近 30 天）× 评分（全部 / 9-10 / 7-8 / 5-6 / 1-4）」组合筛选与分批渲染（每批 10 条 + 「加载更多」）；卡片支持**左滑删除**（Pointer Events 统一触摸与鼠标，`touch-action: pan-y` 保证竖向滚动不受影响，`-42px` 吸附阈值，右侧露出红色删除按钮）。
-* **小结洞察卡片**：深色独立卡片，手动生成 / 清除；「关联生理数据」窗口可在「近 7 天 / 近 30 天」间切换（默认近 7 天）；布局**思维链在上、正文在下**，正文未输出时思维链自动展开、正文一开始输出即自动收起（与「洞察」页行为一致）。
-* **评分文案可配置**：5 个分档（1-2 / 3-4 / 5-6 / 7-8 / 9-10），每档含 `label` + `tone`；落 `config.yaml` 的 `summary.score_bands`（见 §8.1）。打分卡「⚙ 文案」按钮展开编辑器，改动即时联动打分徽章与往期列表的评分 chip。
-* **破坏性操作红线**：删除一律走应用内确认弹窗 `#app-confirm-modal`（Promise 化 `appConfirm()`）与轻量提示条 `#app-toast`，**严禁使用原生 `confirm()` / `alert()`**——会打断 IDE 内嵌浏览器的宿主组件树，且安卓 WebView 下 `confirm()` 恒返回 `false`。
-
-### 4.4 数据可视化规划（v3.3.x，⑥⑦ 已实施，⑧ 待实施）
-
-> 本节为 2026-10-14 需求评审的定稿结论。**实施顺序：⑦ 周平均（已实施）→ ⑥ 60 天详情（已实施）→ ⑧ 阶段对比（待实施）**；每项单独完成后须双端验收再提交。
-
-**全局原则（适用全部图表）**
-
-1. **范围互不联动**：看板（`近7天 / 近30天 / 近60天`）与洞察页（`近7天 / 近30天 / 近60天` + `截止日`）各自维护范围状态，切 Tab 返回后各自保留上次选择，**不做任何跨页联动、不共享档位状态**。
-2. **测量类缺失一律断点，严禁以 0 填充**（体重 / 腰围 / 睡眠时长）；计数类指标（记录天数、运动天数、熬夜档天数等）缺失即 `0`。
-
-#### 4.4.1 数据趋势看板 · 60 天详情（§10.1 ⑥，方案 A 定稿）
-
-> 2026-10-14 追加评审：与 ⑦ 周平均趋势**互补**（周平均看长周期趋势、60 天详情看逐日细节），故采用**方案 A —— 单一总入口 + 独立视图**，与 ⑦「📈 周平均趋势」同一交互范式。
-
-* **档位扩展**：看板档位胶囊扩展为 `近7天 / 近30天 / 近60天`（默认仍为近 7 天）；第三档 = 近 60 天**逐日**。
-* **入口形态（方案 A）**：在**看板页标题下方**新增**一个**总入口「📊 60天详情」→ 进入**独立视图** `view-trend-detail`。**卡片本身不加任何入口**，四张卡片（体重 / 腰围 / 睡眠 / 步数）布局保持不变，**底部导航维持 4 个 Tab 不变**（该视图 nav 高亮 `dash`）。
-* **视图结构**：顶部「‹ 返回 + 📊 60天详情」→ 四指标 Tab `体重 / 腰围 / 睡眠时长 / 步数`（默认体重）→ 图表卡 → 下方「👆 横向拖动 · 点击节点看当日详情」文字条。
-* **竖屏 / 横屏两态（按容器实测宽度自适应）**：
-  * **竖屏 / 桌面窄列**：固定日宽（每点 ≈ 26px，60 天图宽 ≈ 1560px），容器 `overflow-x:auto` **横向滚动**，不压缩数据点。
-  * **手机横屏**：手机框 `#app-frame` 临时解除 `max-w-md`（`frame-wide` 类）→ 整屏铺满，容器宽 ≥ 560px 时 60 点压进一屏，x 轴约**每 3 天一个刻度**；同时切为**紧凑布局**（返回 + 标题 + 指标 Tab 挤成一行、隐藏统计块/提示条/口径说明、图高 220→150px），以适配横屏仅约 360px 的高度、避免被底部导航裁切。
-  * **判定信号**：不用裸 `(orientation: landscape)`——**桌面宽窗口也是 landscape**，会误触发。改用**容器实测宽度**（`#td-chart-scroll.clientWidth ≥ 560` 判定"够宽"）配合 `(orientation: landscape) and (max-height: 600px)`（判定"手机真的转屏了"）。
-  * **切换机制**：`matchMedia('(orientation: landscape) and (max-height: 600px)')`（带 `addListener` 兜底）+ `resize` 监听 → 先同步手机框宽度、再 `chart.resize()`。**转屏不重载页面**（`AndroidManifest.xml` 已 `configChanges="orientation|screenSize|keyboardHidden"`、未锁方向、`MainActivity` 无 `setRequestedOrientation`；真机验证转屏前后 PID 不变），靠用户自然转屏。
-* **数据与聚合**：复用 `GET /api/v1/records/history?start_date=&end_date=`，**前端聚合 / 渲染，不新增后端接口、不改 DB**（与 ⑦ 同一策略）。
-* **缺失与详情**：缺失日 = **断点**（`spanGaps:false`，**严禁以 0 填充**）；点击节点显示当日详情——体重 → 晨重 / 睡前 / 夜间排水；腰围 → 当日腰围；睡眠 → 就寝 / 起床 / 时长 / 档位；步数 → 当日步数（附当日晨光状态）。步数纵轴固定 `0 ~ 20000`、`stepSize 5000`（刻度 0 / 0.5万 / 1万 / 1.5万 / 2万），与录入上限一致。
-* **明确不做**：**不做真·强制横屏**（`MainActivity.setRequestedOrientation`）——仅对手机有意义、电脑端无此概念，且 WebView 旋转会整页重绘、体验割裂；**不做逐日数值表格**（详情即"折线图 + 点节点看值"）。
-
-#### 4.4.2 趋势分析页 · 周平均（§10.1 ⑦，已实施）
-
-* **形态（方案 Y）**：**独立视图**（不在看板卡片内切换），内含 `体重 / 腰围 / 睡眠时长 / 步数` **四个 Tab**，各自一条周平均曲线；步数取整并以千分位展示（不显示小数），纵轴口径与 §4.4.1 一致。入口置于看板「📈 周平均趋势」卡片，与洞察页「🕘 历史」同一交互范式，**底部导航维持 4 个 Tab 不变**。看板页另有一张「步数趋势」折线卡（逐日，与体重/腰围/睡眠三张卡并列），同样缺失日断点。
-* **分桶口径**：**自然周（周一 ~ 周日）**，共 **12 周**（含当前未满周）。
-* **曲线形态**：**周均值折线 + 周内 min/max 区间带**（区间带 = 该周内所有**日值**的 min/max，**非**标准差）。
-* **缺失与置信规则（必须严格遵守）**：
-
-  | 当周有效天数 | 处理                                                                 |
-  | :----------- | :------------------------------------------------------------------- |
-  | `0` 天       | **断点**：均值线断开、区间带留空，**不得显示 0**                     |
-  | `1 ~ 3` 天   | 照常计算均值，但标记**低置信**（节点空心/虚线样式，tooltip 注明"仅 N 天数据"） |
-  | `≥ 4` 天     | 正常置信                                                             |
-
-  * 计数类指标（若后续加入该页）缺失即 `0`，不受上表约束。
-* **聚合位置（本期定稿）**：**前端聚合**——复用 `GET /api/v1/records/history` 一次拉取区间原始记录，在前端按自然周分组求均，**不新增后端接口**；聚合口径以上表为唯一依据并写成代码注释。将来 §10.1 ⑧ 若需复用同一套口径，再评估是否上移到后端（记为待议事项，本期不实施）。
-
-#### 4.4.3 洞察 · 阶段对比（§10.1 ⑧，最后实施）
-
-* **入口与布局（方案 B 定稿，2026-10-15）**：**洞察页不新增任何页内区块**；改为在洞察页头部「🕘 历史」按钮**左侧**新增「⇄ 阶段对比」按钮 → 点击进入**独立视图**（`switchTab('compare')`，与「🕘 洞察历史」「📈 周平均趋势」「📊 60 天详情」同范式：顶部 `‹ 返回` + 标题，底部 4 Tab 保留且 nav 高亮「洞察」）。该视图自上而下为：两个月份选择器（`对比月 A` vs `对比月 B`，胶囊式年 + 月）+ 「生成对比综述」按钮 + 「指标对比表」（由接口回传的聚合快照直接渲染）+ 「AI 阶段对比综述」（SSE 流式输出，思维链在上、正文在下）。**历史页筛选胶囊新增第 5 档「阶段对比」**（筛 `scope=compare`）——点历史卡片直接复用同一独立视图（仅返回目标不同）；胶囊共 5 个，需注意手机端换行/缩写排版。
-* **否决方案 A 的理由**（原型对比见 `.preview/insight_compare_ab.html`）：原稿为「洞察卡片下方新增页内区块、上下并列」，但存在四个问题 —— ① 功能被 `min-h 300px` 的洞察卡片遮挡，手机端（360×780）需下滑才能发现；② 同页出现两个「生成」按钮（生成洞察 / 生成对比）语义打架；③ 洞察页主流程被拉长约一屏，与「档位 + 截止日 → 生成」的单一主任务冲突；④ 历史页第 5 档胶囊需另写一套页内渲染，无法复用。故改用方案 B。
-* **头部排版约束**：360px 视口下「✨ AI 智能健康复盘」标题与两个头部按钮同行偏挤（约 312px）——标题须缩小字号 / 允许 `truncate`，两个按钮保持 `shrink-0` 不换行。
-* **窗口模型**：**自然月**（1 号 ~ 月末）双窗口，UI 提供**两个月份选择器**（`对比月 A` vs `对比月 B`，各选年 + 月）。
-  * **默认值**：`上月` vs `上上个月`（均为完整自然月）。
-  * **约束**：A ≠ B（**互不重叠**）；**相邻非必须**（允许"去年同月 vs 今年同月"这类跨年对比）。
-  * **允许选择当前未过完的月**，但必须在 UI 与 AI 报告中明确标注「数据不足 / 不足月」。
-* **对比方式（方案 C）**：**以两月的聚合数据为主，叠加引用已生成洞察的结论**——不单独比对历史洞察正文（洞察为用户手动按需生成、时间上不连续，仅靠它做"每 30 天一次"会经常缺档）。
-* **产出与展示**：生成结果落 `ai_insights`（`scope='compare'`，窗口边界与指标快照落 `meta_json`，见 §3.2），以「指标对比表 + AI 综述」两段式呈现；对比表由接口回传的聚合快照直接渲染，前端不重算（见 §5.2 / §6.5）。
-
-### 4.5 低负担打卡卡与保存交互（2026-10-28 实施）
-
-**卡片形态（`view-log`）**
-
-* **晨光 / 步数**：各为一张**独立卡片**（不合并），位于日期行下方、体重三连卡上方。
-  * 晨光：一键 `是 / 否`，三态（未点 = 未记录），默认不打卡。
-  * 步数：滑动条 `0 ~ 20000`、`step 500`，右侧大字显示当前值；滑块下方刻度 `0 / 5,000 / 1万 / 1.5万 / 2万`；点「留空」清空为未记录（图表断点）；卡片副标题显示「前一天 · 近7天日均」。
-* **午餐**：独立**折叠卡**，默认收起。收起态标题栏显示摘要（如「鸡胸 · 约25g · 杂粮 · 20–35g · 蒸煮」）+「沿用昨天」按钮 + 旋转箭头；展开 6 行结构化点选（吃了吗 / 蛋白来源多选 / 蛋白量 / 主食 / 碳水 / 烹饪），点「跳过」时摘要显示「今天跳过午餐」，其余行隐藏。
-  * 选项组统一 `flex-1` 撑满剩余宽度并**左对齐**、`flex-wrap` 换行后与首行同起点；`.chip` / `.pill-sm-btn` 加 `white-space: nowrap`，避免窄屏下气泡内文字被压成两行。
-* **专项打卡折叠标题**：保持 `🧬 专项生理与习惯打卡 (运动 / 专注达 / 冷水澡)`，**不显示数值徽标**（360px 宽度下会与文案挤成两行）。
-* **日期行**：右侧显示「已记 X/6」，六项 = 体重 / 腰围 / 睡眠 / 晨光 / 步数 / 午餐。
-* **日记区**：标题改为「身体感受与自由记录」，右侧标签「饮食已结构化」（饮食走午餐结构化卡，日记不再承担记账）。
-
-**吸底保存条（一期定稿，不做自动保存）**
-
-* 固定在底部 Tab 栏**上方**，高度固定不跳动：
-  * **无改动**：绿色「✓ 今日已保存 HH:MM · 无改动」；
-  * **有改动**：蓝色「保存今日记录」+ 副文案「未保存 · 草稿已存」。
-* 任一点击 / 拖动 / 沿用昨天 / 填表都重置为脏状态；保存成功（`POST /api/v1/records` 全量 upsert）后切回绿色并刷新时间。
-* **草稿**：按 `record_date` 写 `localStorage`；重进该日期若检测到草稿则自动回填并提示「已恢复上次未保存的草稿」；保存成功后清除。
-* **离开守卫**：切换日期 / 切到看板等离开动作时，若 `logDirty` 为真则用**应用内确认框**（`#app-confirm-modal`）拦截，**禁用原生 `confirm`**。
-* **明确不做**：自动保存（用户明确"先按一期效果，观察后再定"）；启动困难专项打卡（本期仅以 `Concerta.FocusWork` 作为代理指标，见 §10.2）。
+### 4.6 睡前小结 Tab (`view-evening`) 规范
+* **顶部日期选择器**：显式宽度 138px，彻底解决 Android 移动端日期末位数字被遮挡问题。
+* **心理与成就感复盘**：
+  * 1~10 分自评分滑块，实时联动可配置分档文案与状态徽章；
+  * 今日完成三件事（结构化 3 行）与自由感悟；
+  * 当日照片上传（Canvas 客户端压缩 $\to$ 原生二进制 POST 存储）。
+* **小结深度洞察卡片**：
+  * 关联生理数据窗口（`近7天` / `近30天`）；
+  * 纯中文操作「生成小结深度洞察」，白底中性单线卡片承载，思维链自适应折叠。
+* **往期回顾时间轴**：
+  * 日期 $\times$ 评分组合筛选与分页加载；
+  * 紧凑微缩略图约束为 40px $\times$ 40px，卡片头部严整对齐；
+  * 右上角清晰展示当日自评分徽章；
+  * 左滑露出删除按钮（42px 吸附阈值）。
 
 ---
 
 ## 五、 API 契约、统一响应与 SSE 流式协议
 
 ### 5.1 统一 JSON 响应信封（`internal/model/response.go`）
-
 除 SSE 长连接与静态资源外，所有 RESTful 接口统一以以下结构返回：
-
 ```json
 {
   "code": 200,
@@ -668,424 +413,239 @@ function handleSleepCalculation() {
 }
 ```
 
-**业务错误码常量**：
+**业务错误码规范**：
+* `200`（`CodeSuccess`）：操作成功；
+* `40001`（`CodeParamError`）：参数非法；
+* `40002`（`CodeDateInvalid`）：日期格式错误（须 YYYY-MM-DD）；
+* `40401`（`CodeNotFound`）：未找到对应记录；
+* `50001`（`CodeDBError`）：SQLite 读写或事务异常；
+* `50201`（`CodeAIServiceErr`）：上游大模型通信失败或超时。
 
-| 常量               | 值      | 含义                           |
-| :----------------- | :------ | :----------------------------- |
-| `CodeSuccess`      | `200`   | 操作成功                       |
-| `CodeParamError`   | `40001` | 请求参数非法                   |
-| `CodeDateInvalid`  | `40002` | 日期格式错误（须 `YYYY-MM-DD`）|
-| `CodeNotFound`     | `40401` | 未找到对应记录                 |
-| `CodeDBError`      | `50001` | SQLite 读写或事务异常          |
-| `CodeAIServiceErr` | `50201` | 上游大模型通信失败或超时       |
+### 5.2 核心 RESTful 路由清单
+| 方式 | 路由路径 | 说明 | 关键参数 / 载荷 |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/records/today` | 获取今日已有记录 | 无 |
+| `POST` | `/api/v1/records` | 新建或幂等合并单日数据 | `SaveRecordDTO` JSON |
+| `GET` | `/api/v1/records/history` | 按日期区间拉取数据 | `?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` |
+| `GET` | `/api/v1/insights/stream` | **AI 深度洞察流式接口 (SSE)** | `?days=7\|30\|60&end_date=YYYY-MM-DD&tz_offset=<分钟>` |
+| `GET` | `/api/v1/insights/period` | 判定分析窗口是否已存在洞察 | `?range_days=7\|30\|60&end_date=YYYY-MM-DD&tz_offset=<分钟>` |
+| `GET` | `/api/v1/insights` | AI 洞察历史列表（游标分页） | `?limit=10&before_id=<id>&range_days=&scope=health\|compare&q=` |
+| `GET` | `/api/v1/insights/{id}` | 读取单条洞察存档详情 | 路径参数 `id` |
+| `DELETE` | `/api/v1/insights/{id}` | 删除单条洞察存档 | 路径参数 `id` |
+| `POST` | `/api/v1/insights/batch-delete` | 批量删除洞察存档 | `{"ids":[1,2,3]}` |
+| `GET` | `/api/v1/insights/compare/stream` | **阶段对比流式生成 (SSE)** | `?month_a=YYYY-MM&month_b=YYYY-MM&tz_offset=<分钟>` |
+| `GET` | `/api/v1/insights/compare/period` | 校验月份对并返回预计算快照 | `?month_a=YYYY-MM&month_b=YYYY-MM` |
+| `GET` | `/api/v1/evening/summary` | 读取指定日期的睡前小结 | `?date=YYYY-MM-DD` |
+| `POST` | `/api/v1/evening/summary` | 新建或覆盖当日睡前小结 | `{record_date, done_items[], note_text, score}` |
+| `GET` | `/api/v1/evening/summaries` | 睡前小结全量列表 | 返回 `{items, total}` |
+| `DELETE` | `/api/v1/evening/summary/{date}` | 删除某日睡前小结（连同照片） | 路径参数 `date` |
+| `POST` | `/api/v1/evening/photo` | 上传/替换小结照片（二进制） | `?date=YYYY-MM-DD`，Body 为二进制字节流 |
+| `GET` | `/api/v1/evening/photo/{id}` | 读取小结照片（BLOB 回吐） | 路径参数 `id` |
+| `DELETE` | `/api/v1/evening/photo/{id}` | 删除小结照片 | 路径参数 `id` |
+| `GET` | `/api/v1/evening/insight/stream` | **睡前小结洞察流式生成 (SSE)** | `?date=YYYY-MM-DD&days=7\|30` |
+| `GET` | `/api/v1/evening/insight` | 读取某日小结洞察存档 | `?date=YYYY-MM-DD` |
+| `DELETE` | `/api/v1/evening/insight` | 清除某日小结洞察 | `?date=YYYY-MM-DD` |
+| `POST` | `/api/v1/import/preview` | **数据导入预检（不落库）** | Multipart 表单（文件或粘贴文本，$\le 5\text{MB}$） |
+| `POST` | `/api/v1/import/confirm` | **确认导入（单事务原子落库）** | `{batch_id, conflict_mode, skip_errors}` |
+| `GET` | `/api/v1/import/batches` | 获取导入批次历史列表 | `?limit=20` |
+| `POST` | `/api/v1/import/batches/{id}/retry` | 重试失败批次 | 路径参数 `id` |
+| `GET` | `/api/v1/import/batches/{id}/failed-rows` | 导出失败行 CSV | 路径参数 `id` |
+| `GET` | `/api/v1/import/template` | 下载标准 CSV 导入模板 | 无 |
+| `GET` | `/api/v1/export` | 导出 CSV 数据文件 | `?range=7\|30\|all` |
+| `GET` | `/api/v1/export/json` | 导出全量 JSON 备份 | 无 |
+| `GET` | `/api/config` | 读取运行时配置（脱敏） | 返回 base_url, model, sleep_*, summary |
+| `POST` | `/api/config` | 更新 AI 配置（即时生效） | `{base_url, model, api_key?}` |
+| `POST` | `/api/config/sleep` | 更新熬夜阈值配置 | `{green_before, yellow_before}` |
 
-### 5.2 核心 RESTful 路由清单（`cmd/server/main.go`）
-
-| 方式   | 路由路径                  | 说明                                   | 关键参数 / 载荷                                   |
-| :----- | :------------------------ | :------------------------------------- | :------------------------------------------------ |
-| `GET`  | `/api/v1/records/today`   | 获取今日已有记录，用于表单初始回显     | 无                                                |
-| `POST` | `/api/v1/records`         | 新建或幂等合并单日数据                 | `SaveRecordDTO` 完整 JSON                         |
-| `GET`  | `/api/v1/records/history` | 按日期区间拉取数据，供给看板图表       | `?start_date=2026-09-01&end_date=2026-09-28`      |
-| `GET`  | `/api/v1/insights/stream` | **AI 深度洞察流式接口 (SSE)**          | `?days=7\|30\|60&end_date=YYYY-MM-DD&tz_offset=<分钟>`（`end_date` 缺省为客户端今天；`tz_offset` 为客户端时区偏移，分钟） |
-| `GET`  | `/api/v1/insights/period` | 判定某分析窗口是否已生成洞察（存在性）  | `?range_days=7\|30\|60&end_date=YYYY-MM-DD&tz_offset=<分钟>`；返回 `{exists, insight, start_date, end_date}`；`end_date` 不得为未来日期 |
-| `GET`  | `/api/v1/insights`        | AI 洞察历史列表（游标分页）             | `?limit=10&before_id=<id>&range_days=7\|30\|60&q=<关键词>`；**【规划】** 新增 `scope=health\|compare`（缺省 `health`；历史页第 5 档「阶段对比」传 `compare`，见 §10.1 ⑧） |
-| `GET`  | `/api/v1/insights/{id}`   | AI 洞察历史详情（含思维链原文）         | 路径参数 `id`                                     |
-| `DELETE` | `/api/v1/insights/{id}` | 删除单条洞察存档                        | 路径参数 `id`                                     |
-| `POST` | `/api/v1/insights/batch-delete` | 批量删除洞察存档（历史页管理模式）  | JSON Body `{"ids":[1,2,3]}`（服务端过滤非法值并去重） |
-| `GET`  | `/api/v1/insights/compare/stream` | **【规划】** 阶段对比流式生成 (SSE)  | `?month_a=YYYY-MM&month_b=YYYY-MM&tz_offset=<分钟>`；两月须互不重叠（见 §10.1 ⑧） |
-| `GET`  | `/api/v1/insights/compare/period` | **【规划】** 判定某月份对是否已生成阶段对比，并回传两月指标快照 | `?month_a=YYYY-MM&month_b=YYYY-MM`；返回 `{exists, insight, month_a, month_b, metrics_a, metrics_b}`（指标快照供前端"对比表"直接渲染，见 §6.5） |
-| `GET`  | `/api/v1/evening/summary` | 读取指定日期的睡前小结                 | `?date=YYYY-MM-DD`（缺省为今天）                  |
-| `POST` | `/api/v1/evening/summary` | 新建或覆盖当日睡前小结                 | `{record_date, done_items[], note_text, score}`   |
-| `GET`  | `/api/v1/evening/summaries` | 睡前小结全量列表（日期倒序）         | 无参数；返回 `{items, total}`，筛选与分页在前端完成 |
-| `DELETE` | `/api/v1/evening/summary/{date}` | 删除某日睡前小结（连同其照片） | 路径参数 `date`                                   |
-| `POST` | `/api/v1/evening/photo`   | 上传 / 替换小结照片（原始二进制）      | `?date=YYYY-MM-DD`；Body 为图片字节，`Content-Type` 为图片类型（≤9MB，魔数嗅探） |
-| `GET`  | `/api/v1/evening/photo/{id}` | 读取小结照片（BLOB 回吐）           | 路径参数 `id`；响应带真实 `Content-Type`          |
-| `DELETE` | `/api/v1/evening/photo/{id}` | 删除小结照片                       | 路径参数 `id`                                     |
-| `GET`  | `/api/v1/evening/insight/stream` | **睡前小结洞察流式生成 (SSE)**  | `?date=YYYY-MM-DD&days=7\|30`（白名单，缺省 7）    |
-| `GET`  | `/api/v1/evening/insight` | 读取某日已存档的小结洞察               | `?date=YYYY-MM-DD`                                |
-| `DELETE` | `/api/v1/evening/insight` | 清除某日的小结洞察                    | `?date=YYYY-MM-DD`                                |
-| `GET`  | `/api/v1/export`          | **导出 CSV（UTF-8 BOM，Excel/WPS 友好）** | `?range=7` / `?range=30` / 缺省为全部             |
-| `GET`  | `/api/v1/export/json`     | 导出全量 JSON 备份                     | 无                                                |
-| `GET`  | `/healthz`                | 服务健康检查探针                       | 返回 `{"status":"ok","time":...}`                 |
-| `GET`  | `/api/config`             | 读取 AI 与熬夜阈值配置（API Key 脱敏） | 返回 `base_url`/`model`/`api_key_masked`/`sleep_*` |
-| `POST` | `/api/config`             | 保存 AI 配置（原子写盘并即时生效）     | `{base_url, model, api_key?}`                     |
-| `POST` | `/api/config/test`        | 测试 AI 连通性（走 `/models`，不落盘） | `{base_url, model, api_key?}`                     |
-| `POST` | `/api/config/sleep`       | 保存熬夜三档阈值并即时生效             | `{green_before, yellow_before}`                   |
-
-**导出文件命名规范**：`HealthTrack_export_<range>d_<yyyymmdd>.csv`，其中 `<range>` 为 `7` / `30` / `all`（默认全部）。
-
-> 服务仅监听 `127.0.0.1`（回环），因为配置接口涉及敏感信息；Android WebView 与桌面浏览器均通过回环访问。
-
-### 5.3 SSE (Server-Sent Events) 打字机协议规范
-
-* **响应头**：
-
-  ```http
-  Content-Type: text/event-stream; charset=utf-8
-  Cache-Control: no-cache
-  Connection: keep-alive
-  Access-Control-Allow-Origin: *
-  ```
-
-* **流式帧协议格式**（下列为早期 `AIService` 路径使用的自定义 `{delta, status}` 帧；当前线上洞察入口 `AIHandler` 系列为**透明转发上游原始 OpenAI 帧**，前端据 `choices[0].delta.content` 与 `delta.reasoning_content` 双通道分别渲染正文与思维链）：
-
-  ```text
-  data: {"delta":"根据您近30天的数据...","status":"streaming"}\n\n
-  ```
-
-  * `status = "done"`：传输完成（`delta` 为空串）；
-  * `status = "error"`：异常中断，`delta` 内为可读错误信息。
+### 5.3 SSE 打字机流式协议
+服务端通过透明转发 OpenAI 兼容接口的标准事件流帧，前端区分 `choices[0].delta.content` 与 `delta.reasoning_content` 双通道渲染：
+```http
+Content-Type: text/event-stream; charset=utf-8
+Cache-Control: no-cache
+Connection: keep-alive
+Access-Control-Allow-Origin: *
+```
+* **正文通道**：累积到正文展示区，触发 Markdown 实时增量渲染；
+* **思维链通道**：累积到独立的推导容器，正文开始吐字时自动折叠。
 
 ---
 
 ## 六、 后端特征工程与 AI 模块实现
 
-> ⚠️ **核心工程哲学**：
-> **不要让大模型在长文本中做复杂的数值减法与统计！**
-> Go 后端必须先行计算好夜间呼吸失水差（$\Delta W_{sleep}$）、日间体重变动差（$\Delta W_{day}$）、力量力竭训练标记等特征，再组装成清晰易读的上下文注入给模型。
+### 6.1 特征工程预计算哲学
+> **核心工程红线**：
+> **严禁让大模型在长上下文中做复杂的数值减法与多日统计！**
+> Go 后端必须先行计算好 $\Delta W_{sleep}$、$\Delta W_{day}$、力竭抗阻训练日、熬夜天数等特征，组装成结构化上下文直接注入。
 
-### 6.1 特征工程：`internal/service/insight_service.go`
+`InsightService.BuildPromptContext` 将记录数组转化为两段式结构化文本：
+1. **系统预计算：宏观生理与行为特征大盘**（有效天数、净体重变化、平均夜间失水、力竭训练天数、专注达天数等）；
+2. **逐日微观多维流水**（日增减、排水、睡眠标签、运动、专注达、体感水温、饮食日记）。
 
-`InsightService.BuildPromptContext(records []*model.HealthRecord) string` 负责把记录数组压成两段式文本：
+### 6.2 AI 洞察流式实现（`internal/handler/ai_handler.go`）
+* **双消息下发策略**：
+  * `system`：硬性约束常量 `systemInstruction`（思维链与正文必须全程简体中文，绝不允许英文思考）；
+  * `user`：装载提示词模板 + 预计算数据上下文。
+* **模板双轨加载机制**：
+  * **磁盘优先**：优先读取 `prompts/insight_v1.txt`（桌面端改动即时生效，无需重新编译）；
+  * **内嵌兜底**：磁盘缺失时回退到 `internal/service/default_prompt.txt`（`go:embed` 保证 Android APK 离线可用，**严禁删除**）。
 
-1. **【系统预计算：宏观生理与行为特征大盘】**：统计区间、有效记录天数、期间净体重变化、平均夜间失水（对比 0.4~0.9kg 基准）、力竭抗阻训练天数、专注达服药天数。
-2. **【逐日微观多维流水】**：按日输出晨重（含日变化、睡前排水）、睡眠（时长 / 就寝 / 标签）、运动（多选类型以 `+` 连接，如 `cardio+strength(medium/55分钟)`，经 `NormalizeTypes()` 归一化、兼容旧单值）、药物、冷水澡（含预估体感水温）、饮食日记。
+### 6.3 睡前小结洞察流式实现
+* 以指定小结日期为锚点向前回溯 7 天或 30 天，关联生理特征；
+* 模板侧重**心理状态与成就感**解读，生理数据仅作为辅助佐证；
+* 同一日期的小结洞察以 `scope='evening'` 保持唯一，重新生成时先清理同日旧记录。
 
-### 6.2 AI 流式实现：`internal/service/ai_service.go`
+### 6.4 阶段对比聚合与流式实现（`internal/service/compare_service.go`）
+* **两月聚合先行**：Go 后端先行聚合计算 7 项核心指标（体重均值与净变化、腰围均值与净变化、平均睡眠时长、熬夜天数分布、运动天数与强度分布、专注达天数、平均夜间排水量）；
+* **不足月标注**：单月有效记录天数 $<7$ 天或为当前未过完月份时，显式标明「数据不足 / 不足月」，提示降低置信度；
+* 存储与存档：生成完成后落库 `ai_insights`（`scope='compare'`, `range_days=0`，两月边界与指标快照存入 `meta_json`）。
 
-`AIService.StreamInsight(ctx, userID, startDate, endDate, w)` 的关键流程：
-
-1. `repo.GetRange` 取区间记录；为空则直接回一句"暂无记录"并以 `done` 结束。
-2. `calculateStats` 计算 `MacroStats`（宏观基线）。
-3. `buildPrompt` 组装提示词：
-   * **优先读取磁盘** `prompts/insight_v1.txt`；
-   * **磁盘不可用时回退到内嵌模板**（`//go:embed default_prompt.txt`，经 `service.DefaultPrompt()` 暴露）。此兜底是解决 Android 端 APK 未打包 `prompts/` 目录导致模板读取失败的关键机制，**严禁删除**。
-   * 通过占位符替换注入统计数据（见第七章）。
-4. **未配置 API Key 时**：走 `streamDemoInsight` 本地演示分析（逐字流式输出，明确标注"本地演示分析"），而非报错。
-5. **已配置时**：`callOpenAIStream` 请求 `{base_url}/chat/completions`，`temperature=0.7`、`stream=true`、超时 45s；逐行解析上游 `data:` 帧，抽取 `choices[0].delta.content` 后以本项目 `{delta,status}` 帧转发。
-
-> `cmd/server/main.go` 中 `/api/v1/insights/stream` 与 `/api/v1/evening/insight/stream` 均由 `AIHandler` 直接实现（装载模板 → `proxyChat` 转发上游），**不经过 `AIService.StreamInsight`**；后者为早期实现（含无 Key 时的本地演示分析），保留 `buildPrompt` 与内嵌模板兜底能力。
->
-> **分析窗口口径（AI 洞察）**：窗口身份 = 「档位 + 截止日」。`StreamInsight` 读取 `days`（白名单 `7/30/60`）、`end_date`、`tz_offset` 三个参数，窗口 = `end_date` 向前回溯 `days - 1` 天；`end_date` 缺省取「客户端今天」（由 `tz_offset` 换算——安卓端 Go 进程运行于 UTC，服务端 `time.Now()` 不可信）。落库时 `start_date` / `end_date` 存窗口边界，**重新生成不替换旧记录**（同档位同窗口可并存多条），存在性判定与状态展示取 `id DESC` 最新一条（见 §5.2 的 `/api/v1/insights/period`）。
-
-### 6.3 睡前小结洞察流式实现（`internal/handler/ai_handler.go`）
-
-`AIHandler.StreamEveningInsight(w, r)` 的关键流程：
-
-1. **参数解析**：`date`（缺省为今天）与 `days`——**白名单 `{7, 30}`**，缺省 7。
-2. **取小结**：`eveningRepo.GetByDate`；该日无小结则直接回一句提示并以 `done` 结束，不调用大模型、不落库。
-3. **关联生理数据**：以**小结日期为终点向前回溯 `days - 1` 天**（起点 = `date - (days-1)`），`RecordService.GetHistoryRecords` 取区间记录后交 `InsightService.BuildPromptContext` 压成宏观特征 + 逐日流水文本。注意此处区间为"以小结日为终点的近 N 天"，与「洞察」页"以**自选截止日**为终点的近 N 天"口径不同。
-4. **双消息下发**：`system` = `eveningSystemInstruction`（在通用中文硬约束 `systemInstruction` 之上追加"侧重心理状态与成就感、生理数据仅作辅助佐证"的角色定位）；`user` = 模板固定指令段 + 动态数据块（小结日期 / 关联范围 / 自评 / 三件事 / 感想 / 生理上下文）。
-5. **流结束落库**：以 `scope='evening'` + `record_date` **唯一**，落库前先 `DeleteByDateScope` 清理同日旧条，保证同一天只保留最新一条小结洞察（与「洞察」页"追加保留"策略不同）。
-6. `proxyChat` 统一承担请求组装（`temperature=0.4`、`ai.max_tokens` 封顶、`ai.thinking` 开关）、SSE 透明转发与正文 / 思维链双缓冲累积。
-
-### 6.4 运行时配置热更新（`internal/config/runtime.go`）
-
-`config.RuntimeStore` 持有当前 `Config` 快照与 `-config` 解析后的绝对路径，提供 `Snapshot()` / `UpdateAI(...)` / `UpdateSleep(...)`：先原子写回配置文件，再更新内存快照，实现"保存即生效"，无需重启进程。AI 洞察每次请求开始时调用 `Snapshot()` 取最新配置。
-
-### 6.5 阶段对比（【规划】，v3.3.0 定稿，未实现）
-
-* **聚合先行**：与 §6.0 的工程哲学一致——两月的七项指标**全部由 Go 后端先行聚合**，模型只负责"读表 + 归因 + 综述"，**严禁让模型做跨月数值减法**。
-* **七项指标口径（定稿）**：
-
-  | # | 指标                 | 计算口径                                                                 |
-  | :- | :------------------- | :----------------------------------------------------------------------- |
-  | 1 | 体重均值 + 净变化     | 月内 `weight_am` 均值；净变化 = 月末最后一个晨重 − 月初第一个晨重        |
-  | 2 | 腰围均值 + 净变化     | 同上，取 `waist_size`                                                     |
-  | 3 | 平均睡眠时长          | 月内 `sleep_hours` 均值                                                   |
-  | 4 | 熬夜红/黄/绿天数占比  | 各档天数 ÷ **该月有记录天数**（非自然天数）；标签按当前阈值实时计算       |
-  | 5 | 运动天数 + 强度分布   | 有运动的天数；按 `intensity`（`light/medium/failure`）各占几天（多选类型不单独作主指标） |
-  | 6 | 专注达服药天数        | `concerta.taken` 为真的天数                                               |
-  | 7 | 平均夜间排水量        | 仅在晨重与睡前重**都有值**的天上，算 `weight_pm − weight_am` 的均值       |
-
-* **数据不足标注**：某月有效记录天数不足（含"当前未过完的月"）时，指标快照与 AI 上下文中均须显式输出「数据不足 / 不足月」提示，模型报告开头也必须点明。
-* **窗口校验**：`month_a` / `month_b` 须为合法 `YYYY-MM` 且两月**互不重叠**（A ≠ B）；相邻非必须，允许"去年同月 vs 今年同月"这类跨年对比。
-* **落库**：SSE 正常结束且确有产出时落 `ai_insights`（`scope='compare'`、`range_days=0`，`meta_json` 存两月边界 + 指标快照）；**重新生成追加保留**（与 `health` 策略一致，不覆盖）。
-* **实现入口**：新增 `AIHandler.StreamCompare` / `AIHandler.ComparePeriod`（扩展 `ai_handler.go`），复用 `proxyChat`（`temperature=0.4`、`ai.max_tokens` 封顶、`ai.thinking` 开关）；`system` 承载中文硬约束，`user` 承载模板 + 指标表 + 已生成洞察结论摘要。
+### 6.5 运行时配置热更新（`internal/config/runtime.go`）
+`RuntimeStore` 持有当前配置的内存快照，通过 `UpdateAI` 与 `UpdateSleep` 原子写回 `config.yaml` 并即时刷新快照，全站请求即时生效，无需重启服务。
 
 ---
 
 ## 七、 提示词模板契约
 
 ### 7.1 生理洞察模板（`prompts/insight_v1.txt`）
-
-* **权威文件**：`prompts/insight_v1.txt`（桌面/源码环境优先读取）。
-* **兜底文件**：`internal/service/default_prompt.txt`（通过 `go:embed` 编译进二进制，Android 等无 `prompts/` 目录环境使用）。
-* **消息角色**：线上生成入口 `GET /api/v1/insights/stream`（`AIHandler.StreamInsight`）以 **`system` + `user` 双消息**下发：`system` 固定承载硬性约束（思维链与正文必须全程简体中文，常量 `systemInstruction`），`user` 承载提示词模板 + 预计算数据上下文。**思维链语言由 `system` 角色主导**——同类约束若只写在 `user` 消息里遵循度不稳定，会出现同一模板时而中文、时而英文思考。
-* **占位符契约**（由 `AIService.buildPrompt` 替换，模板须包含以下 token）：
-
-  | 占位符             | 含义                     |
-  | :----------------- | :----------------------- |
-  | `{{.StartDate}}`   | 统计起始日期             |
-  | `{{.EndDate}}`     | 统计结束日期             |
-  | `{{.TotalDays}}`   | 区间自然天数             |
-  | `{{.ValidDays}}`   | 有效记录天数             |
-  | `{{.StartWeight}}` | 期初体重                 |
-  | `{{.EndWeight}}`   | 期末体重                 |
-  | `{{.WeightDelta}}` | 期间净体重变化           |
-  | `{{.GreenDays}}`   | 正常作息天数             |
-  | `{{.YellowDays}}`  | 轻度熬夜天数             |
-  | `{{.RedDays}}`     | 重度熬夜天数             |
-  | `{{.WorkoutDays}}` | 运动打卡天数             |
-  | `{{.DailyLogs}}`   | 逐日明细流水（多行文本） |
-
-* **角色与分析铁律**：AI 扮演精通神经生物学、运动代谢与行为心理学的健康顾问，必须遵守：
-  1. 严禁虚假的"卡路里精确加减法"，只识别**食品加工程度**与营养密度；
-  2. 尊重生理规律粉碎减脂焦虑 —— 单日晨重突增 0.5~1.5kg 必先归因于**抗阻力竭训练水分潴留 / 高钠水肿 / 糖原结合水**，而非脂肪；
-  3. 专注达药动学归因 —— 关注 17:30 后的多巴胺断崖期 (Crash) 与晚间高糖/咖啡因代偿；
-  4. 区分相关性与因果性 —— 客观评估冷水澡对晨间唤醒与睡前交感激活的双面影响。
-* **输出结构**：固定 4 段 Markdown（① 生理体重与代谢水滞留归因；② 饮食加工程度与 8:2 弹性评估；③ 神经调控、专注达效能与睡眠节律；④ 极低阻力行动指南，严格限制 3 条）。
+* **文件位置**：磁盘 `prompts/insight_v1.txt`；兜底 `internal/service/default_prompt.txt`。
+* **角色定位**：精通神经生物学、运动代谢与行为心理学的健康顾问。
+* **分析原则**：
+  1. 尊重生理规律消除虚假减脂焦虑（单日晨重突增优先归因于肌肉微创伤水分潴留、高钠水滞留或糖原结合水，严禁误判为脂肪增长）；
+  2. 专注达 17:30 药效衰退与晚间 Crash 代偿机制识别；
+  3. 区分冷水澡晨起唤醒与睡前交感激活的双面作用；
+  4. 绝不推算微观卡路里，仅评估 NOVA 加工分级与 8:2 弹性维持。
+* **输出结构**：4 段式 Markdown（代谢与水分归因 / 饮食加工程度 / 神经调控与节律 / 3条低阻力行动建议）。
 
 ### 7.2 睡前小结洞察模板（`prompts/evening_insight_v1.txt`）
+* **文件位置**：磁盘 `prompts/evening_insight_v1.txt`；兜底 `internal/service/default_evening_prompt.txt`。
+* **角色定位**：温和务实的个人成长教练，聚焦心理状态与微小成就感。
+* **输出结构**：今日状态概览 / 成就感与心理归因 / 值得留意的信号 / 明日一件小事（仅 1 条极低成本建议）。
 
-* **权威文件**：`prompts/evening_insight_v1.txt`；**兜底文件**：`internal/service/default_evening_prompt.txt`（`//go:embed`，经 `service.DefaultEveningPrompt()` 暴露，供 Android 等无 `prompts/` 目录环境使用）。
-* **装载时机**：`loadEveningPromptTemplate()` 在**每次请求**时读磁盘（读不到或内容为空则回退内嵌），因此桌面端调整措辞只需改 txt、**无需重新编译**；Android 端固定使用内嵌版，改文案必须重新打包。
-* **组装方式**：`模板固定指令段 + "\n\n" + 动态数据块`（无占位符替换，这与 §7.1 的 `{{.Xxx}}` 契约不同）。
-* **模板结构**（基础版，可后续迭代）：
-  1. **【思考与推演硬性约束】**：思考过程必须全程简体中文（严禁英文自问自答或罗列英文小标题）、思考预算上限 300 字。**该段与 `system` 消息的中文约束必须同时存在**——只靠 `system` 不足以稳定约束思维链语言。
-  2. **【角色与任务设定】**：温和务实的个人成长教练，输出侧重**心理状态与成就感**的洞察。
-  3. **【分析原则】**：先理解后归因；成就感为主线且必须落到细节；生理数据仅作辅助佐证、不作医学诊断；只使用给定数据、信息不足须明说"数据不足"；总篇幅 ≤400 字。
-  4. **【输出格式规范】**：固定 4 小节 —— 🌙 今日状态概览 / 🌟 成就感与心理归因 / ⚠️ 值得留意的信号 / 🌤️ 明日一件小事（仅 1 条低成本建议）。
-* **与生理洞察的差异**：生理洞察以代谢归因与 NOVA 饮食评估为主；小结洞察以心理与成就感解读为主，生理数据退为佐证。两份模板**不共用**，各自独立迭代。
-
-### 7.3 阶段对比模板（【规划】`prompts/compare_v1.txt`，v3.3.0 定稿，未实现）
-
-* **权威文件**：`prompts/compare_v1.txt`；**兜底文件**：`internal/service/default_compare_prompt.txt`（`//go:embed`，经 `service.DefaultComparePrompt()` 暴露，供 Android 等无 `prompts/` 目录环境使用）。沿用 §7.1 / §7.2 的「磁盘优先 → 内嵌兜底」双轨机制，**兜底严禁删除**。
-* **装载时机**：每次请求读磁盘（读不到或内容为空则回退内嵌）；桌面端调整措辞无需重新编译，Android 端必须重新打包。
-* **组装方式**：同 §7.2 的 `模板固定指令段 + "\n\n" + 动态数据块`（**不使用** `{{.Xxx}}` 占位符替换）。
-* **消息角色**：与 §7.1 一致采用 `system` + `user` 双消息；`system` 承载"思维链与正文必须全程简体中文"的硬约束常量，`user` 承载模板 + 两月指标表。
-* **模板结构（基础版，可后续迭代）**：
-  1. **【思考与推演硬性约束】**：思考过程必须全程简体中文（严禁英文自问自答）、思考预算字面上限。**该段与 `system` 消息的中文约束必须同时存在**。
-  2. **【角色与任务设定】**：长期健康趋势分析顾问，任务是对比两个自然月的整体变化。
-  3. **【输入数据】**：两个自然月的七项聚合指标表（由 Go 后端预计算，见 §6.5）+ 已生成洞察的结论摘要（可选）。
-  4. **【分析铁律】**：一律以两月聚合表为准；报告开头须先注明**两个对比月份及其各自有效记录天数**；某月数据不足须显式指出并降低结论置信度；严禁把"记录条数"当作"天数"；严禁脑补表中不存在的数值。
-  5. **【输出格式规范】**：固定 3 小节 —— 📊 两月总览（对比表要点）/ 🔁 关键变化与归因（聚焦体重·腰围·睡眠·作息·运动·用药·夜间排水）/ 🎯 下一阶段 1~3 条低成本建议。
+### 7.3 阶段对比模板（`prompts/compare_v1.txt`）
+* **文件位置**：磁盘 `prompts/compare_v1.txt`；兜底 `internal/service/default_compare_prompt.txt`。
+* **角色定位**：长期健康趋势与生理演进分析顾问。
+* **输出结构**：两月总览（指标对比核心要点）/ 关键变化与归因（体重·腰围·作息·运动·用药）/ 下一阶段 1~3 条低成本建议。
 
 ---
 
 ## 八、 工程构建、配置与交付规范
 
-### 8.1 配置加载与运行参数（`internal/config/config.go`）
+### 8.1 配置文件规范（`config.yaml`）
+```yaml
+server:
+  port: 8080
+  dev_mode: false
 
-```go
-type Config struct {
-	ProjectRoot string         `yaml:"-"`
-	Server      ServerConfig   `yaml:"server"`   // port, dev_mode
-	Database    DatabaseConfig `yaml:"database"` // path, backup_dir
-	AI          AIConfig       `yaml:"ai"`       // base_url, api_key, model, max_tokens, thinking
-	Sleep       SleepConfig    `yaml:"sleep"`    // green_before, yellow_before
-	Summary     SummaryConfig  `yaml:"summary"`  // score_bands：睡前小结评分文案分档
-}
+database:
+  path: "data/health.db"
+  backup_dir: "data/backups"
 
-func LoadConfig(configPath, dataDir string) (*Config, error)
-func ResolveConfigPath(configPath string) (string, error)
-func FindProjectRoot() string
+ai:
+  base_url: "https://api.deepseek.com/v1"
+  api_key: "sk-..."
+  model: "deepseek-reasoner"
+  max_tokens: 4096
+  thinking: "enabled"
+
+sleep:
+  green_before: "23:00"
+  yellow_before: "00:00"
+
+summary:
+  score_bands:
+    - range: "1-2"
+      label: "很低落"
+      tone: "gray"
+    - range: "3-4"
+      label: "有点钝"
+      tone: "blue"
+    - range: "5-6"
+      label: "平平"
+      tone: "green"
+    - range: "7-8"
+      label: "还不错，稳住了节奏"
+      tone: "purple"
+    - range: "9-10"
+      label: "满分的一天"
+      tone: "orange"
 ```
 
-**关键行为**：
+### 8.2 多通道构建与交付流水线
+任何涉及前端的改动，必须先在 `web/` 执行 `npm run build`，再进行后续构建：
 
-* **配置文件缺失时自动创建**安全模板（`DefaultConfigTemplate`，不含真实 Key，权限 `0600`），**绝不覆盖已有配置**。
-* **启动参数**：`-config <路径>`（未指定时沿用项目根 `config.yaml`）、`-data-dir <目录>`（指定后数据库与备份强制放入该目录，Android 传入 `filesDir`）、`-port <端口>`（覆盖 `server.port`）。
-* **环境变量覆盖**（容器/CI 场景）：`AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 优先级高于配置文件。
-* **思维链长度封顶（`ai.max_tokens` / `ai.thinking`）**：推理模型的思考过程不受提示词中"500 字以内"约束（该约束写在 user 消息里，对原生 reasoning 通道无效），故改由请求参数硬性封顶。`ai.max_tokens` 为单次响应最大 token 数（含思维链+正文），`>0` 时注入请求体 `max_tokens`，`<=0` 表示不限制（交由服务端默认值）；`ai.thinking` 取 `enabled` / `disabled`，仅在这两个非空值时注入 `thinking: {"type": ...}`，留空则不传、保持服务端默认（即思维链默认开启）。二者均只影响请求参数，前端思维链展示不受影响。
-* **路径解析**：未使用 `-data-dir` 时，`database.path` / `backup_dir` 的相对路径基于 `config.yaml` 所在目录；`FindProjectRoot` 依次尝试"当前目录 → 上一级 → 可执行文件所在目录（含 `bin/` 特判）"，杜绝"不同目录启动导致数据库路径裂脑"。
-* **睡前小结评分文案（`summary.score_bands`）**：为 5 个分档模型，每档含 `range`（如 `"1-2"`）、`label`（文案）、`tone`（色点，取值受 `ValidScoreTones` 白名单约束）。配置缺失时回退 `DefaultScoreBands()`（很低落 / 有点钝 / 平平 / 还不错，稳住了节奏 / 满分的一天）。保存时校验各档区间首尾相接且覆盖 `1~10`，非法则返回 `400`。该配置经 `GET /api/config` 下发，前端打分徽章与往期列表评分 chip 即时联动（详见 §4.3）。
-* **Android DNS 修复**：`main` 启动首行调用 `netutil.ConfigureResolver()`，必须在任何网络请求之前执行。
+| 通道 | 触发方式 | 前置命令 | 核心构建命令 / 产物 |
+| :--- | :--- | :--- | :--- |
+| **前端编译** | 前端开发改动后 | 无 | `cd web && npm run build`（产物落入 `web/static/`） |
+| **桌面本地** | `git commit` 或手动 | 前端已编译 | `go build -o bin/HealthTrack.exe ./cmd/server` |
+| **手机本地** | 手动执行脚本 | 脚本自动执行前端编译 | `.\scripts\build-android.ps1`（自动检测手机版本号、编译 .so、Gradle 打包、无线 `adb install -r` 覆盖安装） |
+| **手机 CI** | 推送 `main` 分支 | CI 流程自动执行 | `.github/workflows/build-apk.yml` 自动编译并分发 APK |
 
-### 8.2 构建与发布（三种通道）
-
-> ⚠️ v2.0.0 中记载的 `Makefile` 在真实工程中**并不存在**，以下为实际构建通道。
-
-| 通道               | 触发方式                        | 产物                                       | 说明                                                                 |
-| :----------------- | :------------------------------ | :----------------------------------------- | :------------------------------------------------------------------- |
-| 桌面本地（钩子）   | `git commit` 成功后自动         | `bin/HealthTrack.exe`                      | 由 `.githooks/post-commit` 执行，`core.hooksPath=.githooks`；**不加 `-s -w`**（避免 Windows Defender 误报），编译失败不影响提交本身 |
-| 手机 CI            | 推送触发 `.github/workflows/build-apk.yml` | `app-debug.apk`（含 `libhealthtrack.so`） | JDK 17 (temurin)、`VERSION_CODE=${{ github.run_number }}`、从 `secrets.ANDROID_KEYSTORE_BASE64` 还原 keystore、`CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -o jniLibs/arm64-v8a/libhealthtrack.so ./cmd/server` → `./gradlew assembleDebug` |
-| 手机本地（免 CI）  | 手动运行 `scripts/build-android.ps1` | 本地签名 APK，可覆盖安装      | 脚本已加入 `.gitignore`（含本机签名口令）；自动重连无线 adb → `versionCode` 取手机已装版本 +1 → 交叉编译 `.so` → Gradle 打包 → `adb install -r` → 拉起 App。支持 `-SkipGoBuild` / `-VersionCode` / `-DeviceAddress` |
-
-**Android 工程约束**：
-
-* `AGP 8.5.2` + `Gradle 8.7`；`compileSdk/targetSdk 34`、`minSdk 26`；`sourceCompatibility/targetCompatibility = JavaVersion.VERSION_17`。
-* `versionCode` 取自环境变量 `VERSION_CODE`：**CI 用 `github.run_number`，本地脚本用"手机已装版本 + 1"**（两者的基线差异见下方说明）。
-* `packaging { jniLibs { useLegacyPackaging = true } }`（应对 Android 10+ `filesDir` noexec，需解压 JNI 库）。
-* 本地与 CI **必须使用同一把签名密钥**（项目根 `healthtrack-release.jks`，alias `healthtrack`），否则无法覆盖安装、会清空手机数据。
-* WebView 需注册 `DownloadListener` 与 JS 桥（`window.HealthTrack.openDownloads()`）才能处理导出文件下载，否则手机端点击导出无反应。
-* 内嵌前端的 HTML 响应（`/` 与 `*.html`）统一加 `Cache-Control: no-cache, must-revalidate`（`noCacheHTML` 中间件）：否则浏览器 / Android WebView 会启发式缓存旧 `index.html`，导致覆盖安装后仍渲染上一版页面、新功能"看不见"。
-
-**版本号基线差异说明（CI 与本地，已知问题，暂不修改）**：
-
-* **两套计数器无共同基线**：CI 的 `github.run_number` 只随仓库 CI 运行次数递增，与代码提交无关；本地脚本取"手机已装 versionCode + 1"，随本地安装持续上爬。因此本地包通常领先 CI 包若干档，两者的 `versionCode` 天然对不上。
-* **签名不受影响**：CI 与本地共用同一把固定密钥（项目根 `healthtrack-release.jks`，alias `healthtrack`），证书指纹一致，不会触发 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`。
-* **覆盖安装后果**：目标设备**从未装过** HealthTrack，或已装包的 `versionCode` **更低**时，CI 包可正常覆盖安装；若已装包 `versionCode` **更高**（例如你自己的开发机上装的本地包），则会报 `INSTALL_FAILED_VERSION_DOWNGRADE`。临时绕过用 `adb install -r -d`（允许降级）；**卸载会清空本地数据库，严禁使用**。
-* **结论**：CI 包仍适用于**全新设备/他人设备安装**与**按提交归档**（文件名带日期与短哈希、随邮件与 artifact 分发），但不保证能覆盖你自己开发机上的更新包。
-* **拟修复方案（方案 A，尚未实施）**：两端统一以仓库提交数 `git rev-list --count HEAD` 作为 `versionCode` 基线，本地脚本取 `max(已装 + 1, 提交数)`。同一提交在 CI 与本地算出的 `versionCode` 相同（相等允许覆盖安装），新提交自动 +1，跨端永远一致。前提：`main` 分支不重写历史（`reset`/`rebase` 会使提交数回退）。详见 §10.2 第 2 条。
+**移动端关键约束**：
+* 必须统一使用固定签名密钥（根目录 `healthtrack-release.jks`，别名 `healthtrack`）；
+* 移动端 HTML 响应（`/` 及 `*.html`）一律注入 `Cache-Control: no-cache, must-revalidate`，避免 WebView 强缓存旧页面导致功能不更新；
+* `versionCode` 必须持续递增，本地脚本基于手机已安装版本号自动 `+1`。
 
 ### 8.3 统一 Git 忽略规则（`.gitignore`）
-
-```gitignore
-# 编译产物
-/bin/
-*.exe
-*.dll
-*.so
-*.dylib
-
-# 本地数据库与备份（严禁提交个人隐私）
-/data/*.db
-/data/*.db-journal
-/data/*.db-wal
-/data/*.db-shm
-/data/backups/
-!/data/.gitkeep
-*.db
-*.db-journal
-*.db-wal
-*.db-shm
-backups/
-
-# 敏感配置
-config.yaml
-.env
-*.local.yaml
-
-# 编辑器与系统缓存
-.idea/
-.vscode/
-*.swp
-*~
-.DS_Store
-Thumbs.db
-
-# Android 签名与构建缓存
-*.jks
-*.keystore
-.gradle/
-android/.gradle/
-android/build/
-android/app/build/
-android/local.properties
-*.log
-
-# 本地打包/安装脚本（含本机签名口令与绝对路径，严禁提交）
-scripts/build-android.ps1
-```
+* 严禁提交个人数据库与备份（`data/*.db`, `data/backups/`）；
+* 严禁提交真实配置文件与密钥（`config.yaml`, `.env`）；
+* 严禁提交含本机签名密钥口令的脚本（`scripts/build-android.ps1`）。
 
 ---
 
-## 九、 Agent 实施约束与"不确定即暂停提问"熔断机制
+## 九、 Agent 实施约束与熔断机制
 
-任何读取本规范的 AI Agent 在落地实施本工程时，**必须无条件执行以下元准则**：
+任何在此工程工作的 AI Agent 必须无条件遵守以下纪律：
 
-### 1. 唯一事实源原则 (Single Source of Truth)
+### 9.1 唯一事实源原则 (SSOT)
+本规范文档（`v3.4.0`）是项目架构、表结构、接口协议与业务逻辑的最高权威。代码与文档冲突时，以本文档为准。
 
-* 表名、列名、目录架构以本规范（`v3.2.0 Reconciled`）为**最高也是唯一裁决标准**。
-* 核心表名**为 `health_records`**；数据存放于 **`data/health.db`**（Android 为 App 私有 `filesDir`）；桌面构建输出为 **`bin/HealthTrack.exe`**；Android 输出为 `app-debug.apk`。
-* SQLite 驱动**固定为 `modernc.org/sqlite`**，以维持 `CGO_ENABLED=0` 的跨平台/交叉编译能力。
+### 9.2 真实数据保护红线
+* **严禁清空、删除或改写 `data/` 目录！**
+* **数据库结构变更仅允许使用 `ALTER TABLE ... ADD COLUMN`**，严禁使用 `DROP TABLE`、`TRUNCATE` 或任何破坏性操作；
+* 启动时必须自动执行当日冷备份。
 
-### 2. 真实数据保护红线 (Data Protection)
+### 9.3 移动端覆盖安装红线
+* 手机端必须通过 `adb install -r` 覆盖安装，**严禁执行 `adb uninstall` 或清除应用数据**，防止手机端已积累的历史数据丢失。
 
-* **严禁删除、清空、覆写 `data/` 目录！**
-* 严禁执行任何 `DROP TABLE`、`TRUNCATE` 或破坏现有数据库已有列的操作。所有数据库升级**必须走 `ALTER TABLE ... ADD COLUMN`**。
-* 手机端历史数据为用户手工录入的真实数据，任何安装/覆盖操作不得清空。
-* **只允许覆盖安装，严禁卸载重装（在「批量导入」功能实现并双端验收通过之前）**：手机端一律通过 `adb install -r`（replace）覆盖安装，以保留 App 私有目录 `filesDir` 下的 `health.db`；严禁 `adb uninstall`、`pm clear`，或删除 / 移动构建产物后另行安装等任何会导致重装的动作。手机历史数据均由用户逐条手工录入，一旦清空无法恢复，只能全部重新录入。
+### 9.4 前端源码开发红线
+* 所有前端页面、样式、交互的开发与修复必须在 `web/src/` 中完成；
+* 严禁直接手改 `web/static/` 内的打包文件；
+* 修改前端后必须执行 `npm run build` 生成最新 Bundle 并验证。
 
-### 3. 交付闭环标准（双端验收）
-
-* 每个需求点实现完成后，须**先在本机验证**（电脑端 Web + 手机端 App）。
-* 手机端验收优先使用本地打包脚本 `scripts/build-android.ps1`（免 CI、免发版消耗）完成"编译 → 打包 → 无线安装"。
-* 双端测试通过并经用户确认后，方可执行 `git commit`，确保可及时回滚问题代码。
-* **提交时效性（未启用 worktree 时）**：在未开启 `git worktree` 独立工作区的常规开发中，每完成一项新增或修复功能，**双端验证通过后必须立即执行一次 `git commit`**，严禁把多个功能点的改动积压在工作区；积压会使提交失去粒度，一旦出问题将无法单独回滚某一功能。
-
-### 4. "不确定即暂停提问"熔断机制 (Stop & Ask)
-
-遇到以下任一情况，**严禁自行脑补猜测或擅自执行危险操作，必须立即中断并向用户提问**：
-
-1. 发现现有源码与本文档规范存在业务逻辑冲突，且代码注释中包含特定历史业务说明时；
-2. 任何需要引入大体积前端框架（如 React/Vue/Tailwind 打包工具链）的场景；
-3. 执行任何可能导致不可逆数据变动的 Git 重置或物理文件删除操作前。
+### 9.5 "不确定即暂停提问"熔断机制 (Stop & Ask)
+遇到业务逻辑存疑、可能引发数据丢失、或需引入大型侵入式重型框架时，**必须立即暂停并向用户提问**，严禁擅自做主。
 
 ---
 
-## 十、 待办需求清单 (Backlog)
+## 十、 需求状态清单 (Backlog)
 
-> 本章记录**已确认**的需求：标注 ✅ 者已实现并同步进正文，其余为待办；实现顺序由用户指定。
+### 10.1 已完成特性归档
+* **[已完成] 1. 冷水澡记录增加体感水温字段**：`ColdShowerDetail.WaterTemp`（0~40℃）与 AI 刺激强度量化关联。
+* **[已完成] 2. AI 洞察历史存档与自选截止日**：`ai_insights` 表持久化、游标分页、按截止日回溯周期窗口、重复生成提醒与批量删除。
+* **[已完成] 3. 睡前小结独立模块**：底部第 4 个 Tab，包含自评分、今日三件事、感想、照片上传与独立小结深度洞察。
+* **[已完成] 4. 看板交互优化与录入顺序对齐**：点击节点查看当日排水与时间；新增独立腰围趋势卡；录入顺序对齐为「睡前体重 $\to$ 晨起空腹 $\to$ 腰围」。
+* **[已完成] 5. 运动训练多选支持**：`types` 支持同时勾选有氧与抗阻，向后兼容旧单值。
+* **[已完成] 6. 数据趋势看板 60 天横滑详情**：总入口进入独立全屏横滑视图，移动端横屏自适应一屏。
+* **[已完成] 7. 趋势分析页 · 周平均趋势**：自然周 12 周聚合、均值折线 + min/max 区间带、置信度分级（0天断点、1~3天低置信）。
+* **[已完成] 8. 洞察 · 阶段对比独立视图**：自然月双窗口选择、7 项核心生理与行为指标 Go 端预计算快照表、AI 阶段对比综述。
+* **[已完成] 9. 批量数据导入预检与原子提交**：CSV/JSON/手写备忘录导入，先预检、逐行展示变更差异、单事务原子提交、批次历史与失败重试。
+* **[已完成] 10. HealthTrack 3.0 Linear 极简极客设计体系落地**：全站 1px 工业单线收敛（`.ht-card`）、`JetBrains Mono` 等宽数字排版、1.5px 线性矢量图标、彻底清除 Emoji。
 
-### 10.1 补增需求
-
-**✅ ① 冷水澡记录增加「预估体感水温」字段（已实现）**
-* **背景**：10 月初天气转凉、持续降雨，水温较夏季大幅下降，冷刺激显著增强（主观体验接近"短效专注达"）。
-* **实现**：`ColdShowerDetail` 新增 `water_temp`（`*float64`，单位 ℃，可空，入参校验 `0~40`）；随 `cold_shower_json` 落库，无需新增数据库列。前端冷水澡子表单新增「水温(估)」输入，历史列表标签展示 `🚿 冷水澡 16℃`；`BuildPromptContext` 输出 `morning(16.0℃/2分钟/refreshed)`；提示词模板同步补充"水温 → 刺激强度 → 时长建议"分析指引。详见 §2.8 / §3.1 / §4.2。
-
-**✅ ② AI 洞察历史存档 + 重复生成提醒（已实现）**
-* **背景**：此前每次点击 AI 洞察都重新调用大模型，既浪费 token，又看不到历史生成的洞察内容。
-* **实现（混合形态：A 入口 + C 页面）**：
-  1. **历史存档**：新增 `ai_insights` 表（见 §3.2）。SSE 流正常结束且确有产出时，服务端自动落库，**同时保存正文 Markdown 与思维链（`reasoning_content`）原文**；客户端中途断开不落库，避免存入半截内容。
-  2. **同天重复生成**：采用**追加保留**（不覆盖），每次生成均为新增一条存档，列表按时间倒序、同天多条可区分。
-  3. **入口与页面**：洞察面板标题栏右侧「🕘 历史」按钮进入独立视图 `view-history`；页面含关键词搜索、档位筛选（全部/近7天/近30天/近60天）、历史列表与「加载更多」。
-  4. **分页**：**游标分页**（`id DESC` + `before_id`），每批 **10 条**，不做页码翻页。
-  5. **重复生成提醒（文字，「档位 + 截止日」窗口独立）**：存在性判定**统一收归后端**——前端携带客户端时区偏移 `tz_offset` 与所选截止日 `end_date` 调 `GET /api/v1/insights/period`，由后端按窗口边界（`range_days` + `start_date` + `end_date`）精确匹配最新一条记录并返回 `{exists, insight}`，前端不再自行做日期比对。有则状态标签显示「已生成过（HH:mm）· 点击查看」、按钮文案改为「重新生成」（需二次确认）；无则显示「点击上方按钮开始」与默认文案。各档位（7/30/60）状态互不影响，生成完成后显示「复盘完成 · 已存档」。
-  6. **自选分析截止日（已实现，提交 `206ee3b`）**：生成窗口终点不再硬编码为服务器当天，改为「档位 + 截止日」周期模型——洞察页可选截止日为「今天 / 昨天」或具体日期（**不允许未来日期**），窗口 = 截止日向前回溯 `range_days - 1` 天；服务端一律以客户端上报的 `end_date` + `tz_offset` 为准（安卓端 Go 进程运行于 UTC，`time.Now()` 不可信）。**重新生成不替换旧记录**，同档位同窗口可并存多条，历史列表按 `id DESC` 取最新一条用于状态展示（删除最新一条后会浮现上一条）。见 §3.2 / §5.2 / §6.2。
-* **详情**：点击列表项内联展开全文（含可折叠的「💭 思维链推导」区块）。
-* **删除（管理模式）**：历史页头部「管理」按钮进入管理模式——条目左侧出现复选框，支持逐条勾选、全选/取消全选，底部浮出「删除所选 (n)」操作条并二次确认后调用 `POST /api/v1/insights/batch-delete`。移动端额外支持**长按条目**直接进入管理模式并选中该项；切换搜索/筛选会自动退出管理模式。展开区不再提供单条删除入口（避免可发现性差）。
-* **说明**：按用户要求**不内置演示数据**，首次进入历史页为空态。
-
-**✅ ③ 睡前小总结（已实现）**
-* **背景**：在生理数据之外，补一层"心理与成就感"的自我复盘，帮助用户看见每天的进展。
-* **实现**：新增底部第 4 个 Tab「睡前小结」（段落详见 §4.3），含今日填写（自评分滑块 / 完成的三件事 / 感想 / 照片）、往期回顾（日期 + 评分组合筛选、分页加载、左滑删除）与小结洞察卡片。数据层新增 `evening_summaries` / `evening_photos` 两表、`ai_insights` 增加 `scope` 列（见 §3.2 / §3.4），后端 `EveningHandler` 提供 summary / summaries / photo / insight 系列接口（见 §5.2）。小结洞察复用了「磁盘模板 → 内嵌兜底」的双轨提示词机制，但模板**侧重心理状态与成就感**、生理数据仅作辅助佐证（见 §7.2）；`system` 硬约束与模板顶部【思考与推演硬性约束】双重保证思维链为简体中文；前端思维链在上、正文在下，正文未输出时思维链自动展开、正文开始输出即自动收起。评分文案落 `config.yaml` 的 `summary.score_bands`，可自定义（见 §8.1）。提交：`ab7e1f1`。
-* **待办**：手写签名尚未实现（见 10.2 第 3 条）。
-
-**✅ ④ 看板交互与录入顺序（已实现）**
-* **睡眠看板点击查看**：点击某天显示当日就寝 / 起床时间（数据后端已具备 `sleep_start_time` / `sleep_end_time`）。提交 `3e7e386`。
-* **体重看板点击查看**：点击单日查看晨起体重 + 睡前体重，并展示夜间排水差值；顺带优化了移动端折线图节点触点命中不灵敏的问题。提交 `3e40383`。
-* **腰围趋势**：未采用原计划的"体重 + 腰围双 Y 轴双折线"（对不同数据跨度用户不友好），改为**新增独立卡片「腰围变化趋势 (cm)」**，与体重卡片结构一致（紫色折线、点击查看当日腰围、缺值显示 `--`）。提交 `3e397a5`。
-* **录入顺序**：记一笔顶部输入框顺序调整为「睡前体重 → 晨起空腹 → 腰围」（仅调整 DOM 顺序，相关 `id` 与取值逻辑未变）。提交 `3e7e386`。
-* **通用基建**：为 `/` 与 `*.html` 增加 `Cache-Control: no-cache, must-revalidate`，避免覆盖安装后 WebView 复用旧页面（见 §8.2）。
-
-**✅ ⑤ 运动训练支持「有氧 + 力量」同时记录（已实现）**
-* **背景**：原 `ExerciseDetail.Type` 为单值，无法记录同一天既做有氧又做力量训练的情况（原为 §10.2 第 1 条）。
-* **实现**：`ExerciseDetail` 新增 `Types []string` 主用字段——`NormalizeTypes()` 归一化（兼容旧单值 `type`、剔除 `none`、去重），`SyncLegacyType()` 落库前把兼容字段 `type` 同步为首个类型（无运动为 `none`）；**无需数据库改动**（沿用 `exercise_json` 列）。前端运动胶囊改为**多选**（有氧 / 力量各自独立可勾选，「无运动」为互斥清空项），回显兼容旧单值；AI 特征上下文以 `+` 连接呈现（如 `cardio+strength(medium/55分钟)`）。详见 §2.6 / §3.1 / §4.2 / §6.1。
-
-**✅ ⑥ 数据趋势看板扩展「近 60 天详情」（方案 A，已实现）**
-* **背景**：看板档位目前只有 `近7天 / 近30天`（见 §4.3），60 天窗口在 AI 洞察侧已支持，可视化侧缺失。2026-10-14 追加评审确认：与 ⑦ 周平均趋势**互补**（周平均看长周期趋势、60 天详情看逐日细节），因此采用**方案 A**。
-* **定稿方案**（详见 §4.4.1）：档位扩展为 `近7天 / 近30天 / 近60天`（默认仍近 7 天）；看板标题下方新增**一个**总入口「📊 60天详情」→ 独立视图 `view-trend-detail`（与「📈 周平均趋势」同一范式，卡片本身不加入口、底部导航维持 4 Tab、该视图 nav 高亮 `dash`）；视图内三指标 Tab `体重 / 腰围 / 睡眠时长`，**竖屏固定日宽横向滚动 / 横屏自适应压进一屏**（x 轴约每 3 天一刻度），转屏不重载页面；数据复用 `GET /api/v1/records/history` **前端聚合渲染，不新增后端接口、不改 DB**；缺失日 = **断点（严禁以 0 填充）**；点击节点看当日详情。
-* **明确不做**：真·强制横屏（`MainActivity.setRequestedOrientation`）；不做逐日数值表格；不做跨页范围联动。
-* **状态**：**已实现**（提交 `c9e6530`；手机端 `adb install -r` 覆盖安装验收通过：竖屏横滑逐日、横屏整屏铺满、点节点看当日详情）。
-
-**✅ ⑦ 趋势分析页 · 周平均（已实现）**
-* **背景**：日粒度看板在长周期下信息密度过低（约 60 点挤一屏），"以周为节点"可显著延长可追踪时长（12 周 ≈ 3 个月）。
-* **定稿方案**（详见 §4.4.2）：独立视图（方案 Y）+ `体重 / 腰围 / 睡眠时长` 三个 Tab；**自然周（周一 ~ 周日）共 12 周**；**周均值折线 + 周内 min/max 区间带**（非标准差）；入口置于看板页标题栏，**底部导航维持 4 个 Tab**。
-* **缺失与置信规则**：当周 `0` 天 → **断点（严禁显示 0）**；`1 ~ 3` 天 → 照常求均但标**低置信**；`≥ 4` 天 → 正常。计数类指标缺失即 `0`，不受此限。
-* **聚合位置**：本期**前端聚合**（复用 `GET /api/v1/records/history` 拉原始记录），**不新增后端接口**；将来若被 ⑧ 复用同一口径，再评估上移后端（待议）。
-* **全局原则**：与洞察页范围**互不联动**、各自记忆上次选择。
-
-**⑧ 洞察 · 阶段对比（自然月双窗口，最后实施）**
-* **背景**：希望定期回看整体变化，但 AI 洞察为手动按需生成、时间上不连续，仅比对其历史正文会经常缺档。
-* **定稿方案**（详见 §4.4.3 / §6.5 / §7.3）：对比方式为**方案 C**——以两月聚合数据为主 + 引用已生成洞察结论；UI 为**两个月份选择器**（默认 `上月 vs 上上个月`，自然月 = 1 号 ~ 月末），两窗**互不重叠**、**相邻非必须**（支持"去年同月 vs 今年同月"跨年对比），**允许选择当前未过完的月但须标注「数据不足 / 不足月」**；**手动触发**，不用自动定时。
-* **七项指标**（口径见 §6.5）：体重均值 + 净变化、腰围均值 + 净变化、平均睡眠时长、熬夜红/黄/绿天数占比、运动天数 + 强度分布、专注达服药天数、平均夜间排水量。
-* **数据层**：`scope` 新增取值 `compare`，并 `ALTER TABLE ai_insights ADD COLUMN meta_json TEXT DEFAULT '{}'`（**仅增列，不删列**，见 §3.2）；生成走 SSE + `system` 中文硬约束 + `ai.max_tokens` 封顶；新增 `GET /api/v1/insights/compare/stream` 与 `/compare/period`（见 §5.2）。
-* **展示（方案 B，2026-10-15 定稿，详见 §4.4.3）**：洞察页**不新增页内区块**；洞察页头部「🕘 历史」左侧新增「⇄ 阶段对比」按钮 → 独立视图（`‹ 返回` + 两月选择器 + 指标对比表 + AI 综述），底部 4 Tab 保留且 nav 高亮「洞察」。历史页筛选胶囊新增第 5 档「阶段对比」（需 `GET /api/v1/insights?scope=compare`，见 §5.2），点卡片复用同一独立视图，注意手机端 5 个胶囊的排版。
-* **前置与验收**：需两段自然月数据；当前电脑端库仅约 30 条（`2026-09-01` ~ `2026-10-05`），手机端有半年以上数据，**验收以手机端为准**（仅 `adb install -r` 覆盖安装）。
-
-### 10.2 历史遗留待办（尚未实现）
-
-| # | 需求                                         | 涉及范围                       | 备注                                                     |
-| :- | :------------------------------------------- | :----------------------------- | :------------------------------------------------------- |
-| 1 | 批量导入历史数据功能                         | 后端导入接口 + 前端上传         | 用户有大量手工录入的历史数据需要一次性导入               |
-| 2 | 统一 CI 与本地 `versionCode` 基线（方案 A：改用仓库提交数） | `.github/workflows/build-apk.yml` + `scripts/build-android.ps1` | 解决 CI 包落后于本地包、无法覆盖安装（`INSTALL_FAILED_VERSION_DOWNGRADE`）问题，详见 §8.2「版本号基线差异说明」 |
-| 3 | 睡前小结支持手写签名                         | 前端画板 + 后端存储             | 用户已提出、**暂缓**；方案待研究（关联 §10.1 ✅③）        |
-| 4 | 启动困难专项打卡（任务启动阻滞量表）         | 前端卡片 + 模型字段 + AI 提示词 | 2026-10-28 评审**本期不实现**；暂以 `Concerta.FocusWork`（工作启动力 1-5）作代理指标，观察一段时间后再决定是否单独建模（关联 §4.5） |
+### 10.2 待办需求清单
+| # | 需求 | 涉及范围 | 状态与说明 |
+| :--- | :--- | :--- | :--- |
+| 1 | 统一 CI 与本地 `versionCode` 基线 | `.github/workflows/build-apk.yml` + 本地打包脚本 | 待办：以 `git rev-list --count HEAD` 为基线，解决 CI 包无法直接覆盖本地安装包的问题 |
+| 2 | 睡前小结手写签名功能 | 前端 Canvas 画板 + 后端存储 | 暂缓：用户提出后评估交互复杂度，待后续排期 |
+| 3 | 启动困难任务阻滞量表打卡 | 前端独立卡片 + 模型字段 | 暂缓：当前暂以 `Concerta.FocusWork`（1~5分）作为代理指标 |
 
 ---
 
-## 附录：版本控制与发布规范
+## 附录：语义化提交规范
 
-1. **分支策略**：个人/小团队采用 Trunk-Based 开发，主线为 `main`。
-2. **提交信息规范 (Semantic Commits)**，前缀统一使用英文小写 + 中文描述：
-   * `feat:` 新增功能（如新增运动标签提取）
-   * `fix:` 缺陷修复（如修复跨日睡眠归属问题）
-   * `ui:` 界面与交互样式调整
-   * `chore:` 构建 / 配置 / 依赖等杂项（如调整 `.gitignore`）
-   * `docs:` 文档更新
-3. **版本里程碑打 Tag**：
-   * `v0.1.0-mvp`：基础录入 + SQLite 存储 + 历史看板
-   * `v0.2.0-ai`：AI 接入 + SSE 流式洞察
-   * `v1.0.0-release`：单二进制跨平台打包正式版
+提交信息统一采用英文小写前缀 + 中文说明：
+* `feat:` 新增功能
+* `fix:` 缺陷修复
+* `ui:` 样式与界面优化
+* `refactor:` 代码重构
+* `chore:` 构建、脚本、配置依赖调整
+* `docs:` 文档更新
