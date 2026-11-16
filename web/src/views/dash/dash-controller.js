@@ -435,7 +435,13 @@ export async function loadDashboardData(days = dashRange) {
             }
             if (r.cold_shower && r.cold_shower.enabled) {
               const csTemp = (r.cold_shower.water_temp === null || r.cold_shower.water_temp === undefined) ? '' : ` ${r.cold_shower.water_temp}℃`;
-              tagsHtml += `<span class="bg-teal-50 text-teal-700 border border-teal-200/60 px-1.5 py-0.5 rounded text-[10px] font-medium font-mono">冷水澡${escapeHtml(csTemp)}</span>`;
+              let csDur = r.cold_shower.duration;
+              let csDurText = '';
+              if (csDur !== null && csDur !== undefined && csDur > 0) {
+                if (csDur <= 10) csDur = csDur * 60;
+                csDurText = ` · ${csDur}s`;
+              }
+              tagsHtml += `<span class="bg-teal-50 text-teal-700 border border-teal-200/60 px-1.5 py-0.5 rounded text-[10px] font-medium font-mono">冷水澡${escapeHtml(csTemp)}${csDurText}</span>`;
             }
             if (r.concerta && r.concerta.taken) {
               const cDose = r.concerta.dose ? ` ${escapeHtml(r.concerta.dose)}mg` : '';

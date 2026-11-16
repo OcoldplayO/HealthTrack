@@ -27,21 +27,21 @@
 .typing-cursor::after { content: '▋'; animation: blink 1s infinite; color: #3b82f6; }
 @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
 
-/* 胶囊与标签交互样式 */
+/* 胶囊与标签交互样式：统一苹果健康中性极简规范 */
 .pill-btn {
   padding: 0.35rem 0.75rem;
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   font-size: 0.75rem;
-  font-weight: 600;
-  background-color: #f1f5f9;
-  color: #475569;
+  font-weight: 500;
+  background-color: #f5f5f5;
+  color: #525252;
   transition: all 0.15s ease;
   border: 1px solid transparent;
 }
 .pill-btn.active {
-  background-color: #2563eb;
+  background-color: #171717;
   color: #ffffff;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 .pill-sm-btn {
   padding: 0.25rem 0.6rem;
@@ -49,41 +49,43 @@
   font-size: 0.7rem;
   font-weight: 500;
   white-space: nowrap;
-  background-color: #f1f5f9;
-  color: #64748b;
+  background-color: #f5f5f5;
+  color: #525252;
   transition: all 0.15s ease;
   border: 1px solid transparent;
 }
 .pill-sm-btn.active {
-  background-color: #3b82f6;
+  background-color: #171717;
   color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
   padding: 0.25rem 0.65rem;
-  border-radius: 9999px;
+  border-radius: 0.5rem;
   font-size: 0.7rem;
   font-weight: 500;
   white-space: nowrap;
-  background-color: #f1f5f9;
-  color: #475569;
+  background-color: #f5f5f5;
+  color: #525252;
   cursor: pointer;
   user-select: none;
   transition: all 0.15s ease;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e5e5e5;
 }
 .chip.active {
-  background-color: #dbeafe;
-  color: #1d4ed8;
-  border-color: #93c5fd;
-  font-weight: 600;
+  background-color: #171717;
+  color: #ffffff;
+  border-color: #171717;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 .chip-warn.active {
-  background-color: #fee2e2;
-  color: #b91c1c;
-  border-color: #fca5a5;
+  background-color: #ffe4e6;
+  color: #be123c;
+  border-color: #fecdd3;
   font-weight: 600;
 }
 

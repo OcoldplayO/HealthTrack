@@ -60,8 +60,8 @@ func (e *ExerciseDetail) SyncLegacyType() {
 // ColdShowerDetail 冷水澡记录
 type ColdShowerDetail struct {
 	Enabled   bool     `json:"enabled"`    // 是否打卡
-	Timing    string   `json:"timing"`     // morning, post_workout, evening
-	Duration  int      `json:"duration"`   // 时长 (分钟)
+	Timing    string   `json:"timing"`     // 时段，如 "07:30" 或旧枚举 "morning"
+	Duration  int      `json:"duration"`   // 时长 (秒)
 	WaterTemp *float64 `json:"water_temp"` // 预估体感水温 (℃)，可空
 	Feeling   string   `json:"feeling"`    // refreshed, neutral, shivering
 }

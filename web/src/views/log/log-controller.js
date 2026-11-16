@@ -27,7 +27,7 @@ let exerciseState = {
 };
 
 let coldShowerState = {
-  timing: 'morning',
+  timing: '07:30',
   feeling: 'refreshed',
 };
 
@@ -184,9 +184,21 @@ function applyLogState(s) {
   const csCheck = document.getElementById('coldShowerEnabled');
   if (csCheck) csCheck.checked = csOn;
   toggleColdShower(csOn);
-  setColdShowerTiming((cs && cs.timing) || 'morning');
+
+  // 兼容旧版 timing: 'morning' -> '07:30', 'post_workout' -> '18:30', 'evening' -> '22:30'
+  let csTime = (cs && cs.timing) || '07:30';
+  if (csTime === 'morning') csTime = '07:30';
+  else if (csTime === 'post_workout') csTime = '18:30';
+  else if (csTime === 'evening') csTime = '22:30';
+  setColdShowerTiming(csTime);
   setColdShowerFeeling((cs && cs.feeling) || 'refreshed');
-  setVal('coldShowerDuration', (cs && cs.duration) || 2);
+
+  // 时长：秒为单位，兼容历史以“分钟”存储的记录 (<= 10 视为分钟转为秒)
+  let csDur = (cs && cs.duration) !== undefined && cs.duration !== null ? Number(cs.duration) : 60;
+  if (csDur > 0 && csDur <= 10) {
+    csDur = csDur * 60;
+  }
+  setColdShowerDuration(csDur);
   setVal('coldShowerWaterTemp', cs && cs.water_temp !== null && cs.water_temp !== undefined ? cs.water_temp : '');
 
   // 晨光 / 步数 / 午餐
@@ -249,8 +261,8 @@ function collectLogState() {
     },
     cold_shower: {
       enabled: !!document.getElementById('coldShowerEnabled')?.checked,
-      timing: coldShowerState.timing,
-      duration: parseInt(val('coldShowerDuration'), 10) || 2,
+      timing: val('coldShowerTime') || coldShowerState.timing || '07:30',
+      duration: parseInt(val('coldShowerDuration'), 10) || 60,
       water_temp: tempRaw === '' ? null : parseFloat(tempRaw),
       feeling: coldShowerState.feeling,
     },
@@ -348,7 +360,9 @@ function updateStepsMeta(weekRecords, dateStr) {
   const avg = valid.length ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length) : null;
   const meta = document.getElementById('steps-meta');
   if (meta) {
-    meta.innerText = `前一天 ${prevStepsValue === null ? '--' : prevStepsValue.toLocaleString('en-US')} · 近7天日均 ${avg === null ? '--' : avg.toLocaleString('en-US')}`;
+    const prevText = prevStepsValue === null ? '--' : prevStepsValue.toLocaleString('en-US');
+    const avgText = avg === null ? '--' : avg.toLocaleString('en-US');
+    meta.innerHTML = `昨 <span class="font-medium text-neutral-700">${prevText}</span> · 7日均 <span class="font-medium text-neutral-700">${avgText}</span> 步`;
   }
 }
 
@@ -634,9 +648,25 @@ function toggleColdShower(enabled) {
 
 function setColdShowerTiming(timing) {
   coldShowerState.timing = timing;
-  document.querySelectorAll('#csTimingPills .pill-sm-btn').forEach((p) => {
-    p.classList.toggle('active', p.getAttribute('data-val') === timing);
+  const timeInput = document.getElementById('coldShowerTime');
+  if (timeInput && timeInput.value !== timing) {
+    timeInput.value = timing;
+  }
+  document.querySelectorAll('#csQuickTimingPills .pill-sm-btn').forEach((p) => {
+    p.classList.toggle('active', p.getAttribute('data-time') === timing);
   });
+}
+
+function syncColdShowerQuickDurationUI(secVal) {
+  document.querySelectorAll('#csQuickDurationPills .pill-sm-btn').forEach((p) => {
+    p.classList.toggle('active', Number(p.getAttribute('data-sec')) === Number(secVal));
+  });
+}
+
+function setColdShowerDuration(sec) {
+  const durInput = document.getElementById('coldShowerDuration');
+  if (durInput) durInput.value = sec;
+  syncColdShowerQuickDurationUI(sec);
 }
 
 function setColdShowerFeeling(feeling) {
@@ -863,6 +893,7 @@ function bindEvents() {
     'concertaTime',
     'concertaDose',
     'focusWork',
+    'coldShowerTime',
     'coldShowerDuration',
     'coldShowerWaterTemp',
   ];
@@ -977,10 +1008,25 @@ function bindEvents() {
     toggleColdShower(e.target.checked);
     markDirty();
   });
-  document.getElementById('csTimingPills')?.addEventListener('click', (e) => {
+  document.getElementById('coldShowerTime')?.addEventListener('change', (e) => {
+    setColdShowerTiming(e.target.value);
+    markDirty();
+  });
+  document.getElementById('csQuickTimingPills')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.pill-sm-btn');
     if (btn) {
-      setColdShowerTiming(btn.getAttribute('data-val'));
+      setColdShowerTiming(btn.getAttribute('data-time'));
+      markDirty();
+    }
+  });
+  document.getElementById('coldShowerDuration')?.addEventListener('input', (e) => {
+    syncColdShowerQuickDurationUI(e.target.value);
+    markDirty();
+  });
+  document.getElementById('csQuickDurationPills')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.pill-sm-btn');
+    if (btn) {
+      setColdShowerDuration(Number(btn.getAttribute('data-sec')));
       markDirty();
     }
   });

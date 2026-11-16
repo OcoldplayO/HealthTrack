@@ -215,10 +215,7 @@
         <div class="w-8 h-8 rounded-lg border border-neutral-200 flex items-center justify-center shrink-0 text-neutral-500">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><path d="M9 12l2 2 4-4"/><path d="M14 8l-2 4-3 2-2 4"/><path d="M10 8l3 1 2-2"/></svg>
         </div>
-        <div class="min-w-0">
-          <p class="text-xs font-medium text-neutral-800">步数</p>
-          <p id="steps-meta" class="text-[10px] text-neutral-400 truncate font-mono">昨 -- · 7d均 --</p>
-        </div>
+        <p class="text-xs font-medium text-neutral-800">步数</p>
       </div>
       <div class="flex items-baseline gap-1 shrink-0">
         <span id="steps-value" class="text-2xl font-bold text-neutral-900 leading-none font-mono tracking-tighter tabular-nums">--</span>
@@ -229,9 +226,9 @@
     <div class="flex justify-between text-[9px] font-mono text-neutral-300">
       <span>0</span><span>5k</span><span>10k</span><span>15k</span><span>20k</span>
     </div>
-    <div class="pt-2 border-t border-neutral-100 flex items-center justify-between">
-      <span id="steps-hint" class="text-[10px] text-neutral-400 truncate font-mono">留空 = 断点（不补 0）</span>
-      <button type="button" id="btn-clear-steps" class="text-[10px] font-medium text-neutral-400 hover:text-neutral-700 px-2 py-0.5 rounded border border-neutral-200 hover:border-neutral-400 ml-2 shrink-0 transition-colors">留空</button>
+    <div class="pt-2 border-t border-neutral-100 flex items-center justify-between text-xs">
+      <span id="steps-meta" class="text-[11px] font-mono text-neutral-500 truncate">昨 -- · 7日均 -- 步</span>
+      <button type="button" id="btn-clear-steps" class="text-[10px] font-mono text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 px-2.5 py-0.5 rounded border border-neutral-200 transition-colors ml-2 shrink-0">留空</button>
     </div>
   </div>
 
@@ -266,8 +263,11 @@
             </div>
           </div>
           <div class="flex space-x-2 text-xs">
-            <input type="number" id="exerciseDuration" placeholder="时长(分)" class="w-24 border border-neutral-200 bg-neutral-50 rounded-lg px-2.5 py-1.5 outline-none font-bold font-mono" value="40">
-            <input type="text" id="exerciseItems" placeholder="备注，如 骑行3km / 腿部深蹲" class="flex-1 border border-neutral-200 bg-neutral-50 rounded-lg px-2.5 py-1.5 outline-none font-mono">
+            <div class="flex items-center space-x-1">
+              <input type="number" id="exerciseDuration" placeholder="40" class="w-16 border border-neutral-200 bg-neutral-50 focus:bg-white rounded-lg px-2.5 py-1.5 outline-none font-bold font-mono text-center text-neutral-800 focus:border-neutral-800 transition-colors" value="40">
+              <span class="text-xs text-neutral-400 font-mono">分</span>
+            </div>
+            <input type="text" id="exerciseItems" placeholder="备注，如 骑行3km / 腿部深蹲" class="flex-1 border border-neutral-200 bg-neutral-50 focus:bg-white rounded-lg px-2.5 py-1.5 outline-none font-mono text-xs placeholder-neutral-400 text-neutral-800 focus:border-neutral-800 transition-colors">
           </div>
         </div>
       </div>
@@ -283,12 +283,12 @@
         <div id="concertaSubForm" class="space-y-2.5 pt-1 hidden">
           <div class="grid grid-cols-2 gap-2 text-xs font-mono">
             <div class="flex items-center space-x-1.5">
-              <span class="text-neutral-500">时间:</span>
-              <input type="time" id="concertaTime" value="08:00" class="border border-neutral-200 rounded-lg px-2 py-1 outline-none">
+              <span class="text-neutral-500 shrink-0">时间:</span>
+              <input type="time" id="concertaTime" value="08:00" class="border border-neutral-200 bg-neutral-50 focus:bg-white rounded-lg px-2.5 py-1.5 outline-none focus:border-neutral-800 text-xs font-mono text-neutral-800 w-full transition-colors">
             </div>
             <div class="flex items-center space-x-1.5">
-              <span class="text-neutral-500">剂量:</span>
-              <select id="concertaDose" class="border border-neutral-200 rounded-lg px-2 py-1 outline-none bg-white">
+              <span class="text-neutral-500 shrink-0">剂量:</span>
+              <select id="concertaDose" class="border border-neutral-200 bg-neutral-50 focus:bg-white rounded-lg px-2.5 py-1.5 outline-none focus:border-neutral-800 text-xs font-mono text-neutral-800 w-full transition-colors">
                 <option value="18">18mg</option>
                 <option value="36" selected>36mg</option>
                 <option value="54">54mg</option>
@@ -328,31 +328,47 @@
             <div class="w-8 h-4 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-neutral-900"></div>
           </label>
         </div>
-        <div id="coldShowerSubForm" class="space-y-2 pt-1 hidden font-mono">
-          <div class="flex items-center justify-between text-xs text-neutral-500">
-            <span>时段:</span>
-            <div class="flex space-x-1.5" id="csTimingPills">
-              <button type="button" class="pill-sm-btn active" data-val="morning">晨起即刻</button>
-              <button type="button" class="pill-sm-btn" data-val="post_workout">训练后</button>
-              <button type="button" class="pill-sm-btn" data-val="evening">睡前</button>
+        <div id="coldShowerSubForm" class="space-y-2.5 pt-1 hidden font-mono">
+          <!-- 时段：时间框 + 快捷胶囊 -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs text-neutral-600">
+              <span class="text-neutral-500">时段:</span>
+              <input type="time" id="coldShowerTime" value="07:30" class="border border-neutral-200 bg-neutral-50 focus:bg-white rounded-lg px-2.5 py-1 text-xs font-mono font-medium outline-none focus:border-neutral-800 transition-colors">
+            </div>
+            <div class="flex flex-wrap gap-1.5 justify-end" id="csQuickTimingPills">
+              <button type="button" class="pill-sm-btn active" data-time="07:30">晨起 07:30</button>
+              <button type="button" class="pill-sm-btn" data-time="14:00">午后 14:00</button>
+              <button type="button" class="pill-sm-btn" data-time="18:30">训练后 18:30</button>
+              <button type="button" class="pill-sm-btn" data-time="22:30">睡前 22:30</button>
             </div>
           </div>
-          <div class="flex items-center justify-between text-xs text-neutral-500">
-            <span>时长:</span>
+          <!-- 时长：秒为单位 + 快捷阶梯 -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs text-neutral-600">
+              <span class="text-neutral-500">时长:</span>
+              <div class="flex items-center space-x-1">
+                <input type="number" id="coldShowerDuration" value="60" min="5" max="900" step="5" class="w-16 border border-neutral-200 bg-neutral-50 focus:bg-white rounded-lg px-2 py-1 text-center font-bold text-neutral-800 outline-none focus:border-neutral-800 transition-colors">
+                <span class="text-xs text-neutral-400 font-mono">秒</span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 justify-end" id="csQuickDurationPills">
+              <button type="button" class="pill-sm-btn" data-sec="30">30s</button>
+              <button type="button" class="pill-sm-btn active" data-sec="60">60s</button>
+              <button type="button" class="pill-sm-btn" data-sec="90">90s</button>
+              <button type="button" class="pill-sm-btn" data-sec="120">120s</button>
+            </div>
+          </div>
+          <!-- 水温 -->
+          <div class="flex items-center justify-between text-xs text-neutral-600">
+            <span class="text-neutral-500">水温(估):</span>
             <div class="flex items-center space-x-1">
-              <input type="number" id="coldShowerDuration" value="2" class="w-14 border border-neutral-200 rounded-lg px-2 py-1 text-center font-bold">
-              <span>分钟</span>
+              <input type="number" id="coldShowerWaterTemp" step="0.5" min="0" max="40" placeholder="--" class="w-16 border border-neutral-200 bg-neutral-50 focus:bg-white rounded-lg px-2 py-1 text-center font-bold text-neutral-800 outline-none focus:border-neutral-800 transition-colors">
+              <span class="text-xs text-neutral-400 font-mono">℃</span>
             </div>
           </div>
-          <div class="flex items-center justify-between text-xs text-neutral-500">
-            <span>水温(估):</span>
-            <div class="flex items-center space-x-1">
-              <input type="number" id="coldShowerWaterTemp" step="0.5" min="0" max="40" placeholder="--" class="w-14 border border-neutral-200 rounded-lg px-2 py-1 text-center font-bold">
-              <span>℃</span>
-            </div>
-          </div>
+          <!-- 即刻体感 -->
           <div class="space-y-1">
-            <span class="text-[10px] text-neutral-400 block">即刻体感:</span>
+            <span class="text-[10px] text-neutral-400 font-mono block">即刻体感:</span>
             <div class="flex flex-wrap gap-1.5" id="csFeelingPills">
               <button type="button" class="pill-sm-btn active" data-val="refreshed">神清气爽</button>
               <button type="button" class="pill-sm-btn" data-val="neutral">无明显感觉</button>

@@ -145,7 +145,11 @@ func (s *InsightService) BuildPromptContext(records []*model.HealthRecord) strin
 			if r.ColdShower.WaterTemp != nil {
 				tempText = fmt.Sprintf("%.1f℃/", *r.ColdShower.WaterTemp)
 			}
-			csText = fmt.Sprintf("%s(%s%d分钟/%s)", r.ColdShower.Timing, tempText, r.ColdShower.Duration, r.ColdShower.Feeling)
+			dur := r.ColdShower.Duration
+			if dur > 0 && dur <= 10 {
+				dur = dur * 60 // 兼容历史分钟单位
+			}
+			csText = fmt.Sprintf("%s(%s%d秒/%s)", r.ColdShower.Timing, tempText, dur, r.ColdShower.Feeling)
 		}
 
 		sb.WriteString(fmt.Sprintf(
