@@ -215,7 +215,10 @@
         <div class="w-8 h-8 rounded-lg border border-neutral-200 flex items-center justify-center shrink-0 text-neutral-500">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><path d="M9 12l2 2 4-4"/><path d="M14 8l-2 4-3 2-2 4"/><path d="M10 8l3 1 2-2"/></svg>
         </div>
-        <p class="text-xs font-medium text-neutral-800">步数</p>
+        <div class="flex items-center gap-1.5 min-w-0">
+          <p class="text-xs font-medium text-neutral-800">步数</p>
+          <span id="steps-source-badge" class="hidden text-[10px] font-mono px-1.5 py-0.5 rounded border border-neutral-200 text-neutral-500 bg-neutral-50 leading-none">手机计步</span>
+        </div>
       </div>
       <div class="flex items-baseline gap-1 shrink-0">
         <span id="steps-value" class="text-2xl font-bold text-neutral-900 leading-none font-mono tracking-tighter tabular-nums">--</span>
@@ -228,7 +231,10 @@
     </div>
     <div class="pt-2 border-t border-neutral-100 flex items-center justify-between text-xs">
       <span id="steps-meta" class="text-[11px] font-mono text-neutral-500 truncate">昨 -- · 7日均 -- 步</span>
-      <button type="button" id="btn-clear-steps" class="text-[10px] font-mono text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 px-2.5 py-0.5 rounded border border-neutral-200 transition-colors ml-2 shrink-0">留空</button>
+      <div class="flex items-center gap-1.5 shrink-0 ml-2">
+        <button type="button" id="btn-sync-steps" class="hidden text-[10px] font-mono text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 px-2 py-0.5 rounded border border-neutral-200 transition-colors">同步</button>
+        <button type="button" id="btn-clear-steps" class="text-[10px] font-mono text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 px-2.5 py-0.5 rounded border border-neutral-200 transition-colors">留空</button>
+      </div>
     </div>
   </div>
 

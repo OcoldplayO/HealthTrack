@@ -17,7 +17,7 @@ let draftTimer = null;
 let yesterdayRecord = null;
 
 let morningLightState = null;
-let stepsState = { value: null, prefilled: null };
+let stepsState = { value: null, prefilled: null, autoDetected: false };
 let prevStepsValue = null;
 let lunchState = { touched: false };
 
@@ -111,6 +111,20 @@ export async function loadRecordForDate(dateStr) {
       renderSaveBar();
       showToast('已恢复上次未保存的草稿');
     }
+
+    const isToday = (dateStr === localDateStr(new Date()));
+    if (isToday && stepsState.value === null) {
+      if (hasNativeStepBridge() && typeof window.HealthTrack.hasStepPermission === 'function' && window.HealthTrack.hasStepPermission()) {
+        const rawSteps = window.HealthTrack.getTodaySteps();
+        if (rawSteps > 0) {
+          stepsState.value = Math.max(0, Math.min(20000, Math.round(rawSteps / 500) * 500));
+          stepsState.autoDetected = true;
+          syncStepsSlider();
+          updateLogCompleteness();
+        }
+      }
+    }
+    updateStepsSourceUI(isToday);
   }
 }
 
@@ -205,6 +219,7 @@ function applyLogState(s) {
   morningLightState = s.morning_light === true ? 'yes' : (s.morning_light === false ? 'no' : null);
   syncMorningLightUI();
   stepsState.value = s.steps === null || s.steps === undefined ? null : Number(s.steps);
+  stepsState.autoDetected = false;
   syncStepsSlider();
   applyLunch(s.lunch || null);
 }
@@ -317,16 +332,88 @@ function syncMorningLightUI() {
 }
 
 // ---------- 步数 ----------
+function hasNativeStepBridge() {
+  return !!(window.HealthTrack && typeof window.HealthTrack.isStepSensorAvailable === 'function' && window.HealthTrack.isStepSensorAvailable());
+}
+
+function updateStepsSourceUI(isToday) {
+  const badge = document.getElementById('steps-source-badge');
+  const syncBtn = document.getElementById('btn-sync-steps');
+  if (!isToday || !hasNativeStepBridge()) {
+    if (badge) badge.classList.add('hidden');
+    if (syncBtn) syncBtn.classList.add('hidden');
+    return;
+  }
+
+  const hasPerm = typeof window.HealthTrack.hasStepPermission === 'function' && window.HealthTrack.hasStepPermission();
+  if (syncBtn) {
+    syncBtn.classList.remove('hidden');
+    syncBtn.innerText = hasPerm ? '同步' : '授权';
+    syncBtn.title = hasPerm ? '同步手机硬件计步器步数' : '申请手机计步权限';
+  }
+
+  if (badge) {
+    if (hasPerm && stepsState.autoDetected) {
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+}
+
+function syncNativeSteps(interactive = false) {
+  if (!hasNativeStepBridge()) {
+    if (interactive) showToast('当前环境未检测到计步传感器');
+    return;
+  }
+
+  const isToday = (loadedDate === localDateStr(new Date()));
+  if (!isToday) {
+    if (interactive) showToast('仅支持同步当天的实时步数');
+    return;
+  }
+
+  const hasPerm = typeof window.HealthTrack.hasStepPermission === 'function' && window.HealthTrack.hasStepPermission();
+  if (!hasPerm) {
+    if (typeof window.HealthTrack.requestStepPermission === 'function') {
+      window.HealthTrack.requestStepPermission();
+      if (interactive) showToast('正在请求手机计步权限…');
+    }
+    return;
+  }
+
+  const rawSteps = window.HealthTrack.getTodaySteps();
+  if (rawSteps < 0) {
+    if (interactive) showToast('未读取到有效步数');
+    return;
+  }
+
+  const rounded = Math.max(0, Math.min(20000, Math.round(rawSteps / 500) * 500));
+  stepsState.value = rounded;
+  stepsState.autoDetected = true;
+  syncStepsSlider();
+  updateStepsSourceUI(true);
+  updateLogCompleteness();
+  markDirty();
+  if (interactive) {
+    showToast(`已同步手机计步 ${rawSteps.toLocaleString('en-US')} 步`);
+  }
+}
+
 function onStepsInput(raw) {
   const v = Number(raw);
   stepsState.value = isNaN(v) ? null : Math.max(0, Math.min(20000, Math.round(v / 500) * 500));
+  stepsState.autoDetected = false;
   syncStepsSlider();
+  updateStepsSourceUI(loadedDate === localDateStr(new Date()));
   markDirty();
 }
 
 function clearSteps() {
   stepsState.value = null;
+  stepsState.autoDetected = false;
   syncStepsSlider();
+  updateStepsSourceUI(loadedDate === localDateStr(new Date()));
   markDirty();
 }
 
@@ -878,6 +965,17 @@ function bindEvents() {
   // 步数
   document.getElementById('input-steps')?.addEventListener('input', (e) => onStepsInput(e.target.value));
   document.getElementById('btn-clear-steps')?.addEventListener('click', clearSteps);
+  document.getElementById('btn-sync-steps')?.addEventListener('click', () => syncNativeSteps(true));
+
+  window.onStepPermissionResult = (granted) => {
+    if (granted) {
+      showToast('已授权手机计步');
+      syncNativeSteps(false);
+    } else {
+      showToast('未获得计步权限');
+    }
+    updateStepsSourceUI(loadedDate === localDateStr(new Date()));
+  };
 
   // 输入监听标记脏状态
   const inputIds = [

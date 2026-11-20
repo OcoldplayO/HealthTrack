@@ -32,6 +32,8 @@ import android.widget.Toast;
 
 import org.json.JSONObject;
 
+import com.healthtrack.app.step.StepManager;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileInputStream;
@@ -58,6 +60,7 @@ public final class MainActivity extends Activity {
     private static final String HEALTH_URL = "http://127.0.0.1:8080/healthz";
     private static final String APP_URL = "http://127.0.0.1:8080";
     private static final int REQUEST_FILE_CHOOSER = 2001;
+    private static final int REQUEST_ACTIVITY_RECOGNITION = 2002;
 
     private final ExecutorService startupExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -66,10 +69,12 @@ public final class MainActivity extends Activity {
     private TextView statusView;
     private Process serverProcess;
     private ValueCallback<Uri[]> fileChooserCallback;
+    private StepManager stepManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        stepManager = StepManager.getInstance(this);
         requestLegacyStoragePermissionIfNeeded();
         enableFullscreen();
         setContentView(createContentView());
@@ -397,6 +402,72 @@ public final class MainActivity extends Activity {
             ClipboardManager manager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
             if (manager == null || text == null) return;
             manager.setPrimaryClip(ClipData.newPlainText("HealthTrack", text));
+        }
+
+        @android.webkit.JavascriptInterface
+        public boolean isStepSensorAvailable() {
+            return stepManager != null && stepManager.isAvailable();
+        }
+
+        @android.webkit.JavascriptInterface
+        public boolean hasStepPermission() {
+            return stepManager != null && stepManager.hasPermission();
+        }
+
+        @android.webkit.JavascriptInterface
+        public void requestStepPermission() {
+            if (stepManager != null) {
+                mainHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        stepManager.requestPermission(MainActivity.this, REQUEST_ACTIVITY_RECOGNITION);
+                    }
+                });
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        public int getTodaySteps() {
+            if (stepManager == null) {
+                return -1;
+            }
+            return stepManager.getTodaySteps();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (stepManager != null) {
+            stepManager.start();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (stepManager != null) {
+            stepManager.stop();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_ACTIVITY_RECOGNITION) {
+            boolean granted = grantResults != null && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            if (granted && stepManager != null) {
+                stepManager.start();
+            }
+            final String script = "if (window.onStepPermissionResult) window.onStepPermissionResult(" + granted + ");";
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (webView != null) {
+                        webView.evaluateJavascript(script, null);
+                    }
+                }
+            });
         }
     }
 
