@@ -25,8 +25,8 @@ android {
         applicationId 'com.healthtrack.app'
         minSdk 26
         targetSdk 34
-        // versionCode 由 CI 注入（GITHUB_RUN_NUMBER），保证每次构建严格递增可覆盖安装；
-        // 本地未提供该环境变量时回退为固定值 1，不影响本地构建。
+        // versionCode 由 CI 基于 Git 历史提交数注入（1000 + git rev-list --count HEAD），
+        // 保证各工作流与本地递增基线对齐可覆盖安装；本地未提供该环境变量时回退为固定值 1。
         versionCode (versionCodeEnv != null ? versionCodeEnv.toInteger() : 1)
         versionName '1.0.0'
     }

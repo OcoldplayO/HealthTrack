@@ -49,13 +49,14 @@
 
 ## 快速启动
 
-### 前端开发与构建（Vite 工程）
+### 前端开发与构建（项目根目录执行）
 ```bash
-# 1. 进入前端源码目录
-cd web
-
-# 2. 安装依赖（首次运行）
+# 1. 安装依赖（首次运行）
 npm install
+
+# 2. 静态类型检查与单元测试
+npm run typecheck
+npm test
 
 # 3. 编译生产产物（将 web/src/ 构建输出到 web/static/）
 npm run build
@@ -162,21 +163,24 @@ summary:
 │   ├── evening_insight_v1.txt      # 睡前小结洞察提示词模板
 │   └── compare_v1.txt              # 阶段对比提示词模板
 ├── web/
-│   ├── src/                        # 前端源码工程（模块化开发入口）
-│   │   ├── views/                  # 4 大业务视图（log / dash / insight / evening）
-│   │   ├── components/             # 通用交互组件（BottomNav / Modals / Toast）
-│   │   ├── services/               # API 抽象层与轻量状态管理
-│   │   ├── utils/                  # 日期、Markdown 渲染、对话框与格式化工具
-│   │   ├── css/app.css             # HealthTrack 3.0 极简单线 Design Tokens
+│   ├── src/                        # 前端源码工程（原生 ESM 模块化入口）
+│   │   ├── views/                  # 4 大业务视图与子模块（log / dash / insight / evening）
+│   │   ├── components/             # 通用交互组件（BottomNav / Header / Modals / Toast）
+│   │   ├── services/               # API 客户端、SSE 消费、路由与轻量状态管理
+│   │   ├── utils/                  # DOM 类型窄化、日期、对话框与 Markdown 格式化工具
+│   │   ├── types/                  # TypeScript checkJs 类型声明
+│   │   ├── css/app.css             # 构建期 Tailwind CSS v3 + JetBrains Mono Tokens
 │   │   ├── index.html              # 移动端适配单页主入口
 │   │   └── main.js                 # 前端应用引导与模块装载
-│   ├── static/                     # Vite 生产编译产物（由 npm run build 生成）
-│   │   ├── assets/                 # 编译后的压缩 Bundle（index.js / index.css）
-│   │   ├── vendor/                 # 自托管离线库（Tailwind 3.4.17 / Chart.js 4.5.1）
+│   ├── static/                     # Vite 生产编译产物（由根目录 npm run build 生成）
+│   │   ├── assets/                 # 带内容哈希的 JS/CSS 及本地 JetBrains Mono 字体
+│   │   ├── vendor/                 # 自托管离线 Chart.js 4.5.1
 │   │   └── index.html              # 编译后的单页模板
-│   ├── package.json                # 前端开发依赖与构建脚本
-│   ├── vite.config.js              # Vite 构建配置（相对路径基准 ./）
 │   └── embed.go                    # go:embed 静态资源打包声明
+├── package.json                    # 前端依赖与构建/校验/测试脚本（位于项目根目录）
+├── vite.config.js                  # Vite 构建配置（root: web/src, base: ./）
+├── jsconfig.json                   # TypeScript checkJs 静态检查配置
+├── vitest.config.mjs               # 前端 Vitest 单元测试配置
 ├── android/                        # Android WebView 壳工程（Gradle，arm64-v8a）
 ├── scripts/build-android.ps1       # 本地一键打包 + 无线覆盖安装脚本（已加入 .gitignore）
 ├── .github/workflows/              # CI：build-apk.yml 推 main 自动打包；release-apk.yml 推 tag 发 Release

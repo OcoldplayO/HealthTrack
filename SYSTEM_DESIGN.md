@@ -328,13 +328,14 @@ ALTER TABLE ai_insights ADD COLUMN meta_json TEXT DEFAULT '{}';
 ### 4.1 现代前端工程架构
 * **源码工程目录**：`web/src/`（开发与功能重构的唯一入口）。
 * **生产落盘路径**：`web/static/`（由 Vite 构建生成的纯静态 Bundle，供 Go `embed.go` 打包）。
-* **开发约束红线**：**严禁直接修改 `web/static/` 目录下的任何产物**。每次前端源码或样式变更后，必须在 `web/` 目录下执行 `npm run build` 重新编译，确保 Go 二进制与 Android APK 包含最新前端代码。
+* **开发约束红线**：**严禁直接修改 `web/static/` 目录下的任何产物**。每次前端源码或样式变更后，必须在**项目根目录**执行 `npm run typecheck && npm test && npm run build` 重新验证并编译，确保 Go 二进制与 Android APK 包含最新前端代码。
 * **工程架构分层**：
-  * `web/src/views/`：4 大业务页面控制器（`log-view.js`、`dash-view.js`、`insight-view.js`、`evening-view.js`、`compare-view.js`、`history-view.js` 等）；
-  * `web/src/components/`：通用交互组件（`BottomNav.js`、`Header.js`、`Toast.js`、`modals/` 等）；
-  * `web/src/services/`：API 请求与轻量状态管理（`api.js` 等）；
-  * `web/src/utils/`：日期处理、弹窗确认、Markdown 渲染与格式化函数；
-  * `web/src/css/app.css`：HealthTrack 3.0 极简极客 Design Tokens。
+  * `web/src/views/`：4 大业务区控制器与子模块（`log/log-controller.js`、`dash/{dash-controller,trend-weekly,trend-detail}.js`、`insight/{insight-controller,insight-history,compare-controller,stream-renderer}.js`、`evening/{evening-controller,evening-history}.js`）；
+  * `web/src/components/`：通用交互组件（`BottomNav.js`、`Header.js`、`Toast.js`、`modals/{SettingsModal,DataSheetModal,ExportModal,ImportModal,ImportBatchesModal,OtherModals}.js`）；
+  * `web/src/services/`：API 抽象层、SSE 流式消费、视图路由与轻量状态管理（`api.js`、`sse.js`、`router.js`、`state.js`）；
+  * `web/src/utils/`：DOM 类型窄化、日期处理、弹窗确认、Markdown 渲染与格式化工具（`dom.js`、`date.js`、`dialog.js`、`format.js`）；
+  * `web/src/types/`：TypeScript `checkJs` 全局类型与 Vite `?raw` 声明；
+  * `web/src/css/app.css`：HealthTrack 3.0 构建期 Tailwind CSS v3 + `@fontsource/jetbrains-mono` + 极简极客 Design Tokens。
 
 ### 4.2 HealthTrack 3.0 Linear 1px 工业单线设计系统
 * **视觉范式**：**Linear / Raycast 1px 工业单线极简极客美学**。淘汰夸张大圆角（`rounded-3xl`）、粗笨投影（`shadow-2xl`）与深色渐变卡片，全站统一收敛至标准 12px 圆角单线容器（`.ht-card`：`rounded-xl border border-neutral-200/80 bg-white`）。
@@ -571,19 +572,19 @@ summary:
 ```
 
 ### 8.2 多通道构建与交付流水线
-任何涉及前端的改动，必须先在 `web/` 执行 `npm run build`，再进行后续构建：
+任何涉及前端的改动，必须先在**项目根目录**执行 `npm run typecheck && npm test && npm run build`，再进行后续构建：
 
 | 通道 | 触发方式 | 前置命令 | 核心构建命令 / 产物 |
 | :--- | :--- | :--- | :--- |
-| **前端编译** | 前端开发改动后 | 无 | `cd web && npm run build`（产物落入 `web/static/`） |
+| **前端验证与编译** | 前端开发改动后 | 无 | `npm run typecheck && npm test && npm run build`（产物落入 `web/static/`） |
 | **桌面本地** | `git commit` 或手动 | 前端已编译 | `go build -o bin/HealthTrack.exe ./cmd/server` |
 | **手机本地** | 手动执行脚本 | 脚本自动执行前端编译 | `.\scripts\build-android.ps1`（自动检测手机版本号、编译 .so、Gradle 打包、无线 `adb install -r` 覆盖安装） |
-| **手机 CI** | 推送 `main` 分支 | CI 流程自动执行 | `.github/workflows/build-apk.yml` 自动编译并分发 APK |
+| **手机 CI** | 推送 `main` 分支 | CI 流程自动执行 | `.github/workflows/build-apk.yml`（debug 测试包）与 `release-apk.yml`（`assembleRelease` 正式包） |
 
 **移动端关键约束**：
 * 必须统一使用固定签名密钥（根目录 `healthtrack-release.jks`，别名 `healthtrack`）；
 * 移动端 HTML 响应（`/` 及 `*.html`）一律注入 `Cache-Control: no-cache, must-revalidate`，避免 WebView 强缓存旧页面导致功能不更新；
-* `versionCode` 必须持续递增，本地脚本基于手机已安装版本号自动 `+1`。
+* `versionCode` 必须持续递增，CI 统一按 `1000 + git rev-list --count HEAD` 注入，本地脚本基于手机已安装版本号自动 `+1`。
 
 ### 8.3 统一 Git 忽略规则（`.gitignore`）
 * 严禁提交个人数据库与备份（`data/*.db`, `data/backups/`）；
@@ -634,7 +635,7 @@ summary:
 ### 10.2 待办需求清单
 | # | 需求 | 涉及范围 | 状态与说明 |
 | :--- | :--- | :--- | :--- |
-| 1 | 统一 CI 与本地 `versionCode` 基线 | `.github/workflows/build-apk.yml` + 本地打包脚本 | 待办：以 `git rev-list --count HEAD` 为基线，解决 CI 包无法直接覆盖本地安装包的问题 |
+| 1 | 统一 CI 与本地 `versionCode` 基线 | `.github/workflows/{build,release}-apk.yml` | **[已完成]**：CI 统一以 `1000 + git rev-list --count HEAD` 注入且 `release-apk.yml` 使用 `assembleRelease` 构建 |
 | 2 | 睡前小结手写签名功能 | 前端 Canvas 画板 + 后端存储 | 暂缓：用户提出后评估交互复杂度，待后续排期 |
 | 3 | 启动困难任务阻滞量表打卡 | 前端独立卡片 + 模型字段 | 暂缓：当前暂以 `Concerta.FocusWork`（1~5分）作为代理指标 |
 

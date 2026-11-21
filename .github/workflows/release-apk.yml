@@ -43,11 +43,29 @@ jobs:
           mkdir -p android/app/src/main/assets
           cp config.yaml.example android/app/src/main/assets/config.yaml
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Verify & build frontend
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Run Go vet & tests
+        run: |
+          go vet ./...
+          go test -count=1 ./...
 
       - name: Build pure-Go Android ARM64 server library
         run: |
@@ -72,6 +90,13 @@ jobs:
           test -s "$RUNNER_TEMP/healthtrack-release.jks"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/healthtrack-release.jks" >> "$GITHUB_ENV"
 
+      - name: Resolve unified versionCode
+        run: |
+          set -euo pipefail
+          VERSION_CODE=$((1000 + $(git rev-list --count HEAD)))
+          echo "VERSION_CODE=${VERSION_CODE}" >> "$GITHUB_ENV"
+          echo "Resolved versionCode=${VERSION_CODE}"
+
       - name: Stamp versionName from tag
         run: |
           set -euo pipefail
@@ -84,20 +109,20 @@ jobs:
       - name: Build release APK
         working-directory: android
         env:
-          VERSION_CODE: ${{ github.run_number }}
+          VERSION_CODE: ${{ env.VERSION_CODE }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleRelease --stacktrace
 
       - name: Rename APK with version and commit hash
         run: |
           # 用检出后的实际提交（即 tag 指向的提交），而非 GITHUB_SHA ——
           # 手动触发时 GITHUB_SHA 是 main 的 HEAD，会与真正编译的代码对不上
           SHORT_SHA="$(git rev-parse --short=7 HEAD)"
-          APK=$(ls android/app/build/outputs/apk/debug/*.apk | head -n1)
+          APK=$(ls android/app/build/outputs/apk/release/*.apk | head -n1)
           APK_NAME="HealthTrack-v${VERSION_NAME}-${SHORT_SHA}.apk"
           cp "$APK" "$APK_NAME"
           echo "APK_NAME=$APK_NAME" >> "$GITHUB_ENV"
@@ -118,7 +143,7 @@ jobs:
             HealthTrack ${{ env.VERSION_NAME }} 构建完成。
 
             - 版本号：v${{ env.VERSION_NAME }}
-            版本代码（versionCode）：${{ github.run_number }}
+            版本代码（versionCode）：${{ env.VERSION_CODE }}
             提交哈希：${{ env.SHORT_SHA }}
             构建运行：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 

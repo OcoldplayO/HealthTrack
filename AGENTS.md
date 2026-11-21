@@ -5,9 +5,9 @@
 ## 1. 前端工程化与源码红线
 * **开发源码目录**：所有前端页面、组件、样式改动必须在 `web/src/` 中完成。
 * **禁止修改产物**：严禁直接手改 `web/static/` 目录下的任何 JS/CSS/HTML 构建文件。
-* **编译闭环**：修改前端代码后，在编译 Go 服务端或执行 Android 打包前，必须执行 `cd web && npm run build`。
+* **编译闭环**：修改前端代码后，在编译 Go 服务端或执行 Android 打包前，必须在项目根目录执行 `npm run typecheck && npm run build`（或附带 `npm test`）。
 * **Vite 相对路径**：`vite.config.js` 必须维持 `base: './'`，确保在 Android WebView 离线环境与单二进制内嵌中正常加载，防止白屏。
-* **ES Module 作用域防坑**：动态模板字符串中内联的 `onclick` 处理函数，必须显式挂载至 `window`（如 `window.onHistoryItemClick = onHistoryItemClick`），或使用事件委托。
+* **事件委托与最小全局边界**：严禁在 HTML 或动态模板字符串中使用内联 `onclick` / `onchange` / `oninput`，严禁向 `window.*` 挂载非原生桥接函数；跨视图调用通过 ESM 导入或 [router.js](web/src/services/router.js)，列表与面板交互统一采用 `data-action` 容器事件委托（仅 Android 原生桥接所需的 4 个回调挂在 `window`）。
 
 ## 2. HealthTrack 3.0 Linear 工业单线设计系统
 * **单线容器**：统一使用 `.ht-card`（`rounded-xl border border-neutral-200/80 bg-white`），严禁使用夸张大圆角（`rounded-3xl`）、深色渐变底或厚重投影。

@@ -5,6 +5,7 @@ import path from 'path';
 function cleanAssetsPlugin() {
   return {
     name: 'clean-static-assets',
+    apply: 'build',
     buildStart() {
       const assetsDir = path.resolve(__dirname, 'web/static/assets');
       fs.rmSync(assetsDir, { recursive: true, force: true });
