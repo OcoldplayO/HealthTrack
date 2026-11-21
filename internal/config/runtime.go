@@ -20,18 +20,43 @@ type RuntimeStore struct {
 	configPath string
 }
 
+func cloneScoreBands(bands []ScoreBandConfig) []ScoreBandConfig {
+	if bands == nil {
+		return nil
+	}
+	copied := make([]ScoreBandConfig, len(bands))
+	for i, b := range bands {
+		var rangeCopy []int
+		if b.Range != nil {
+			rangeCopy = make([]int, len(b.Range))
+			copy(rangeCopy, b.Range)
+		}
+		copied[i] = ScoreBandConfig{
+			Range: rangeCopy,
+			Label: b.Label,
+			Tone:  b.Tone,
+		}
+	}
+	return copied
+}
+
+func cloneConfig(c Config) Config {
+	c.Summary.ScoreBands = cloneScoreBands(c.Summary.ScoreBands)
+	return c
+}
+
 func NewRuntimeStore(cfg *Config, configPath string) *RuntimeStore {
 	return &RuntimeStore{
-		cfg:        *cfg,
+		cfg:        cloneConfig(*cfg),
 		configPath: configPath,
 	}
 }
 
-// Snapshot 返回一个可安全供请求使用的配置副本。
+// Snapshot 返回一个可安全供请求使用的配置深拷贝副本。
 func (s *RuntimeStore) Snapshot() Config {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.cfg
+	return cloneConfig(s.cfg)
 }
 
 // UpdateAI 验证、原子持久化并立即应用新的 AI 配置。
@@ -54,7 +79,7 @@ func (s *RuntimeStore) UpdateAI(baseURL, model string, apiKey *string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	next := s.cfg
+	next := cloneConfig(s.cfg)
 	next.AI.BaseURL = baseURL
 	next.AI.Model = model
 	if apiKey != nil {
@@ -65,7 +90,7 @@ func (s *RuntimeStore) UpdateAI(baseURL, model string, apiKey *string) error {
 		return err
 	}
 
-	s.cfg = next
+	s.cfg = cloneConfig(next)
 	return nil
 }
 
@@ -80,7 +105,7 @@ func (s *RuntimeStore) UpdateSleep(greenBefore, yellowBefore string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	next := s.cfg
+	next := cloneConfig(s.cfg)
 	next.Sleep.GreenBefore = greenBefore
 	next.Sleep.YellowBefore = yellowBefore
 
@@ -88,7 +113,7 @@ func (s *RuntimeStore) UpdateSleep(greenBefore, yellowBefore string) error {
 		return err
 	}
 
-	s.cfg = next
+	s.cfg = cloneConfig(next)
 	return nil
 }
 
@@ -101,14 +126,14 @@ func (s *RuntimeStore) UpdateScoreBands(bands []ScoreBandConfig) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	next := s.cfg
-	next.Summary.ScoreBands = bands
+	next := cloneConfig(s.cfg)
+	next.Summary.ScoreBands = cloneScoreBands(bands)
 
 	if err := writeConfigAtomically(s.configPath, &next); err != nil {
 		return err
 	}
 
-	s.cfg = next
+	s.cfg = cloneConfig(next)
 	return nil
 }
 

@@ -2,6 +2,14 @@
  * 数据管理面板组件 (DataSheetModal)
  * 极简极客风单线抽屉面板，集成导入与导出入口
  */
+import {
+  downloadFile,
+  openExportModal,
+  openImportBatchesModal,
+  openImportModal,
+  openMemoImportModal,
+} from './OtherModals.js';
+
 export function renderDataSheetModal(container) {
   const html = `
     <!-- 数据管理底部面板：导入与导出的统一入口 -->
@@ -72,22 +80,23 @@ export function renderDataSheetModal(container) {
 
   document.getElementById('btn-open-file-import')?.addEventListener('click', () => {
     closeDataSheet();
-    if (typeof window.openImportModal === 'function') window.openImportModal();
+    openImportModal();
   });
   document.getElementById('btn-open-memo-import')?.addEventListener('click', () => {
     closeDataSheet();
-    if (typeof window.openMemoImportModal === 'function') window.openMemoImportModal();
+    openMemoImportModal();
   });
   document.getElementById('btn-open-batches')?.addEventListener('click', () => {
     closeDataSheet();
-    if (typeof window.openImportBatchesModal === 'function') window.openImportBatchesModal();
+    openImportBatchesModal();
   });
   document.getElementById('btn-dl-template')?.addEventListener('click', () => {
-    window.location.href = '/api/v1/import/template';
+    closeDataSheet();
+    downloadFile('/api/v1/import/template', 'HealthTrack_import_template.csv', '模板已下载');
   });
   document.getElementById('btn-open-export')?.addEventListener('click', () => {
     closeDataSheet();
-    if (typeof window.openExportModal === 'function') window.openExportModal();
+    openExportModal();
   });
 }
 
@@ -98,6 +107,3 @@ export function openDataSheet() {
 export function closeDataSheet() {
   document.getElementById('data-sheet')?.classList.add('hidden');
 }
-
-window.openDataSheet = openDataSheet;
-window.closeDataSheet = closeDataSheet;

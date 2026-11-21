@@ -7,6 +7,28 @@ import { api } from '../../services/api.js';
 import { localDateStr, shiftDateStr, getPrevDateStr } from '../../utils/date.js';
 import { showToast } from '../../components/Toast.js';
 import { appConfirm } from '../../utils/dialog.js';
+import { buttonById, byId, closestEl, inputById, textareaById } from '../../utils/dom.js';
+
+/**
+ * 查询可读写 .value 的表单控件（input / textarea / select）
+ * @param {string} id
+ * @returns {HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null}
+ */
+function controlById(id) {
+  const el = document.getElementById(id);
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+    return el;
+  }
+  return null;
+}
+
+/**
+ * @param {string} id
+ * @returns {string}
+ */
+function controlVal(id) {
+  return controlById(id)?.value || '';
+}
 
 let loadedDate = localDateStr(new Date());
 let logDirty = false;
@@ -47,6 +69,7 @@ const LUNCH_TEXT = {
 
 export async function initLogView(container) {
   container.insertAdjacentHTML('beforeend', templateHtml);
+  pruneStaleDrafts();
   bindEvents();
   await loadSleepThresholds();
   await loadRecordForDate(loadedDate);
@@ -63,7 +86,7 @@ async function loadSleepThresholds() {
 }
 
 window.addEventListener('sleep-thresholds-updated', (e) => {
-  if (e.detail) {
+  if (e instanceof CustomEvent && e.detail) {
     if (e.detail.green) sleepThresholds.green = e.detail.green;
     if (e.detail.yellow) sleepThresholds.yellow = e.detail.yellow;
     handleSleepCalculation();
@@ -73,7 +96,7 @@ window.addEventListener('sleep-thresholds-updated', (e) => {
 export async function loadRecordForDate(dateStr) {
   loadedDate = dateStr;
   suppressDirty = true;
-  const dateInput = document.getElementById('input-date');
+  const dateInput = inputById('input-date');
   if (dateInput) dateInput.value = dateStr;
 
   let rec = null;
@@ -138,8 +161,8 @@ function timeFromRecord(rec) {
 function applyLogState(s) {
   s = s || {};
   const setVal = (id, v) => {
-    const el = document.getElementById(id);
-    if (el) el.value = v === null || v === undefined ? '' : v;
+    const el = controlById(id);
+    if (el) el.value = v === null || v === undefined ? '' : String(v);
   };
 
   setVal('input-weight-am', s.weight_am);
@@ -153,8 +176,8 @@ function applyLogState(s) {
   setVal('sleepWakeTime', s.sleep_end_time || s.sleep_wake_time || '07:15');
   handleSleepCalculation();
   if (s.sleep_hours !== null && s.sleep_hours !== undefined) {
-    const durEl = document.getElementById('sleepDuration');
-    if (durEl) durEl.value = s.sleep_hours;
+    const durEl = inputById('sleepDuration');
+    if (durEl) durEl.value = String(s.sleep_hours);
   }
 
   // 运动
@@ -173,14 +196,14 @@ function applyLogState(s) {
   // 专注达
   const con = s.concerta;
   const conTaken = !!(con && con.taken);
-  const conCheck = document.getElementById('concertaEnabled');
+  const conCheck = inputById('concertaEnabled');
   if (conCheck) conCheck.checked = conTaken;
   toggleConcerta(conTaken);
   if (conTaken) {
     setVal('concertaTime', con.time || '08:00');
     setVal('concertaDose', String(con.dose || 36));
     setVal('focusWork', con.focus_work || 4);
-    const fwEl = document.getElementById('focusWorkText');
+    const fwEl = byId('focusWorkText');
     if (fwEl) fwEl.innerText = (con.focus_work || 4) + '分';
   }
   const seKeys = (con && con.side_effects) || [];
@@ -195,7 +218,7 @@ function applyLogState(s) {
   // 冷水澡
   const cs = s.cold_shower;
   const csOn = !!(cs && cs.enabled);
-  const csCheck = document.getElementById('coldShowerEnabled');
+  const csCheck = inputById('coldShowerEnabled');
   if (csCheck) csCheck.checked = csOn;
   toggleColdShower(csOn);
 
@@ -225,8 +248,8 @@ function applyLogState(s) {
 }
 
 function collectLogState() {
-  const dateStr = loadedDate || document.getElementById('input-date')?.value || localDateStr(new Date());
-  const val = (id) => document.getElementById(id)?.value || '';
+  const dateStr = loadedDate || inputById('input-date')?.value || localDateStr(new Date());
+  const val = controlVal;
   const numOrNull = (v) => (v === '' || v === null || v === undefined || isNaN(parseFloat(v)) ? null : parseFloat(v));
 
   const sideEffects = [];
@@ -240,7 +263,7 @@ function collectLogState() {
     if (k) compensations.push(k);
   });
 
-  const concertaTaken = !!document.getElementById('concertaEnabled')?.checked;
+  const concertaTaken = !!inputById('concertaEnabled')?.checked;
   const concerta = concertaTaken
     ? {
         taken: true,
@@ -275,7 +298,7 @@ function collectLogState() {
       items: val('exerciseItems') || '',
     },
     cold_shower: {
-      enabled: !!document.getElementById('coldShowerEnabled')?.checked,
+      enabled: !!inputById('coldShowerEnabled')?.checked,
       timing: val('coldShowerTime') || coldShowerState.timing || '07:30',
       duration: parseInt(val('coldShowerDuration'), 10) || 60,
       water_temp: tempRaw === '' ? null : parseFloat(tempRaw),
@@ -291,7 +314,7 @@ function collectLogState() {
 async function saveCurrentRecord() {
   const payload = collectLogState();
   const dateStr = payload.record_date;
-  const btn = document.getElementById('btn-save-log');
+  const btn = buttonById('btn-save-log');
   if (btn) btn.disabled = true;
 
   try {
@@ -312,7 +335,8 @@ async function saveCurrentRecord() {
       showToast((res && res.message) || '保存失败', false);
     }
   } catch (err) {
-    showToast('保存失败: ' + err.message, false);
+    const msg = err instanceof Error ? err.message : String(err);
+    showToast('保存失败: ' + msg, false);
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -418,11 +442,11 @@ function clearSteps() {
 }
 
 function syncStepsSlider() {
-  const slider = document.getElementById('input-steps');
+  const slider = inputById('input-steps');
   if (!slider) return;
   stepsState.prefilled = stepsState.value === null ? prevStepsValue : null;
   const rawDisplay = stepsState.value === null ? (prevStepsValue === null ? 0 : prevStepsValue) : stepsState.value;
-  slider.value = Math.max(0, Math.min(20000, Math.round(rawDisplay / 500) * 500));
+  slider.value = String(Math.max(0, Math.min(20000, Math.round(rawDisplay / 500) * 500)));
   updateStepsDisplay();
 }
 
@@ -595,8 +619,8 @@ function updateLunchYesterdayNote() {
 
 // ---------- 身体感受输入框交互增强 ----------
 function syncJournalClearBtn() {
-  const journalEl = document.getElementById('input-journal');
-  const btnClear = document.getElementById('btn-clear-journal');
+  const journalEl = textareaById('input-journal');
+  const btnClear = byId('btn-clear-journal');
   if (!journalEl || !btnClear) return;
   if (journalEl.value && journalEl.value.trim().length > 0) {
     btnClear.classList.remove('hidden');
@@ -642,8 +666,8 @@ function calcSleepTag(bedTime, green, yellow) {
 }
 
 function handleSleepCalculation() {
-  const bedTime = document.getElementById('sleepBedTime')?.value;
-  const wakeTime = document.getElementById('sleepWakeTime')?.value;
+  const bedTime = inputById('sleepBedTime')?.value;
+  const wakeTime = inputById('sleepWakeTime')?.value;
   if (!bedTime || !wakeTime) return;
 
   const [bH, bM] = bedTime.split(':').map(Number);
@@ -657,7 +681,7 @@ function handleSleepCalculation() {
   }
 
   const hours = ((wakeMinutes - bedMinutes) / 60).toFixed(1);
-  const durEl = document.getElementById('sleepDuration');
+  const durEl = inputById('sleepDuration');
   if (durEl) durEl.value = hours;
 
   const badge = document.getElementById('sleepTagBadge');
@@ -736,7 +760,7 @@ function toggleColdShower(enabled) {
 
 function setColdShowerTiming(timing) {
   coldShowerState.timing = timing;
-  const timeInput = document.getElementById('coldShowerTime');
+  const timeInput = inputById('coldShowerTime');
   if (timeInput && timeInput.value !== timing) {
     timeInput.value = timing;
   }
@@ -752,8 +776,8 @@ function syncColdShowerQuickDurationUI(secVal) {
 }
 
 function setColdShowerDuration(sec) {
-  const durInput = document.getElementById('coldShowerDuration');
-  if (durInput) durInput.value = sec;
+  const durInput = inputById('coldShowerDuration');
+  if (durInput) durInput.value = String(sec);
   syncColdShowerQuickDurationUI(sec);
 }
 
@@ -767,7 +791,7 @@ function setColdShowerFeeling(feeling) {
 // ---------- 较昨日变化 (Δ) ----------
 function updateDiffDisplay() {
   // 1. 晨起体重
-  const amVal = parseFloat(document.getElementById('input-weight-am')?.value);
+  const amVal = parseFloat(controlVal('input-weight-am'));
   const diffAmEl = document.getElementById('diff-weight-am');
   if (diffAmEl) {
     if (!isNaN(amVal) && yesterdayRecord && yesterdayRecord.weight_am !== null && yesterdayRecord.weight_am !== undefined) {
@@ -785,7 +809,7 @@ function updateDiffDisplay() {
   }
 
   // 2. 睡前体重
-  const pmVal = parseFloat(document.getElementById('input-weight-pm')?.value);
+  const pmVal = parseFloat(controlVal('input-weight-pm'));
   const diffPmEl = document.getElementById('diff-weight-pm');
   if (diffPmEl) {
     if (!isNaN(pmVal)) {
@@ -807,7 +831,7 @@ function updateDiffDisplay() {
   }
 
   // 3. 晨起腰围
-  const waistVal = parseFloat(document.getElementById('input-waist')?.value);
+  const waistVal = parseFloat(controlVal('input-waist'));
   const diffWaistEl = document.getElementById('diff-waist');
   if (diffWaistEl) {
     if (!isNaN(waistVal) && yesterdayRecord && yesterdayRecord.waist_size !== null && yesterdayRecord.waist_size !== undefined) {
@@ -825,7 +849,7 @@ function updateDiffDisplay() {
   }
 
   // 4. 睡眠时长
-  const sleepVal = parseFloat(document.getElementById('sleepDuration')?.value);
+  const sleepVal = parseFloat(controlVal('sleepDuration'));
   const diffSleepEl = document.getElementById('diff-sleep');
   if (diffSleepEl) {
     if (!isNaN(sleepVal) && yesterdayRecord && yesterdayRecord.sleep_hours !== null && yesterdayRecord.sleep_hours !== undefined) {
@@ -844,7 +868,7 @@ function updateDiffDisplay() {
 }
 
 function updateLogCompleteness() {
-  const has = (id) => String(document.getElementById(id)?.value || '').trim() !== '';
+  const has = (id) => controlVal(id).trim() !== '';
   let n = 0;
   if (has('input-weight-am') || has('input-weight-pm')) n++;
   if (has('input-waist')) n++;
@@ -926,6 +950,27 @@ function clearDraft(dateStr) {
   } catch (_) {}
 }
 
+/**
+ * 清理超过 maxAgeDays 天的过期日志草稿，避免长期积累占用 localStorage
+ * @param {number} [maxAgeDays=14]
+ */
+function pruneStaleDrafts(maxAgeDays = 14) {
+  try {
+    const cutoff = shiftDateStr(localDateStr(new Date()), -maxAgeDays);
+    /** @type {string[]} */
+    const staleKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      const m = /^ht_log_draft_(\d{4}-\d{2}-\d{2})$/.exec(k);
+      if (m && m[1] < cutoff) {
+        staleKeys.push(k);
+      }
+    }
+    staleKeys.forEach((k) => localStorage.removeItem(k));
+  } catch (_) {}
+}
+
 async function handleDateChange(target) {
   if (!target) return;
   if (target === loadedDate) return;
@@ -936,7 +981,7 @@ async function handleDateChange(target) {
       danger: false,
     });
     if (!ok) {
-      const input = document.getElementById('input-date');
+      const input = inputById('input-date');
       if (input) input.value = loadedDate;
       return;
     }
@@ -946,27 +991,35 @@ async function handleDateChange(target) {
 }
 
 function bindEvents() {
-  const dateInput = document.getElementById('input-date');
+  const dateInput = inputById('input-date');
   if (dateInput) {
-    dateInput.addEventListener('change', (e) => handleDateChange(e.target.value));
+    dateInput.addEventListener('change', (e) => {
+      if (e.currentTarget instanceof HTMLInputElement) {
+        handleDateChange(e.currentTarget.value);
+      }
+    });
   }
 
-  document.getElementById('btn-today-date')?.addEventListener('click', () => {
+  byId('btn-today-date')?.addEventListener('click', () => {
     const today = localDateStr(new Date());
     handleDateChange(today);
   });
 
   // 晨光
-  document.getElementById('morningLightPills')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-val]');
+  byId('morningLightPills')?.addEventListener('click', (e) => {
+    const btn = closestEl(e.target, 'button[data-val]');
     if (!btn) return;
     setMorningLight(btn.getAttribute('data-val'));
   });
 
   // 步数
-  document.getElementById('input-steps')?.addEventListener('input', (e) => onStepsInput(e.target.value));
-  document.getElementById('btn-clear-steps')?.addEventListener('click', clearSteps);
-  document.getElementById('btn-sync-steps')?.addEventListener('click', () => syncNativeSteps(true));
+  inputById('input-steps')?.addEventListener('input', (e) => {
+    if (e.currentTarget instanceof HTMLInputElement) {
+      onStepsInput(e.currentTarget.value);
+    }
+  });
+  byId('btn-clear-steps')?.addEventListener('click', clearSteps);
+  byId('btn-sync-steps')?.addEventListener('click', () => syncNativeSteps(true));
 
   window.onStepPermissionResult = (granted) => {
     if (granted) {
@@ -1044,7 +1097,7 @@ function bindEvents() {
   }
 
   document.getElementById('btn-clear-journal')?.addEventListener('click', async () => {
-    const jEl = document.getElementById('input-journal');
+    const jEl = textareaById('input-journal');
     if (!jEl || !jEl.value) return;
     const ok = await appConfirm('确定清空自由记录吗？', {
       title: '清空自由记录',
@@ -1060,40 +1113,40 @@ function bindEvents() {
   });
 
   // 午餐折叠与选择
-  document.getElementById('lunch-toggle')?.addEventListener('click', (e) => {
-    if (e.target.closest('#btn-lunch-template')) return;
+  byId('lunch-toggle')?.addEventListener('click', (e) => {
+    if (closestEl(e.target, '#btn-lunch-template')) return;
     toggleLunch();
   });
-  document.getElementById('btn-lunch-template')?.addEventListener('click', (e) => {
+  byId('btn-lunch-template')?.addEventListener('click', (e) => {
     e.stopPropagation();
     applyLunchTemplate();
   });
-  document.getElementById('lunch-eaten')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('.pill-sm-btn');
+  byId('lunch-eaten')?.addEventListener('click', (e) => {
+    const btn = closestEl(e.target, '.pill-sm-btn');
     if (btn) setLunchPill(btn);
   });
-  document.getElementById('lunch-protein')?.addEventListener('click', (e) => {
-    const chip = e.target.closest('.chip');
+  byId('lunch-protein')?.addEventListener('click', (e) => {
+    const chip = closestEl(e.target, '.chip');
     if (chip) toggleLunchChip(chip);
   });
   ['lunch-protein-g', 'lunch-staple', 'lunch-carb', 'lunch-cook'].forEach((id) => {
-    document.getElementById(id)?.addEventListener('click', (e) => {
-      const btn = e.target.closest('.pill-sm-btn');
+    byId(id)?.addEventListener('click', (e) => {
+      const btn = closestEl(e.target, '.pill-sm-btn');
       if (btn) setLunchPill(btn);
     });
   });
 
   // 生物黑客折叠与多选
-  document.getElementById('biohack-toggle')?.addEventListener('click', toggleBiohackPanel);
-  document.getElementById('exerciseTypePills')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('.pill-btn');
+  byId('biohack-toggle')?.addEventListener('click', toggleBiohackPanel);
+  byId('exerciseTypePills')?.addEventListener('click', (e) => {
+    const btn = closestEl(e.target, '.pill-btn');
     if (btn) {
       toggleExerciseType(btn.getAttribute('data-val'));
       markDirty();
     }
   });
-  document.getElementById('exerciseIntensityPills')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('.pill-sm-btn');
+  byId('exerciseIntensityPills')?.addEventListener('click', (e) => {
+    const btn = closestEl(e.target, '.pill-sm-btn');
     if (btn) {
       setExerciseIntensity(btn.getAttribute('data-val'));
       markDirty();
@@ -1101,18 +1154,22 @@ function bindEvents() {
   });
 
   // 专注达
-  document.getElementById('concertaEnabled')?.addEventListener('change', (e) => {
-    toggleConcerta(e.target.checked);
-    markDirty();
+  inputById('concertaEnabled')?.addEventListener('change', (e) => {
+    if (e.currentTarget instanceof HTMLInputElement) {
+      toggleConcerta(e.currentTarget.checked);
+      markDirty();
+    }
   });
-  document.getElementById('focusWork')?.addEventListener('input', (e) => {
-    const fwEl = document.getElementById('focusWorkText');
-    if (fwEl) fwEl.innerText = e.target.value + '分';
+  inputById('focusWork')?.addEventListener('input', (e) => {
+    const fwEl = byId('focusWorkText');
+    if (e.currentTarget instanceof HTMLInputElement && fwEl) {
+      fwEl.innerText = e.currentTarget.value + '分';
+    }
     markDirty();
   });
   ['concertaSideEffects', 'concertaCompensations'].forEach((id) => {
-    document.getElementById(id)?.addEventListener('click', (e) => {
-      const chip = e.target.closest('.chip');
+    byId(id)?.addEventListener('click', (e) => {
+      const chip = closestEl(e.target, '.chip');
       if (chip) {
         chip.classList.toggle('active');
         markDirty();
@@ -1121,34 +1178,40 @@ function bindEvents() {
   });
 
   // 冷水澡
-  document.getElementById('coldShowerEnabled')?.addEventListener('change', (e) => {
-    toggleColdShower(e.target.checked);
-    markDirty();
+  inputById('coldShowerEnabled')?.addEventListener('change', (e) => {
+    if (e.currentTarget instanceof HTMLInputElement) {
+      toggleColdShower(e.currentTarget.checked);
+      markDirty();
+    }
   });
-  document.getElementById('coldShowerTime')?.addEventListener('change', (e) => {
-    setColdShowerTiming(e.target.value);
-    markDirty();
+  inputById('coldShowerTime')?.addEventListener('change', (e) => {
+    if (e.currentTarget instanceof HTMLInputElement) {
+      setColdShowerTiming(e.currentTarget.value);
+      markDirty();
+    }
   });
-  document.getElementById('csQuickTimingPills')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('.pill-sm-btn');
+  byId('csQuickTimingPills')?.addEventListener('click', (e) => {
+    const btn = closestEl(e.target, '.pill-sm-btn');
     if (btn) {
       setColdShowerTiming(btn.getAttribute('data-time'));
       markDirty();
     }
   });
-  document.getElementById('coldShowerDuration')?.addEventListener('input', (e) => {
-    syncColdShowerQuickDurationUI(e.target.value);
-    markDirty();
+  inputById('coldShowerDuration')?.addEventListener('input', (e) => {
+    if (e.currentTarget instanceof HTMLInputElement) {
+      syncColdShowerQuickDurationUI(e.currentTarget.value);
+      markDirty();
+    }
   });
-  document.getElementById('csQuickDurationPills')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('.pill-sm-btn');
+  byId('csQuickDurationPills')?.addEventListener('click', (e) => {
+    const btn = closestEl(e.target, '.pill-sm-btn');
     if (btn) {
       setColdShowerDuration(Number(btn.getAttribute('data-sec')));
       markDirty();
     }
   });
-  document.getElementById('csFeelingPills')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('.pill-sm-btn');
+  byId('csFeelingPills')?.addEventListener('click', (e) => {
+    const btn = closestEl(e.target, '.pill-sm-btn');
     if (btn) {
       setColdShowerFeeling(btn.getAttribute('data-val'));
       markDirty();

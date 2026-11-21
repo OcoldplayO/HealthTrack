@@ -3,6 +3,7 @@
  * 18px 极细线条 SVG，JetBrains Mono 紧凑标签，单线顶边
  */
 import { store } from '../services/state.js';
+import { closestEl } from '../utils/dom.js';
 
 export function renderBottomNav(container, onTabSwitch) {
   const html = `
@@ -29,7 +30,7 @@ export function renderBottomNav(container, onTabSwitch) {
 
   const navEl = document.getElementById('bottom-nav');
   navEl?.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-tab]');
+    const btn = closestEl(e.target, 'button[data-tab]');
     if (!btn) return;
     const targetTab = btn.getAttribute('data-tab');
     if (typeof onTabSwitch === 'function') {

@@ -2,6 +2,9 @@
  * 顶部状态栏组件 (Header)
  * 极简极客风、1.5px 极细 SVG、单线分割
  */
+import { openSettings } from './modals/SettingsModal.js';
+import { openDataSheet } from './modals/DataSheetModal.js';
+
 export function renderHeader(container) {
   const html = `
     <header class="pt-4 pb-3 px-5 bg-white border-b border-neutral-200/80 flex justify-between items-center shrink-0 z-10">
@@ -29,9 +32,9 @@ export function renderHeader(container) {
   container.insertAdjacentHTML('afterbegin', html);
 
   document.getElementById('btn-open-settings')?.addEventListener('click', () => {
-    if (typeof window.openSettings === 'function') window.openSettings();
+    openSettings();
   });
   document.getElementById('btn-open-data')?.addEventListener('click', () => {
-    if (typeof window.openDataSheet === 'function') window.openDataSheet();
+    openDataSheet();
   });
 }

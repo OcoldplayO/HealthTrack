@@ -10,28 +10,39 @@ import './css/app.css';
 import { initToast } from './components/Toast.js';
 import { renderHeader } from './components/Header.js';
 import { renderBottomNav } from './components/BottomNav.js';
-import { renderSettingsModal } from './components/modals/SettingsModal.js';
-import { renderDataSheetModal } from './components/modals/DataSheetModal.js';
-import { renderOtherModals } from './components/modals/OtherModals.js';
+import { renderSettingsModal, closeSettings } from './components/modals/SettingsModal.js';
+import { renderDataSheetModal, closeDataSheet } from './components/modals/DataSheetModal.js';
+import {
+  renderOtherModals,
+  closeExport,
+  closeImport,
+  closeMemo,
+  closeBatches,
+} from './components/modals/OtherModals.js';
 import { initLogView } from './views/log/log-controller.js';
 import {
   initDashView,
   activateDash,
   activateTrend,
-  activateTrendDetail
+  activateTrendDetail,
 } from './views/dash/dash-controller.js';
 import {
   initInsightView,
   activateInsight,
-  activateCompare
+  activateCompare,
+  cmpBack,
 } from './views/insight/insight-controller.js';
-import { initEveningView, activateEvening } from './views/evening/evening-controller.js';
+import {
+  initEveningView,
+  activateEvening,
+  closeEveningPhoto,
+} from './views/evening/evening-controller.js';
+import { registerTabSwitcher } from './services/router.js';
 import { store } from './services/state.js';
 
 export function switchTab(tab) {
   store.set({ currentTab: tab });
 
-  // 视图显隐切换
   const allViews = ['log', 'dash', 'trend', 'trend-detail', 'insight', 'history', 'compare', 'evening'];
   allViews.forEach((t) => {
     const el = document.getElementById(`view-${t}`);
@@ -65,7 +76,7 @@ export function switchTab(tab) {
   else if (tab === 'evening') activateEvening();
 }
 
-window.switchTab = switchTab;
+registerTabSwitcher(switchTab);
 
 function isVisibleModal(id) {
   const el = document.getElementById(id);
@@ -74,7 +85,7 @@ function isVisibleModal(id) {
 
 export function handleNativeBack() {
   if (isVisibleModal('ev-photo-viewer')) {
-    window.evoClosePhoto?.();
+    closeEveningPhoto();
     return true;
   }
   if (isVisibleModal('app-confirm-modal')) {
@@ -82,34 +93,33 @@ export function handleNativeBack() {
     return true;
   }
   if (isVisibleModal('settings-modal')) {
-    window.closeSettings?.();
+    closeSettings();
     return true;
   }
   if (isVisibleModal('data-sheet')) {
-    window.closeDataSheet?.();
+    closeDataSheet();
     return true;
   }
   if (isVisibleModal('export-modal')) {
-    window.closeExport?.();
+    closeExport();
     return true;
   }
   if (isVisibleModal('import-modal')) {
-    window.closeImport?.();
+    closeImport();
     return true;
   }
   if (isVisibleModal('memo-import-modal')) {
-    window.closeMemo?.();
+    closeMemo();
     return true;
   }
   if (isVisibleModal('import-batches-modal')) {
-    window.closeBatches?.();
+    closeBatches();
     return true;
   }
 
   const tab = store.state.currentTab || 'log';
   if (tab === 'compare') {
-    if (typeof window.cmpBack === 'function') window.cmpBack();
-    else switchTab('insight');
+    cmpBack();
     return true;
   }
   if (tab === 'history') {
@@ -123,6 +133,7 @@ export function handleNativeBack() {
   return false;
 }
 
+// 原生 Android 返回键桥接回调
 window.handleNativeBack = handleNativeBack;
 
 document.addEventListener('DOMContentLoaded', () => {

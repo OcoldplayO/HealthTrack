@@ -14,11 +14,11 @@
             </div>
           </div>
           <div class="flex items-center gap-1.5 shrink-0 font-mono">
-            <button onclick="openCompareView()" class="h-8 px-2.5 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 rounded-lg text-[11px] text-neutral-600 font-medium transition-all active:scale-95 flex items-center gap-1">
+            <button type="button" data-action="open-compare" class="h-8 px-2.5 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 rounded-lg text-[11px] text-neutral-600 font-medium transition-all active:scale-95 flex items-center gap-1">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/></svg>
               <span>阶段对比</span>
             </button>
-            <button onclick="openInsightHistory()" class="h-8 px-2.5 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 rounded-lg text-[11px] text-neutral-600 font-medium transition-all active:scale-95 flex items-center gap-1">
+            <button type="button" data-action="open-history" class="h-8 px-2.5 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 rounded-lg text-[11px] text-neutral-600 font-medium transition-all active:scale-95 flex items-center gap-1">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               <span>历史</span>
             </button>
@@ -30,24 +30,24 @@
           <div class="flex justify-between items-center">
             <span class="text-[10px] font-mono uppercase tracking-wider text-neutral-400">分析周期</span>
             <div class="flex gap-1">
-              <button onclick="setInsightDays(7)" id="pill-7" class="ht-seg-btn">近7天</button>
-              <button onclick="setInsightDays(30)" id="pill-30" class="ht-seg-btn active">近30天</button>
-              <button onclick="setInsightDays(60)" id="pill-60" class="ht-seg-btn">近60天</button>
+              <button type="button" data-action="insight-days" data-days="7" id="pill-7" class="ht-seg-btn">近7天</button>
+              <button type="button" data-action="insight-days" data-days="30" id="pill-30" class="ht-seg-btn active">近30天</button>
+              <button type="button" data-action="insight-days" data-days="60" id="pill-60" class="ht-seg-btn">近60天</button>
             </div>
           </div>
           <div class="pt-2.5 border-t border-neutral-100 flex items-center justify-between">
             <span class="text-[10px] font-mono uppercase tracking-wider text-neutral-400">截止日期</span>
             <div class="flex items-center gap-1.5 font-mono">
-              <button onclick="setInsightEndMode('today')" id="endpill-today" class="ht-seg-btn active">今日</button>
-              <button onclick="setInsightEndMode('yesterday')" id="endpill-yesterday" class="ht-seg-btn">昨日</button>
-              <input type="date" id="insight-end-date" onchange="setInsightEndDate(this.value)"
+              <button type="button" data-action="insight-end-mode" data-mode="today" id="endpill-today" class="ht-seg-btn active">今日</button>
+              <button type="button" data-action="insight-end-mode" data-mode="yesterday" id="endpill-yesterday" class="ht-seg-btn">昨日</button>
+              <input type="date" id="insight-end-date"
                      class="bg-white border border-neutral-200 text-[11px] font-mono text-neutral-700 rounded-lg px-2 py-1 outline-none w-[138px] focus:border-neutral-800 transition-colors" />
             </div>
           </div>
         </div>
 
         <!-- 主操作按钮：高质感深色极客大按钮 -->
-        <button onclick="generateInsightStream()" id="btn-generate-insight" class="w-full h-11 bg-neutral-900 hover:bg-neutral-800 text-white font-mono text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99] shadow-sm">
+        <button type="button" data-action="insight-generate" id="btn-generate-insight" class="w-full h-11 bg-neutral-900 hover:bg-neutral-800 text-white font-mono text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99] shadow-sm">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           <span>生成阶段深度洞察</span>
         </button>
@@ -71,41 +71,41 @@
       <!-- 4. AI 洞察历史页 (Insight History View) -->
       <section id="view-history" class="fade-in space-y-3.5 hidden">
         <div class="flex justify-between items-center">
-          <button onclick="switchTab('insight')" class="flex items-center gap-1 text-neutral-500 hover:text-neutral-800 transition-colors">
+          <button type="button" data-action="back-insight" class="flex items-center gap-1 text-neutral-500 hover:text-neutral-800 transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
             <span class="text-xs font-mono font-medium">返回</span>
           </button>
           <h2 class="text-sm font-bold text-neutral-900 font-mono">洞察历史存档</h2>
-          <button onclick="toggleHistoryManage()" id="history-manage-btn" class="text-xs font-mono font-medium text-neutral-700 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 px-2.5 py-1 rounded-lg transition-colors">管理</button>
+          <button type="button" data-action="history-manage" id="history-manage-btn" class="text-xs font-mono font-medium text-neutral-700 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 px-2.5 py-1 rounded-lg transition-colors">管理</button>
         </div>
 
         <!-- 关键词搜索 -->
         <div class="relative">
-          <input id="history-search" oninput="onHistorySearchInput()" type="text" placeholder="搜索洞察内容关键词…"
+          <input id="history-search" type="text" placeholder="搜索洞察内容关键词…"
             class="w-full bg-white border border-neutral-200 rounded-xl pl-9 pr-3 py-2 text-xs font-sans text-neutral-800 placeholder-neutral-400 focus:outline-none focus:border-neutral-800 transition-colors">
           <svg class="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </div>
 
         <!-- 档位筛选 -->
         <div class="flex gap-1.5 font-mono">
-          <button onclick="setHistoryFilter(0)" id="hfilter-0" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-900 text-white transition-all">全部</button>
-          <button onclick="setHistoryFilter(7)" id="hfilter-7" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">近7天</button>
-          <button onclick="setHistoryFilter(30)" id="hfilter-30" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">近30天</button>
-          <button onclick="setHistoryFilter(60)" id="hfilter-60" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">近60天</button>
-          <button onclick="setHistoryFilterCompare()" id="hfilter-compare" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">对比</button>
+          <button type="button" data-action="history-filter" data-days="0" id="hfilter-0" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-900 text-white transition-all">全部</button>
+          <button type="button" data-action="history-filter" data-days="7" id="hfilter-7" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">近7天</button>
+          <button type="button" data-action="history-filter" data-days="30" id="hfilter-30" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">近30天</button>
+          <button type="button" data-action="history-filter" data-days="60" id="hfilter-60" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">近60天</button>
+          <button type="button" data-action="history-filter-compare" id="hfilter-compare" class="flex-1 py-1.5 rounded-lg text-[11px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all">对比</button>
         </div>
 
         <!-- 历史列表 -->
         <div id="history-list" class="space-y-2.5"></div>
 
         <!-- 加载更多（游标分页，每批 10 条） -->
-        <button onclick="loadHistory(false)" id="history-loadmore" class="hidden w-full py-2.5 rounded-xl ht-card text-xs font-mono font-medium text-neutral-600 hover:bg-neutral-50 transition-all">加载更多</button>
+        <button type="button" data-action="history-load-more" id="history-loadmore" class="hidden w-full py-2.5 rounded-xl ht-card text-xs font-mono font-medium text-neutral-600 hover:bg-neutral-50 transition-all">加载更多</button>
 
         <!-- 管理模式底部操作条 -->
         <div id="history-delete-bar" class="hidden sticky bottom-2 z-10 flex items-center justify-between bg-neutral-900/95 backdrop-blur-md text-white rounded-xl px-4 py-2.5 shadow-lg border border-neutral-800">
-          <button onclick="toggleHistorySelectAll()" id="history-selectall-btn" class="text-xs font-mono font-medium text-neutral-300 hover:text-white transition-colors">全选</button>
+          <button type="button" data-action="history-select-all" id="history-selectall-btn" class="text-xs font-mono font-medium text-neutral-300 hover:text-white transition-colors">全选</button>
           <span id="history-selected-count" class="text-xs font-mono text-neutral-400">已选 0 项</span>
-          <button onclick="deleteSelectedInsights()" id="history-delete-btn" class="text-xs font-mono font-medium bg-neutral-700 text-neutral-400 px-3.5 py-1.5 rounded-lg cursor-not-allowed transition-colors" disabled>删除所选</button>
+          <button type="button" data-action="history-delete" id="history-delete-btn" class="text-xs font-mono font-medium bg-neutral-700 text-neutral-400 px-3.5 py-1.5 rounded-lg cursor-not-allowed transition-colors" disabled>删除所选</button>
         </div>
       </section>
 
@@ -113,7 +113,7 @@
       <section id="view-compare" class="fade-in space-y-3.5 hidden">
         <!-- topbar -->
         <div class="flex justify-between items-center">
-          <button onclick="cmpBack()" class="flex items-center gap-1 text-neutral-500 hover:text-neutral-800 transition-colors">
+          <button type="button" data-action="cmp-back" class="flex items-center gap-1 text-neutral-500 hover:text-neutral-800 transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
             <span class="text-xs font-mono font-medium">返回</span>
           </button>
@@ -125,21 +125,21 @@
         <div class="ht-card p-3.5 space-y-3">
           <div class="flex items-center justify-between">
             <div class="flex-1 min-w-0 flex items-center justify-center space-x-1">
-              <button onclick="cmpStepMonth('a',-1)" id="cmp-a-prev" class="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50 text-sm font-mono font-bold leading-none transition-colors">‹</button>
+              <button type="button" data-action="cmp-step" data-which="a" data-delta="-1" id="cmp-a-prev" class="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50 text-sm font-mono font-bold leading-none transition-colors">‹</button>
               <div class="text-center min-w-0 px-2">
                 <p class="text-[9px] font-mono uppercase text-neutral-400">对比月 A</p>
                 <p id="cmp-a-label" class="text-sm font-bold font-mono text-neutral-900 whitespace-nowrap tabular-nums">—</p>
               </div>
-              <button onclick="cmpStepMonth('a',1)" id="cmp-a-next" class="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50 text-sm font-mono font-bold leading-none transition-colors">›</button>
+              <button type="button" data-action="cmp-step" data-which="a" data-delta="1" id="cmp-a-next" class="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50 text-sm font-mono font-bold leading-none transition-colors">›</button>
             </div>
             <span class="px-2 text-[10px] font-mono font-bold text-neutral-300 shrink-0">VS</span>
             <div class="flex-1 min-w-0 flex items-center justify-center space-x-1">
-              <button onclick="cmpStepMonth('b',-1)" id="cmp-b-prev" class="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50 text-sm font-mono font-bold leading-none transition-colors">‹</button>
+              <button type="button" data-action="cmp-step" data-which="b" data-delta="-1" id="cmp-b-prev" class="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50 text-sm font-mono font-bold leading-none transition-colors">‹</button>
               <div class="text-center min-w-0 px-2">
                 <p class="text-[9px] font-mono uppercase text-neutral-400">对比月 B</p>
                 <p id="cmp-b-label" class="text-sm font-bold font-mono text-neutral-900 whitespace-nowrap tabular-nums">—</p>
               </div>
-              <button onclick="cmpStepMonth('b',1)" id="cmp-b-next" class="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50 text-sm font-mono font-bold leading-none transition-colors">›</button>
+              <button type="button" data-action="cmp-step" data-which="b" data-delta="1" id="cmp-b-next" class="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50 text-sm font-mono font-bold leading-none transition-colors">›</button>
             </div>
           </div>
           <p class="text-[10px] text-neutral-400 text-center font-mono">默认「上月 vs 上上月」· 独立两月 · 支持跨年对比</p>
@@ -149,7 +149,7 @@
         <div id="cmp-warn" class="hidden bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2 text-[11px] font-mono leading-relaxed"></div>
 
         <!-- 生成按钮 -->
-        <button onclick="cmpGenerateStream()" id="compare-gen-btn" class="w-full h-11 bg-neutral-900 hover:bg-neutral-800 text-white font-mono text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99] shadow-sm">
+        <button type="button" data-action="cmp-generate" id="compare-gen-btn" class="w-full h-11 bg-neutral-900 hover:bg-neutral-800 text-white font-mono text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99] shadow-sm">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           <span>生成阶段对比综述</span>
         </button>

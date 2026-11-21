@@ -15,21 +15,22 @@ func NewRecordRepository(db *sql.DB) *RecordRepository {
 	return &RecordRepository{db: db}
 }
 
-// GetByDate 根据用户ID和日期查询单条记录
-func (r *RecordRepository) GetByDate(userID int64, dateStr string) (*model.HealthRecord, error) {
-	query := `
-	SELECT id, user_id, record_date, weight_am, weight_pm, waist_size,
-	       sleep_start_time, sleep_end_time, sleep_hours, sleep_tag,
-	       journal_text, activity_tags,
-	       sleep_bed_time, sleep_wake_time, exercise_json, cold_shower_json, concerta_json,
-	       morning_light, steps, lunch_json,
-	       created_at, updated_at
-	FROM health_records
-	WHERE user_id = ? AND record_date = ?
-	LIMIT 1
-	`
-	row := r.db.QueryRow(query, userID, dateStr)
+const healthRecordSelectColumns = `id, user_id, record_date, weight_am, weight_pm, waist_size,
+	sleep_start_time, sleep_end_time, sleep_hours, sleep_tag,
+	journal_text, activity_tags,
+	sleep_bed_time, sleep_wake_time, exercise_json, cold_shower_json, concerta_json,
+	morning_light, steps, lunch_json,
+	created_at, updated_at`
 
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+type recordQuerier interface {
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+func scanHealthRecord(s rowScanner) (*model.HealthRecord, error) {
 	rec := &model.HealthRecord{}
 	var journalText, activityTags sql.NullString
 	var sleepBedTime, sleepWakeTime, exerciseJSON, coldShowerJSON, concertaJSON sql.NullString
@@ -37,7 +38,7 @@ func (r *RecordRepository) GetByDate(userID int64, dateStr string) (*model.Healt
 	var lunchJSON sql.NullString
 	var createdAt, updatedAt string
 
-	err := row.Scan(
+	err := s.Scan(
 		&rec.ID, &rec.UserID, &rec.RecordDate,
 		&rec.WeightAM, &rec.WeightPM, &rec.WaistSize,
 		&rec.SleepStartTime, &rec.SleepEndTime, &rec.SleepHours,
@@ -46,12 +47,8 @@ func (r *RecordRepository) GetByDate(userID int64, dateStr string) (*model.Healt
 		&morningLight, &steps, &lunchJSON,
 		&createdAt, &updatedAt,
 	)
-
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil // 记录不存在
-		}
-		return nil, fmt.Errorf("查询记录失败: %w", err)
+		return nil, err
 	}
 
 	if journalText.Valid {
@@ -111,9 +108,46 @@ func (r *RecordRepository) GetByDate(userID int64, dateStr string) (*model.Healt
 	return rec, nil
 }
 
-// SaveOrMerge 保存或增量合并单日记录 (UPSERT)
+func getByDateWith(q recordQuerier, userID int64, dateStr string) (*model.HealthRecord, error) {
+	query := fmt.Sprintf(`
+	SELECT %s
+	FROM health_records
+	WHERE user_id = ? AND record_date = ?
+	LIMIT 1
+	`, healthRecordSelectColumns)
+
+	rec, err := scanHealthRecord(q.QueryRow(query, userID, dateStr))
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // 记录不存在
+		}
+		return nil, fmt.Errorf("查询记录失败: %w", err)
+	}
+	return rec, nil
+}
+
+// GetByDate 根据用户ID和日期查询单条记录
+func (r *RecordRepository) GetByDate(userID int64, dateStr string) (*model.HealthRecord, error) {
+	return getByDateWith(r.db, userID, dateStr)
+}
+
+func marshalJSONOrDefault(v any, fallback string) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return fallback
+	}
+	return string(b)
+}
+
+// SaveOrMerge 保存或增量合并单日记录 (单事务 UPSERT)
 func (r *RecordRepository) SaveOrMerge(userID int64, dto *model.SaveRecordDTO, sleepTag string, activityTags string) (*model.HealthRecord, error) {
-	existing, err := r.GetByDate(userID, dto.RecordDate)
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("开启记录事务失败: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	existing, err := getByDateWith(tx, userID, dto.RecordDate)
 	if err != nil {
 		return nil, err
 	}
@@ -123,30 +157,22 @@ func (r *RecordRepository) SaveOrMerge(userID int64, dto *model.SaveRecordDTO, s
 	if dto.Exercise != nil {
 		// 落库前把多选类型规范化为 Types 并把兼容字段 Type 同步为首个类型
 		dto.Exercise.SyncLegacyType()
-		if b, err := json.Marshal(dto.Exercise); err == nil {
-			exerciseJSONStr = string(b)
-		}
+		exerciseJSONStr = marshalJSONOrDefault(dto.Exercise, "{}")
 	}
 
 	coldShowerJSONStr := "{}"
 	if dto.ColdShower != nil {
-		if b, err := json.Marshal(dto.ColdShower); err == nil {
-			coldShowerJSONStr = string(b)
-		}
+		coldShowerJSONStr = marshalJSONOrDefault(dto.ColdShower, "{}")
 	}
 
 	concertaJSONStr := "{}"
 	if dto.Concerta != nil {
-		if b, err := json.Marshal(dto.Concerta); err == nil {
-			concertaJSONStr = string(b)
-		}
+		concertaJSONStr = marshalJSONOrDefault(dto.Concerta, "{}")
 	}
 
 	lunchJSONStr := "{}"
 	if dto.Lunch != nil {
-		if b, err := json.Marshal(dto.Lunch); err == nil {
-			lunchJSONStr = string(b)
-		}
+		lunchJSONStr = marshalJSONOrDefault(dto.Lunch, "{}")
 	}
 
 	bedTimeStr := ""
@@ -175,14 +201,13 @@ func (r *RecordRepository) SaveOrMerge(userID int64, dto *model.SaveRecordDTO, s
 			journal = *dto.JournalText
 		}
 
-		_, err := r.db.Exec(insertSQL,
+		if _, err := tx.Exec(insertSQL,
 			userID, dto.RecordDate, dto.WeightAM, dto.WeightPM, dto.WaistSize,
 			dto.SleepStartTime, dto.SleepEndTime, dto.SleepHours, sleepTag,
 			journal, activityTags,
 			bedTimeStr, wakeTimeStr, exerciseJSONStr, coldShowerJSONStr, concertaJSONStr,
 			dto.MorningLight, dto.Steps, lunchJSONStr,
-		)
-		if err != nil {
+		); err != nil {
 			return nil, fmt.Errorf("新增记录失败: %w", err)
 		}
 	} else {
@@ -245,19 +270,13 @@ func (r *RecordRepository) SaveOrMerge(userID int64, dto *model.SaveRecordDTO, s
 		}
 
 		if dto.Exercise == nil && existing.Exercise != nil {
-			if b, err := json.Marshal(existing.Exercise); err == nil {
-				exerciseJSONStr = string(b)
-			}
+			exerciseJSONStr = marshalJSONOrDefault(existing.Exercise, "{}")
 		}
 		if dto.ColdShower == nil && existing.ColdShower != nil {
-			if b, err := json.Marshal(existing.ColdShower); err == nil {
-				coldShowerJSONStr = string(b)
-			}
+			coldShowerJSONStr = marshalJSONOrDefault(existing.ColdShower, "{}")
 		}
 		if dto.Concerta == nil && existing.Concerta != nil {
-			if b, err := json.Marshal(existing.Concerta); err == nil {
-				concertaJSONStr = string(b)
-			}
+			concertaJSONStr = marshalJSONOrDefault(existing.Concerta, "{}")
 		}
 
 		updateSQL := `
@@ -272,35 +291,36 @@ func (r *RecordRepository) SaveOrMerge(userID int64, dto *model.SaveRecordDTO, s
 		`
 		// 晨光 / 步数 / 午餐以本次提交的整份表单为准：nil 即写 NULL（当天未记录 / 断点），
 		// 这样「留空」才能真正清除历史值，不会被 merge 逻辑保留。
-		_, err := r.db.Exec(updateSQL,
+		if _, err := tx.Exec(updateSQL,
 			weightAM, weightPM, waistSize,
 			sleepStart, sleepEnd, sleepHours, tag,
 			journal, actTags,
 			bedTimeStr, wakeTimeStr, exerciseJSONStr, coldShowerJSONStr, concertaJSONStr,
 			dto.MorningLight, dto.Steps, lunchJSONStr,
 			userID, dto.RecordDate,
-		)
-		if err != nil {
+		); err != nil {
 			return nil, fmt.Errorf("更新记录失败: %w", err)
 		}
 	}
 
-	return r.GetByDate(userID, dto.RecordDate)
+	saved, err := getByDateWith(tx, userID, dto.RecordDate)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("提交记录事务失败: %w", err)
+	}
+	return saved, nil
 }
 
 // GetRange 查询指定日期区间内的所有记录 (升序排列便于图表绘制)
 func (r *RecordRepository) GetRange(userID int64, startDate, endDate string) ([]*model.HealthRecord, error) {
-	query := `
-	SELECT id, user_id, record_date, weight_am, weight_pm, waist_size,
-	       sleep_start_time, sleep_end_time, sleep_hours, sleep_tag,
-	       journal_text, activity_tags,
-	       sleep_bed_time, sleep_wake_time, exercise_json, cold_shower_json, concerta_json,
-	       morning_light, steps, lunch_json,
-	       created_at, updated_at
+	query := fmt.Sprintf(`
+	SELECT %s
 	FROM health_records
 	WHERE user_id = ? AND record_date >= ? AND record_date <= ?
 	ORDER BY record_date ASC
-	`
+	`, healthRecordSelectColumns)
 	rows, err := r.db.Query(query, userID, startDate, endDate)
 	if err != nil {
 		return nil, fmt.Errorf("查询历史记录失败: %w", err)
@@ -309,77 +329,14 @@ func (r *RecordRepository) GetRange(userID int64, startDate, endDate string) ([]
 
 	var records []*model.HealthRecord
 	for rows.Next() {
-		rec := &model.HealthRecord{}
-		var journalText, activityTags sql.NullString
-		var sleepBedTime, sleepWakeTime, exerciseJSON, coldShowerJSON, concertaJSON sql.NullString
-		var morningLight, steps sql.NullInt64
-		var lunchJSON sql.NullString
-		var createdAt, updatedAt string
-
-		if err := rows.Scan(
-			&rec.ID, &rec.UserID, &rec.RecordDate,
-			&rec.WeightAM, &rec.WeightPM, &rec.WaistSize,
-			&rec.SleepStartTime, &rec.SleepEndTime, &rec.SleepHours,
-			&rec.SleepTag, &journalText, &activityTags,
-			&sleepBedTime, &sleepWakeTime, &exerciseJSON, &coldShowerJSON, &concertaJSON,
-			&morningLight, &steps, &lunchJSON,
-			&createdAt, &updatedAt,
-		); err != nil {
+		rec, err := scanHealthRecord(rows)
+		if err != nil {
 			return nil, fmt.Errorf("扫描记录数据失败: %w", err)
 		}
-
-		if journalText.Valid {
-			rec.JournalText = journalText.String
-		}
-		if activityTags.Valid {
-			rec.ActivityTags = activityTags.String
-		}
-
-		if rec.SleepStartTime == nil && sleepBedTime.Valid && sleepBedTime.String != "" {
-			val := sleepBedTime.String
-			rec.SleepStartTime = &val
-		}
-		if rec.SleepEndTime == nil && sleepWakeTime.Valid && sleepWakeTime.String != "" {
-			val := sleepWakeTime.String
-			rec.SleepEndTime = &val
-		}
-
-		if exerciseJSON.Valid && exerciseJSON.String != "" && exerciseJSON.String != "{}" {
-			var ex model.ExerciseDetail
-			if err := json.Unmarshal([]byte(exerciseJSON.String), &ex); err == nil {
-				rec.Exercise = &ex
-			}
-		}
-		if coldShowerJSON.Valid && coldShowerJSON.String != "" && coldShowerJSON.String != "{}" {
-			var cs model.ColdShowerDetail
-			if err := json.Unmarshal([]byte(coldShowerJSON.String), &cs); err == nil {
-				rec.ColdShower = &cs
-			}
-		}
-		if concertaJSON.Valid && concertaJSON.String != "" && concertaJSON.String != "{}" {
-			var con model.ConcertaDetail
-			if err := json.Unmarshal([]byte(concertaJSON.String), &con); err == nil {
-				rec.Concerta = &con
-			}
-		}
-		if morningLight.Valid {
-			v := morningLight.Int64 != 0
-			rec.MorningLight = &v
-		}
-		if steps.Valid {
-			v := int(steps.Int64)
-			rec.Steps = &v
-		}
-		if lunchJSON.Valid && lunchJSON.String != "" && lunchJSON.String != "{}" {
-			var lunch model.LunchDetail
-			if err := json.Unmarshal([]byte(lunchJSON.String), &lunch); err == nil {
-				rec.Lunch = &lunch
-			}
-		}
-
-		rec.CreatedAt = parseSQLiteTime(createdAt)
-		rec.UpdatedAt = parseSQLiteTime(updatedAt)
 		records = append(records, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("遍历历史记录失败: %w", err)
 	}
 
 	return records, nil

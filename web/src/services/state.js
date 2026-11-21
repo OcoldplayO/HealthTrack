@@ -47,17 +47,3 @@ class AppStore {
 
 export const store = new AppStore();
 
-// 全局响应式 currentTab 属性，兼容老代码中的裸 currentTab 访问
-try {
-  Object.defineProperty(window, 'currentTab', {
-    get() {
-      return store.state.currentTab || 'log';
-    },
-    set(v) {
-      store.set({ currentTab: v });
-    },
-    configurable: true,
-  });
-} catch (e) {
-  window.currentTab = 'log';
-}

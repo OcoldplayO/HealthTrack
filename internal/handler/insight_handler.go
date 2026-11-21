@@ -171,6 +171,7 @@ func (h *InsightHandler) BatchDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 	var body struct {
 		IDs []int64 `json:"ids"`
 	}

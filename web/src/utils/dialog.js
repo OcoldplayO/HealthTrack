@@ -111,7 +111,3 @@ export function appToast(message) {
   }
 }
 
-// 兼容挂载到 window，确保全局和模板内联可用
-window.appConfirm = appConfirm;
-window.appCopyText = appCopyText;
-window.appToast = appToast;

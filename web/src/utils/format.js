@@ -144,6 +144,3 @@ export function renderMarkdown(md) {
   return html;
 }
 
-// 挂载到 window 供全局与内联使用
-window.escapeHtml = escapeHtml;
-window.renderMarkdown = renderMarkdown;

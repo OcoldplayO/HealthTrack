@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -68,13 +69,29 @@ const eveningSystemInstruction = systemInstruction + " 你正在解读用户当�
 // compareSystemInstruction 阶段对比的 system 硬约束（中文思考 + 只读表不许自算）。
 const compareSystemInstruction = systemInstruction + " 你正在做「阶段对比」：系统已把两个自然月的七项指标全部聚合好并以表格给出，你的职责是读表并做机制性归因，严禁自行重算或修正表中数值；表中为「—」的项即数据缺失，必须明确说明缺口，严禁估算或以 0 代替。若某月标注「尚未过完」或「数据不足」，须显式提示结论置信度低。"
 
-// setupSSE 写入标准 SSE 响应头并返回 flusher。
-func (h *AIHandler) setupSSE(w http.ResponseWriter) (http.Flusher, bool) {
+// isLoopbackOrigin 校验请求头 Origin 是否为本机回环地址。
+func isLoopbackOrigin(origin string) bool {
+	if origin == "" {
+		return false
+	}
+	u, err := url.Parse(origin)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return false
+	}
+	host := u.Hostname()
+	return host == "127.0.0.1" || host == "localhost" || host == "::1"
+}
+
+// setupSSE 写入标准 SSE 响应头并返回 flusher，仅对本机回环 Origin 放行 CORS。
+func (h *AIHandler) setupSSE(w http.ResponseWriter, r *http.Request) (http.Flusher, bool) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if origin := strings.TrimSpace(r.Header.Get("Origin")); isLoopbackOrigin(origin) {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Add("Vary", "Origin")
+	}
 	flusher, ok := w.(http.Flusher)
 	return flusher, ok
 }
@@ -85,7 +102,7 @@ func (h *AIHandler) setupSSE(w http.ResponseWriter) (http.Flusher, bool) {
 // 若直接用 time.Now() 当"今天"，会把客户端凌晨的请求算到前一天。
 func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 	cfg := h.configs.Snapshot()
-	flusher, ok := h.setupSSE(w)
+	flusher, ok := h.setupSSE(w, r)
 	if !ok {
 		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
 		return
@@ -190,7 +207,7 @@ func sseFail(w io.Writer, text string) {
 // 七项指标一律由 CompareService 在后端先行聚合，模型只读表与归因，不做任何跨月数值减法。
 func (h *AIHandler) StreamCompare(w http.ResponseWriter, r *http.Request) {
 	cfg := h.configs.Snapshot()
-	flusher, ok := h.setupSSE(w)
+	flusher, ok := h.setupSSE(w, r)
 	if !ok {
 		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
 		return
@@ -377,7 +394,7 @@ func loadComparePromptTemplate() string {
 // StreamEveningInsight 睡前小结洞察：GET /api/v1/evening/insight/stream?date=YYYY-MM-DD
 func (h *AIHandler) StreamEveningInsight(w http.ResponseWriter, r *http.Request) {
 	cfg := h.configs.Snapshot()
-	flusher, ok := h.setupSSE(w)
+	flusher, ok := h.setupSSE(w, r)
 	if !ok {
 		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
 		return

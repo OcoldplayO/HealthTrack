@@ -17,14 +17,12 @@ import (
 
 type RecordHandler struct {
 	recordService *service.RecordService
-	aiService     *service.AIService
 	eveningRepo   *repository.EveningRepository
 }
 
-func NewRecordHandler(recordService *service.RecordService, aiService *service.AIService, eveningRepo *repository.EveningRepository) *RecordHandler {
+func NewRecordHandler(recordService *service.RecordService, eveningRepo *repository.EveningRepository) *RecordHandler {
 	return &RecordHandler{
 		recordService: recordService,
-		aiService:     aiService,
 		eveningRepo:   eveningRepo,
 	}
 }
@@ -62,6 +60,7 @@ func (h *RecordHandler) SaveRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 256<<10)
 	var dto model.SaveRecordDTO
 	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
 		writeJSON(w, http.StatusOK, model.Error(model.CodeParamError, "JSON 格式非法: "+err.Error()))
@@ -98,34 +97,6 @@ func (h *RecordHandler) GetHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, model.Success(records))
-}
-
-// StreamInsight 流式 AI 洞察
-func (h *RecordHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	startDate := r.URL.Query().Get("start_date")
-	endDate := r.URL.Query().Get("end_date")
-
-	if startDate == "" {
-		startDate = time.Now().AddDate(0, 0, -29).Format("2006-01-02")
-	}
-	if endDate == "" {
-		endDate = time.Now().Format("2006-01-02")
-	}
-
-	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	userID := int64(1)
-	if err := h.aiService.StreamInsight(r.Context(), userID, startDate, endDate, w); err != nil {
-		slog.Error("流式洞察处理失败", "err", err)
-	}
 }
 
 // ExportCSV 导出 Excel / WPS 友好的 CSV 表格 (带 UTF-8 BOM，防止乱码与公式注入)

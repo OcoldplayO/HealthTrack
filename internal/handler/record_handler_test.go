@@ -40,7 +40,7 @@ func TestExportJSONV2IncludesSummariesAndExcludesPhotos(t *testing.T) {
 	}
 
 	recordService := service.NewRecordService(recordRepo, config.NewRuntimeStore(&config.Config{}, ""))
-	h := NewRecordHandler(recordService, nil, eveningRepo)
+	h := NewRecordHandler(recordService, eveningRepo)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/export/json", nil)
 	rec := httptest.NewRecorder()
@@ -115,7 +115,7 @@ func TestExportCSVIncludesExtendedColumnsAndSanitizesFormulas(t *testing.T) {
 	}
 
 	recordService := service.NewRecordService(recordRepo, config.NewRuntimeStore(&config.Config{}, ""))
-	h := NewRecordHandler(recordService, nil, eveningRepo)
+	h := NewRecordHandler(recordService, eveningRepo)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/export?tz_offset=480", nil)
 	rec := httptest.NewRecorder()

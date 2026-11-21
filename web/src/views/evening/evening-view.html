@@ -14,8 +14,8 @@
             </div>
           </div>
           <div class="flex items-center gap-1.5 shrink-0 font-mono">
-            <input type="date" id="summary-date" class="bg-white border border-neutral-200 text-neutral-800 text-xs font-mono font-medium rounded-lg px-2 py-1 w-[138px] outline-none focus:border-neutral-800 transition-colors" onchange="evOnDateChange(this.value)">
-            <button onclick="evSetToday()" class="h-8 px-2.5 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 rounded-lg text-[11px] text-neutral-600 font-medium transition-all active:scale-95">今日</button>
+            <input type="date" id="summary-date" class="bg-white border border-neutral-200 text-neutral-800 text-xs font-mono font-medium rounded-lg px-2 py-1 w-[138px] outline-none focus:border-neutral-800 transition-colors">
+            <button type="button" data-action="ev-today" class="h-8 px-2.5 bg-white border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 rounded-lg text-[11px] text-neutral-600 font-medium transition-all active:scale-95">今日</button>
           </div>
         </div>
 
@@ -43,17 +43,17 @@
           <!-- 已选 -->
           <div id="photo-filled" class="hidden">
             <div class="relative rounded-xl overflow-hidden bg-neutral-100 border border-neutral-200">
-              <img id="photo-preview" src="" alt="今日图片" onclick="evoOpenPhoto(this.src, '今日图片')" class="w-full h-48 object-cover cursor-zoom-in">
+              <img id="photo-preview" src="" alt="今日图片" data-action="ev-open-photo" class="w-full h-48 object-cover cursor-zoom-in">
               <div class="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-neutral-900/60 to-transparent"></div>
               <span class="absolute top-2 left-2 text-[10px] font-mono font-medium text-white bg-neutral-900/60 backdrop-blur px-2 py-0.5 rounded-md">TODAY PHOTO</span>
               <div class="absolute bottom-2 right-2 flex space-x-1.5 font-mono">
                 <label for="photo-input" class="text-[10px] font-medium text-neutral-800 bg-white/90 hover:bg-white px-2.5 py-1 rounded-md cursor-pointer active:scale-95 transition-transform shadow-sm">替换</label>
-                <button onclick="evRemovePhoto()" class="text-[10px] font-medium text-rose-600 bg-white/90 hover:bg-white px-2.5 py-1 rounded-md active:scale-95 transition-transform shadow-sm">删除</button>
+                <button type="button" data-action="ev-remove-photo" class="text-[10px] font-medium text-rose-600 bg-white/90 hover:bg-white px-2.5 py-1 rounded-md active:scale-95 transition-transform shadow-sm">删除</button>
               </div>
             </div>
             <p id="photo-meta" class="pt-1.5 text-[10px] font-mono text-neutral-400"></p>
           </div>
-          <input type="file" id="photo-input" accept="image/*" class="hidden" onchange="evOnPhotoPick(event)">
+          <input type="file" id="photo-input" accept="image/*" class="hidden">
 
           <!-- 感想 -->
           <div class="pt-2 border-t border-dashed border-neutral-200">
@@ -61,7 +61,7 @@
               <span class="text-[10px] font-mono uppercase tracking-wider text-neutral-400">那一刻的感想</span>
               <span class="text-[10px] font-mono text-neutral-400"><span id="note-len">0</span> 字</span>
             </div>
-            <textarea id="note-text" rows="3" oninput="document.getElementById('note-len').innerText=this.value.length" class="evo-selectable w-full bg-neutral-50 text-neutral-800 border border-neutral-200 rounded-lg p-2.5 text-xs outline-none focus:border-neutral-800 focus:bg-white transition-all resize-none leading-relaxed placeholder:text-neutral-400" placeholder="记录下为什么这张图值得被记住…"></textarea>
+            <textarea id="note-text" rows="3" class="evo-selectable w-full bg-neutral-50 text-neutral-800 border border-neutral-200 rounded-lg p-2.5 text-xs outline-none focus:border-neutral-800 focus:bg-white transition-all resize-none leading-relaxed placeholder:text-neutral-400" placeholder="记录下为什么这张图值得被记住…"></textarea>
           </div>
         </div>
 
@@ -74,15 +74,15 @@
           <div class="space-y-2">
             <div class="flex items-center space-x-2.5 bg-neutral-50 border border-neutral-200/80 rounded-lg px-2.5 py-2 focus-within:border-neutral-500 focus-within:bg-white transition-all">
               <span class="evo-seq-dot" id="seq-1">1</span>
-              <input type="text" id="done-1" maxlength="200" oninput="evUpdateDoneCount()" placeholder="最有成就感的那件事" class="evo-selectable flex-1 bg-transparent text-xs text-neutral-800 outline-none placeholder:text-neutral-400">
+              <input type="text" id="done-1" maxlength="200" placeholder="最有成就感的那件事" class="evo-selectable flex-1 bg-transparent text-xs text-neutral-800 outline-none placeholder:text-neutral-400">
             </div>
             <div class="flex items-center space-x-2.5 bg-neutral-50 border border-neutral-200/80 rounded-lg px-2.5 py-2 focus-within:border-neutral-500 focus-within:bg-white transition-all">
               <span class="evo-seq-dot" id="seq-2">2</span>
-              <input type="text" id="done-2" maxlength="200" oninput="evUpdateDoneCount()" placeholder="其次推进的一件事" class="evo-selectable flex-1 bg-transparent text-xs text-neutral-800 outline-none placeholder:text-neutral-400">
+              <input type="text" id="done-2" maxlength="200" placeholder="其次推进的一件事" class="evo-selectable flex-1 bg-transparent text-xs text-neutral-800 outline-none placeholder:text-neutral-400">
             </div>
             <div class="flex items-center space-x-2.5 bg-neutral-50 border border-neutral-200/80 rounded-lg px-2.5 py-2 focus-within:border-neutral-500 focus-within:bg-white transition-all">
               <span class="evo-seq-dot" id="seq-3">3</span>
-              <input type="text" id="done-3" maxlength="200" oninput="evUpdateDoneCount()" placeholder="哪怕很小，也算（可留空）" class="evo-selectable flex-1 bg-transparent text-xs text-neutral-800 outline-none placeholder:text-neutral-400">
+              <input type="text" id="done-3" maxlength="200" placeholder="哪怕很小，也算（可留空）" class="evo-selectable flex-1 bg-transparent text-xs text-neutral-800 outline-none placeholder:text-neutral-400">
             </div>
           </div>
         </div>
@@ -92,7 +92,7 @@
           <div class="flex items-end justify-between">
             <div class="flex items-center space-x-2">
               <span class="text-xs font-bold text-neutral-900">今日自评分</span>
-              <button onclick="evToggleBandEditor()" class="text-[10px] font-mono text-neutral-500 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded-md flex items-center gap-1 transition-all active:scale-95">
+              <button type="button" data-action="ev-toggle-bands" class="text-[10px] font-mono text-neutral-500 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded-md flex items-center gap-1 transition-all active:scale-95">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 <span>文案</span>
               </button>
@@ -103,7 +103,7 @@
             </div>
           </div>
           <div class="pt-1">
-            <input type="range" id="score-range" min="1" max="10" step="1" value="7" oninput="evUpdateScore(this.value)" class="ht-range w-full">
+            <input type="range" id="score-range" min="1" max="10" step="1" value="7" class="ht-range w-full">
             <div class="flex justify-between text-[10px] font-mono text-neutral-400 px-0.5 mt-1 tabular-nums">
               <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
             </div>
@@ -115,19 +115,19 @@
             <div class="mt-3 pt-3 border-t border-dashed border-neutral-200">
               <div class="flex items-center justify-between mb-2">
                 <span class="text-[10px] font-mono uppercase tracking-wider text-neutral-400">评分文案设置</span>
-                <button onclick="evResetBands()" class="text-[10px] font-mono text-neutral-400 hover:text-neutral-700 active:scale-95 transition-transform">恢复默认</button>
+                <button type="button" data-action="ev-reset-bands" class="text-[10px] font-mono text-neutral-400 hover:text-neutral-700 active:scale-95 transition-transform">恢复默认</button>
               </div>
               <div id="band-rows" class="space-y-1.5"></div>
               <div class="flex items-center justify-between mt-3">
                 <p class="text-[10px] text-neutral-400 leading-relaxed font-mono">改动保存后立即生效并同步历史小结。</p>
-                <button onclick="evSaveBands()" id="band-save-btn" class="shrink-0 ml-2 text-[11px] font-mono font-semibold text-white bg-neutral-900 hover:bg-neutral-800 px-3 py-1.5 rounded-lg active:scale-95 transition-all">保存设置</button>
+                <button type="button" data-action="ev-save-bands" id="band-save-btn" class="shrink-0 ml-2 text-[11px] font-mono font-semibold text-white bg-neutral-900 hover:bg-neutral-800 px-3 py-1.5 rounded-lg active:scale-95 transition-all">保存设置</button>
               </div>
             </div>
           </div>
         </div>
 
         <!-- ── 保存按钮 ── -->
-        <button onclick="evSave()" id="ev-save-btn" class="w-full h-11 bg-neutral-900 hover:bg-neutral-800 text-white font-mono text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99] shadow-sm">
+        <button type="button" data-action="ev-save" id="ev-save-btn" class="w-full h-11 bg-neutral-900 hover:bg-neutral-800 text-white font-mono text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99] shadow-sm">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           <span>保存今日小结</span>
         </button>
@@ -153,14 +153,14 @@
           <div class="flex items-center justify-between">
             <span class="text-[10px] font-mono uppercase tracking-wider text-neutral-400">关联生理数据</span>
             <div class="flex gap-1" id="ev-insight-range">
-              <button class="ht-seg-btn active" data-val="7" onclick="evSetInsightRange(this)">近7天</button>
-              <button class="ht-seg-btn" data-val="30" onclick="evSetInsightRange(this)">近30天</button>
+              <button type="button" class="ht-seg-btn active" data-action="ev-insight-range" data-val="7">近7天</button>
+              <button type="button" class="ht-seg-btn" data-action="ev-insight-range" data-val="30">近30天</button>
             </div>
           </div>
 
           <div id="insight-empty" class="pt-1">
             <p class="text-xs text-neutral-500 leading-relaxed">从小结的<b class="text-neutral-800">自评与文字</b>出发，结合所选区间内的体重、睡眠与打卡趋势，深度解读心理状态与成就感。</p>
-            <button onclick="evGenerateInsight()" id="ev-insight-btn" class="mt-3 w-full h-10 bg-neutral-900 hover:bg-neutral-800 text-white font-mono text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99] shadow-sm">
+            <button type="button" data-action="ev-insight-generate" id="ev-insight-btn" class="mt-3 w-full h-10 bg-neutral-900 hover:bg-neutral-800 text-white font-mono text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99] shadow-sm">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               <span>生成小结深度洞察</span>
             </button>
@@ -170,14 +170,14 @@
             <div class="flex items-center justify-between text-[10px] font-mono">
               <span id="insight-meta" class="text-neutral-400"></span>
               <div class="flex items-center gap-1.5">
-                <button id="ev-insight-stop-btn" onclick="evStopInsight()" class="hidden text-rose-600 hover:text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-mono transition-colors">停止生成</button>
-                <button id="ev-insight-reset-btn" onclick="evResetInsight()" class="text-neutral-400 hover:text-neutral-800 px-1 font-mono transition-colors">清除</button>
+                <button type="button" id="ev-insight-stop-btn" data-action="ev-insight-stop" class="hidden text-rose-600 hover:text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-mono transition-colors">停止生成</button>
+                <button type="button" id="ev-insight-reset-btn" data-action="ev-insight-reset" class="text-neutral-400 hover:text-neutral-800 px-1 font-mono transition-colors">清除</button>
               </div>
             </div>
 
             <!-- 思维链推导折叠面板 -->
             <div class="pb-2 border-b border-neutral-100">
-              <button onclick="evToggleThinking()" class="text-[10px] font-mono text-neutral-500 hover:text-neutral-900 flex items-center gap-1.5 transition-colors">
+              <button type="button" data-action="ev-toggle-thinking" class="text-[10px] font-mono text-neutral-500 hover:text-neutral-900 flex items-center gap-1.5 transition-colors">
                 <span id="think-arrow" class="inline-block transform transition-transform text-[9px]">▶</span>
                 <span>思维链推导 (REASONING)</span>
               </button>
@@ -205,26 +205,26 @@
             <div class="flex items-center space-x-2">
               <span class="text-[10px] font-mono uppercase tracking-wider text-neutral-400 w-8 shrink-0">日期</span>
               <div class="flex flex-wrap gap-1.5" id="ev-filter-date">
-                <button class="ht-seg-btn active" data-val="all" onclick="evSetDateFilter(this)">全部</button>
-                <button class="ht-seg-btn" data-val="7" onclick="evSetDateFilter(this)">近 7 天</button>
-                <button class="ht-seg-btn" data-val="30" onclick="evSetDateFilter(this)">近 30 天</button>
+                <button type="button" class="ht-seg-btn active" data-action="ev-filter-date" data-val="all">全部</button>
+                <button type="button" class="ht-seg-btn" data-action="ev-filter-date" data-val="7">近 7 天</button>
+                <button type="button" class="ht-seg-btn" data-action="ev-filter-date" data-val="30">近 30 天</button>
               </div>
             </div>
             <div class="flex items-center space-x-2">
               <span class="text-[10px] font-mono uppercase tracking-wider text-neutral-400 w-8 shrink-0">评分</span>
               <div class="flex flex-wrap gap-1.5" id="ev-filter-score">
-                <button class="ht-seg-btn active" data-val="all" onclick="evSetScoreFilter(this)">全部</button>
-                <button class="ht-seg-btn" data-val="high" onclick="evSetScoreFilter(this)">9-10</button>
-                <button class="ht-seg-btn" data-val="good" onclick="evSetScoreFilter(this)">7-8</button>
-                <button class="ht-seg-btn" data-val="mid" onclick="evSetScoreFilter(this)">5-6</button>
-                <button class="ht-seg-btn" data-val="low" onclick="evSetScoreFilter(this)">1-4</button>
+                <button type="button" class="ht-seg-btn active" data-action="ev-filter-score" data-val="all">全部</button>
+                <button type="button" class="ht-seg-btn" data-action="ev-filter-score" data-val="high">9-10</button>
+                <button type="button" class="ht-seg-btn" data-action="ev-filter-score" data-val="good">7-8</button>
+                <button type="button" class="ht-seg-btn" data-action="ev-filter-score" data-val="mid">5-6</button>
+                <button type="button" class="ht-seg-btn" data-action="ev-filter-score" data-val="low">1-4</button>
               </div>
             </div>
           </div>
 
           <div class="flex items-center justify-between px-0.5 text-[10px] font-mono">
             <span class="text-neutral-400">筛选结果 <b id="ev-filter-count" class="text-neutral-800 tabular-nums">0</b> 篇</span>
-            <button id="ev-filter-reset" onclick="evResetFilters()" class="hidden text-neutral-600 hover:text-neutral-900 active:scale-95 transition-transform">清除筛选</button>
+            <button type="button" id="ev-filter-reset" data-action="ev-filter-reset" class="hidden text-neutral-600 hover:text-neutral-900 active:scale-95 transition-transform">清除筛选</button>
           </div>
 
           <div id="ev-history-list" class="space-y-0"></div>
@@ -236,7 +236,7 @@
           </div>
 
           <div class="pt-1 pb-3 text-center">
-            <button id="ev-load-more" onclick="evLoadMore()" class="hidden px-4 py-1.5 bg-white border border-neutral-200 hover:border-neutral-400 rounded-lg text-xs font-mono text-neutral-600 transition-all active:scale-95">
+            <button type="button" id="ev-load-more" data-action="ev-load-more" class="hidden px-4 py-1.5 bg-white border border-neutral-200 hover:border-neutral-400 rounded-lg text-xs font-mono text-neutral-600 transition-all active:scale-95">
               加载更多（剩 <span id="ev-remain-count">0</span> 篇）
             </button>
             <p id="ev-load-done" class="hidden text-[10px] font-mono text-neutral-400">ALL SUMMARIES LOADED</p>

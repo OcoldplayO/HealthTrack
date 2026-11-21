@@ -2,14 +2,14 @@
         <div class="flex justify-between items-center">
           <h2 class="text-base font-bold text-slate-900">数据趋势看板</h2>
           <div class="flex bg-slate-200/70 p-0.5 rounded-xl text-xs font-semibold">
-            <button onclick="switchDashRange(7)" id="btn-range-7" class="px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all">近7天</button>
-            <button onclick="switchDashRange(30)" id="btn-range-30" class="px-3 py-1 rounded-lg text-slate-600 transition-all">近30天</button>
-            <button onclick="switchDashRange(60)" id="btn-range-60" class="px-3 py-1 rounded-lg text-slate-600 transition-all">近60天</button>
+            <button type="button" data-action="dash-range" data-days="7" id="btn-range-7" class="px-3 py-1 rounded-lg bg-white shadow-sm text-blue-600 transition-all">近7天</button>
+            <button type="button" data-action="dash-range" data-days="30" id="btn-range-30" class="px-3 py-1 rounded-lg text-slate-600 transition-all">近30天</button>
+            <button type="button" data-action="dash-range" data-days="60" id="btn-range-60" class="px-3 py-1 rounded-lg text-slate-600 transition-all">近60天</button>
           </div>
         </div>
 
         <!-- 60天详情入口（独立视图，逐日；与周平均趋势互补） -->
-        <button onclick="openTrendDetailView()" class="w-full flex items-center justify-between apple-card hover:border-blue-300 rounded-2xl px-4 py-3 transition-all active:scale-[0.99]">
+        <button type="button" data-action="open-trend-detail" class="w-full flex items-center justify-between apple-card hover:border-blue-300 rounded-2xl px-4 py-3 transition-all active:scale-[0.99]">
           <span class="flex items-center space-x-2.5 min-w-0">
             <svg class="w-4 h-4 text-neutral-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
             <span class="text-xs font-medium text-neutral-800 shrink-0">60 天详情</span>
@@ -19,7 +19,7 @@
         </button>
 
         <!-- 周平均趋势分析入口（独立视图，不占用底部导航） -->
-        <button onclick="openTrendView()" class="w-full flex items-center justify-between apple-card hover:border-emerald-300 rounded-2xl px-4 py-3 transition-all active:scale-[0.99]">
+        <button type="button" data-action="open-trend" class="w-full flex items-center justify-between apple-card hover:border-emerald-300 rounded-2xl px-4 py-3 transition-all active:scale-[0.99]">
           <span class="flex items-center space-x-2.5 min-w-0">
             <svg class="w-4 h-4 text-neutral-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             <span class="text-xs font-medium text-neutral-800 shrink-0">周平均趋势分析</span>
@@ -119,7 +119,7 @@
       <!-- 2.1 周平均趋势分析（独立视图，看板入口进入，不占用底部导航） -->
       <section id="view-trend" class="fade-in space-y-4 hidden">
         <div class="flex justify-between items-center">
-          <button onclick="switchTab('dash')" class="flex items-center space-x-0.5 text-slate-500 hover:text-slate-800 transition-colors">
+          <button type="button" data-action="back-dash" class="flex items-center space-x-0.5 text-slate-500 hover:text-slate-800 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
             <span class="text-xs font-bold">返回</span>
           </button>
@@ -129,10 +129,10 @@
 
         <!-- 指标切换：体重 / 腰围 / 睡眠 / 步数，各一条周平均曲线 -->
         <div class="flex space-x-1.5">
-          <button onclick="setTrendMetric('weight')" id="trend-tab-weight" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">体重</button>
-          <button onclick="setTrendMetric('waist')" id="trend-tab-waist" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">腰围</button>
-          <button onclick="setTrendMetric('sleep')" id="trend-tab-sleep" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">睡眠</button>
-          <button onclick="setTrendMetric('steps')" id="trend-tab-steps" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">步数</button>
+          <button type="button" data-action="trend-metric" data-metric="weight" id="trend-tab-weight" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">体重</button>
+          <button type="button" data-action="trend-metric" data-metric="waist" id="trend-tab-waist" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">腰围</button>
+          <button type="button" data-action="trend-metric" data-metric="sleep" id="trend-tab-sleep" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">睡眠</button>
+          <button type="button" data-action="trend-metric" data-metric="steps" id="trend-tab-steps" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">步数</button>
         </div>
 
         <!-- 周均值折线 + 周内 min/max 区间带 -->
@@ -164,7 +164,7 @@
       <section id="view-trend-detail" class="fade-in space-y-4 hidden">
         <div id="td-topbar" class="space-y-4">
           <div id="td-header" class="flex justify-between items-center">
-            <button onclick="switchTab('dash')" class="flex items-center space-x-0.5 text-slate-500 hover:text-slate-800 transition-colors">
+            <button type="button" data-action="back-dash" class="flex items-center space-x-0.5 text-slate-500 hover:text-slate-800 transition-colors">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
               <span class="text-xs font-bold">返回</span>
             </button>
@@ -174,10 +174,10 @@
 
           <!-- 指标切换：体重 / 腰围 / 睡眠 / 步数 -->
           <div id="td-tabs" class="flex space-x-1.5">
-            <button onclick="setTrendDetailMetric('weight')" id="td-tab-weight" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">体重</button>
-            <button onclick="setTrendDetailMetric('waist')" id="td-tab-waist" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">腰围</button>
-            <button onclick="setTrendDetailMetric('sleep')" id="td-tab-sleep" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">睡眠</button>
-            <button onclick="setTrendDetailMetric('steps')" id="td-tab-steps" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">步数</button>
+            <button type="button" data-action="td-metric" data-metric="weight" id="td-tab-weight" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 transition-all">体重</button>
+            <button type="button" data-action="td-metric" data-metric="waist" id="td-tab-waist" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">腰围</button>
+            <button type="button" data-action="td-metric" data-metric="sleep" id="td-tab-sleep" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">睡眠</button>
+            <button type="button" data-action="td-metric" data-metric="steps" id="td-tab-steps" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">步数</button>
           </div>
         </div>
 

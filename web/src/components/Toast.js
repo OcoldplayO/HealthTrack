@@ -34,5 +34,3 @@ export function showToast(msg, isSuccess = true) {
   }, 2200);
 }
 
-// 兼容全局挂载以防部分内联调用
-window.showToast = showToast;

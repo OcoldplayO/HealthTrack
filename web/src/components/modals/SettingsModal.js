@@ -2,6 +2,7 @@
  * AI 服务与熬夜阈值设置弹窗组件 (SettingsModal)
  */
 import { api } from '../../services/api.js';
+import { byId, inputById } from '../../utils/dom.js';
 import { showToast } from '../Toast.js';
 
 export function renderSettingsModal(container) {
@@ -72,11 +73,13 @@ export function renderSettingsModal(container) {
   closeBtn?.addEventListener('click', closeSettings);
 
   toggleKeyBtn?.addEventListener('click', () => {
-    if (apiKeyInput.type === 'password') {
-      apiKeyInput.type = 'text';
+    const keyInput = inputById('setting-api-key');
+    if (!keyInput) return;
+    if (keyInput.type === 'password') {
+      keyInput.type = 'text';
       toggleKeyBtn.innerText = '隐藏';
     } else {
-      apiKeyInput.type = 'password';
+      keyInput.type = 'password';
       toggleKeyBtn.innerText = '显示';
     }
   });
@@ -102,9 +105,9 @@ async function loadConfig() {
   try {
     const res = await api.getConfig();
     const cfg = (res && res.data) ? res.data : (res || {});
-    const urlEl = document.getElementById('setting-base-url');
-    const modelEl = document.getElementById('setting-model');
-    const statusEl = document.getElementById('api-key-status');
+    const urlEl = inputById('setting-base-url');
+    const modelEl = inputById('setting-model');
+    const statusEl = byId('api-key-status');
 
     if (urlEl) urlEl.value = cfg.base_url || '';
     if (modelEl) modelEl.value = cfg.model || '';
@@ -114,20 +117,22 @@ async function loadConfig() {
         : '尚未配置 API Key';
     }
 
-    const greenEl = document.getElementById('setting-sleep-green');
-    const yellowEl = document.getElementById('setting-sleep-yellow');
+    const greenEl = inputById('setting-sleep-green');
+    const yellowEl = inputById('setting-sleep-yellow');
     if (greenEl) greenEl.value = cfg.sleep_green_before || '23:30';
     if (yellowEl) yellowEl.value = cfg.sleep_yellow_before || '01:00';
   } catch (err) {
-    showToast('读取设置失败: ' + err.message, false);
+    const msg = err instanceof Error ? err.message : String(err);
+    showToast('读取设置失败: ' + msg, false);
   }
 }
 
 async function saveConfig() {
-  const urlEl = document.getElementById('setting-base-url');
-  const modelEl = document.getElementById('setting-model');
-  const keyEl = document.getElementById('setting-api-key');
+  const urlEl = inputById('setting-base-url');
+  const modelEl = inputById('setting-model');
+  const keyEl = inputById('setting-api-key');
 
+  /** @type {Record<string, string>} */
   const payload = {
     base_url: urlEl?.value.trim() || '',
     model: modelEl?.value.trim() || '',
@@ -141,16 +146,18 @@ async function saveConfig() {
     showToast('AI 配置已更新');
     closeSettings();
   } catch (err) {
-    showToast('保存失败: ' + err.message, false);
+    const msg = err instanceof Error ? err.message : String(err);
+    showToast('保存失败: ' + msg, false);
   }
 }
 
 async function testConfig() {
-  const urlEl = document.getElementById('setting-base-url');
-  const modelEl = document.getElementById('setting-model');
-  const keyEl = document.getElementById('setting-api-key');
-  const feedback = document.getElementById('settings-feedback');
+  const urlEl = inputById('setting-base-url');
+  const modelEl = inputById('setting-model');
+  const keyEl = inputById('setting-api-key');
+  const feedback = byId('settings-feedback');
 
+  /** @type {Record<string, string>} */
   const payload = {
     base_url: urlEl?.value.trim() || '',
     model: modelEl?.value.trim() || '',
@@ -171,16 +178,17 @@ async function testConfig() {
       feedback.innerText = '✓ 测试连接成功！';
     }
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     if (feedback) {
       feedback.className = 'text-xs font-mono rounded-lg px-3 py-2 bg-neutral-100 border border-neutral-300 text-neutral-800 block';
-      feedback.innerText = '✕ 测试连接失败: ' + err.message;
+      feedback.innerText = '✕ 测试连接失败: ' + msg;
     }
   }
 }
 
 async function saveSleepThresholds() {
-  const greenEl = document.getElementById('setting-sleep-green');
-  const yellowEl = document.getElementById('setting-sleep-yellow');
+  const greenEl = inputById('setting-sleep-green');
+  const yellowEl = inputById('setting-sleep-yellow');
   const green = greenEl?.value || '23:30';
   const yellow = yellowEl?.value || '01:00';
   try {
@@ -189,14 +197,11 @@ async function saveSleepThresholds() {
       yellow_before: yellow,
     });
     window.dispatchEvent(new CustomEvent('sleep-thresholds-updated', {
-      detail: { green, yellow }
+      detail: { green, yellow },
     }));
     showToast('熬夜阈值已保存并立即生效');
   } catch (err) {
-    showToast('保存阈值失败: ' + err.message, false);
+    const msg = err instanceof Error ? err.message : String(err);
+    showToast('保存阈值失败: ' + msg, false);
   }
 }
-
-// 挂载全局方法
-window.openSettings = openSettings;
-window.closeSettings = closeSettings;
