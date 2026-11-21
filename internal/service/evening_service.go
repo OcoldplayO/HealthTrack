@@ -117,10 +117,18 @@ type archiveManifest struct {
 // WriteArchive 将小结与照片打包为 ZIP 流式写入 w；days<=0 表示全量。
 // 目录结构：photos/YYYY-MM-DD.jpg + summaries.csv + manifest.json。
 func (s *EveningService) WriteArchive(w io.Writer, userID int64, days int) error {
-	endDate := s.Today()
+	return s.WriteArchiveAt(w, userID, days, s.Today())
+}
+
+// WriteArchiveAt 以指定 endDate（YYYY-MM-DD）为截止日导出图文归档 ZIP；days<=0 表示全量。
+func (s *EveningService) WriteArchiveAt(w io.Writer, userID int64, days int, endDate string) error {
+	if _, err := time.Parse("2006-01-02", endDate); err != nil {
+		endDate = s.Today()
+	}
 	startDate := ""
 	if days > 0 {
-		startDate = time.Now().AddDate(0, 0, -(days - 1)).Format("2006-01-02")
+		et, _ := time.Parse("2006-01-02", endDate)
+		startDate = et.AddDate(0, 0, -(days - 1)).Format("2006-01-02")
 	}
 
 	summaries, err := s.repo.ListAll(userID)

@@ -5,9 +5,10 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
+
+	"healthtrack/internal/model"
 
 	"gopkg.in/yaml.v3"
 )
@@ -157,8 +158,8 @@ func isValidTone(tone string) bool {
 
 // validateSleepTimes 校验熬夜阈值为合法 HH:mm 且未熬夜截止早于轻度截止。
 func validateSleepTimes(greenBefore, yellowBefore string) error {
-	g, okG := parseHHMM(greenBefore)
-	y, okY := parseHHMM(yellowBefore)
+	g, okG := model.ParseSleepTimeMinutes(greenBefore)
+	y, okY := model.ParseSleepTimeMinutes(yellowBefore)
 	if !okG || !okY {
 		return fmt.Errorf("熬夜阈值必须是 HH:mm 格式")
 	}
@@ -166,30 +167,6 @@ func validateSleepTimes(greenBefore, yellowBefore string) error {
 		return fmt.Errorf("轻度熬夜截止时间必须晚于未熬夜截止时间")
 	}
 	return nil
-}
-
-// parseHHMM 将 HH:mm 折算为分钟；凌晨(00:00-04:00)视为跨日后 +24h。
-func parseHHMM(s string) (int, bool) {
-	parts := strings.Split(s, ":")
-	if len(parts) != 2 {
-		return 0, false
-	}
-	hour, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return 0, false
-	}
-	minute, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return 0, false
-	}
-	if minute < 0 || minute > 59 {
-		return 0, false
-	}
-	total := hour*60 + minute
-	if hour >= 0 && hour <= 4 {
-		total += 24 * 60
-	}
-	return total, true
 }
 
 func writeConfigAtomically(configPath string, cfg *Config) error {

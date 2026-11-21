@@ -2,6 +2,10 @@
  * HealthTrack 现代化模块架构总入口 (main.js)
  * 极简极客风、JetBrains Mono、单线美学
  */
+import '@fontsource/jetbrains-mono/latin-400.css';
+import '@fontsource/jetbrains-mono/latin-500.css';
+import '@fontsource/jetbrains-mono/latin-600.css';
+import '@fontsource/jetbrains-mono/latin-700.css';
 import './css/app.css';
 import { initToast } from './components/Toast.js';
 import { renderHeader } from './components/Header.js';

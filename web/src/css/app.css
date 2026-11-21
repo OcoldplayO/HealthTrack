@@ -1,12 +1,16 @@
 ﻿/* ============================================================
-   HealthTrack app.css — 从 index.html 提取 + Apple Health UI 2.0
-   v2.0  (Phase 0+1 合并：零回归拆分 + 设计系统 Tokens)
+   HealthTrack app.css — 构建期 Tailwind + 3.0 单线设计系统 Tokens
    ============================================================ */
 
-/* ─── 原始基础样式（原汁原味移植，保持 100% 兼容） ─── */
+@tailwind base;
+@tailwind components;
 
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+/* ─── 基础辅助样式 ─── */
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+}
 
 /* 手机横屏 + 「60天详情」视图：临时解除手机框宽高限制 */
 #app-frame.frame-wide { max-width: none; height: 100vh; margin-top: 0; margin-bottom: 0; border-radius: 0; border: none; }
@@ -149,7 +153,12 @@
   padding-left: 1.25rem;
   margin-top: 0.35rem;
   margin-bottom: 0.5rem;
-  space-y: 0.25rem;
+}
+.markdown-body ol {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin-top: 0.35rem;
+  margin-bottom: 0.5rem;
 }
 .markdown-body li {
   margin-bottom: 0.35rem;
@@ -158,6 +167,16 @@
 .markdown-body p {
   margin-bottom: 0.6rem;
   line-height: 1.65;
+}
+.markdown-body blockquote {
+  border-left: 2px solid #d4d4d4;
+  padding-left: 0.65rem;
+  margin: 0.5rem 0;
+  color: #737373;
+}
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
 }
 .markdown-body strong {
   color: #0f172a;
@@ -567,10 +586,10 @@
 
 /* ── 记一笔 · 日期选择器 ──
    原生 date 控件宽度随值变化重新测量，偶发把最后一位数字裁掉。
-   这里只给宽度兜底（w-[124px]），保留原生外观与日历图标，
+   这里只给宽度兜底（w-[138px]），保留原生外观与日历图标，
    因为在 Android WebView 上 appearance:none 会让日段不渲染（只显示 2026/10/）。 */
 #input-date {
-  min-width: 124px;
+  min-width: 138px;
 }
 
 /* ── 指标卡底部“较昨日”行 ──
@@ -704,3 +723,5 @@
   font-family: var(--font-mono);
   font-size: 0.7rem;
 }
+
+@tailwind utilities;

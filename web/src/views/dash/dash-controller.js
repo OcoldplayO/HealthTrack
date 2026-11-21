@@ -74,19 +74,32 @@ export async function loadDashboardData(days = dashRange) {
   try {
     const res = await api.getHistoryRecords(startStr, endStr);
     const records = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
-    renderDashboardCharts(records);
+    renderDashboardCharts(records, startStr, days);
   } catch (err) {
     console.error('加载看板数据失败:', err);
   }
 }
 
-    function renderDashboardCharts(records) {
-      const labels = records.map(r => r.record_date.slice(5));
-      const weightAmData = records.map(r => r.weight_am);
-      const weightPmData = records.map(r => r.weight_pm);
-      const waistData = records.map(r => r.waist_size);
-      const sleepHoursData = records.map(r => r.sleep_hours);
-      const sleepColors = records.map(r => {
+    function renderDashboardCharts(records, startStr, days) {
+      const byDate = Object.create(null);
+      records.forEach((r) => {
+        if (r && r.record_date) byDate[r.record_date] = r;
+      });
+      const span = days || dashRange || 7;
+      const anchorStart = startStr || shiftDateStr(localDateStr(new Date()), -(span - 1));
+      const daysList = [];
+      for (let i = 0; i < span; i++) {
+        daysList.push(shiftDateStr(anchorStart, i));
+      }
+      const seriesRecords = daysList.map((ds) => byDate[ds] || { record_date: ds });
+
+      const labels = daysList.map((ds) => ds.slice(5));
+      const weightAmData = seriesRecords.map((r) => (r.weight_am === null || r.weight_am === undefined) ? null : r.weight_am);
+      const weightPmData = seriesRecords.map((r) => (r.weight_pm === null || r.weight_pm === undefined) ? null : r.weight_pm);
+      const waistData = seriesRecords.map((r) => (r.waist_size === null || r.waist_size === undefined) ? null : r.waist_size);
+      const sleepHoursData = seriesRecords.map((r) => (r.sleep_hours === null || r.sleep_hours === undefined) ? null : r.sleep_hours);
+      const sleepColors = seriesRecords.map((r) => {
+        if (r.sleep_hours === null || r.sleep_hours === undefined) return 'transparent';
         if (r.sleep_tag === 'RED') return '#f43f5e';
         if (r.sleep_tag === 'YELLOW') return '#fbbf24';
         return '#34c759';
@@ -145,7 +158,7 @@ export async function loadDashboardData(days = dashRange) {
               backgroundColor: weightGradPm,
               fill: true,
               tension: 0.35,
-              spanGaps: true,
+              spanGaps: false,
               pointBackgroundColor: '#ffffff',
               pointBorderColor: '#f59e0b',
               pointBorderWidth: 2,
@@ -161,7 +174,7 @@ export async function loadDashboardData(days = dashRange) {
               backgroundColor: weightGradAm,
               fill: true,
               tension: 0.35,
-              spanGaps: true,
+              spanGaps: false,
               pointBackgroundColor: '#ffffff',
               pointBorderColor: '#1e293b',
               pointBorderWidth: 2,
@@ -183,8 +196,8 @@ export async function loadDashboardData(days = dashRange) {
           },
           onClick: (evt, elements) => {
             if (!elements || !elements.length) return;
-            const r = records[elements[0].index];
-            if (!r) return;
+            const r = seriesRecords[elements[0].index];
+            if (!r || (r.weight_am == null && r.weight_pm == null)) return;
             const fmtW = (v) => (v === null || v === undefined) ? '--' : `${v} kg`;
             const am = r.weight_am, pm = r.weight_pm;
             let diffHtml = '';
@@ -244,7 +257,7 @@ export async function loadDashboardData(days = dashRange) {
             backgroundColor: waistGrad,
             fill: true,
             tension: 0.35,
-            spanGaps: true,
+            spanGaps: false,
             pointBackgroundColor: '#ffffff',
             pointBorderColor: '#7c3aed',
             pointBorderWidth: 2,
@@ -260,8 +273,8 @@ export async function loadDashboardData(days = dashRange) {
           plugins: { legend: { display: false } },
           onClick: (evt, elements) => {
             if (!elements || !elements.length) return;
-            const r = records[elements[0].index];
-            if (!r) return;
+            const r = seriesRecords[elements[0].index];
+            if (!r || r.waist_size == null) return;
             const waistText = (r.waist_size === null || r.waist_size === undefined) ? '--' : `${r.waist_size} cm`;
             waistDetailEl.innerHTML = `<span class="font-mono text-neutral-400">·</span><span><b class="text-neutral-800 font-mono">${r.record_date}</b>　腰围 ${waistText}</span>`;
           },
@@ -308,8 +321,8 @@ export async function loadDashboardData(days = dashRange) {
           },
           onClick: (evt, elements) => {
             if (!elements || !elements.length) return;
-            const r = records[elements[0].index];
-            if (!r) return;
+            const r = seriesRecords[elements[0].index];
+            if (!r || (r.sleep_hours == null && !r.sleep_start_time)) return;
             const tagText = r.sleep_tag === 'RED' ? '熬夜' : (r.sleep_tag === 'YELLOW' ? '轻度' : '正常');
             const hours = (r.sleep_hours === null || r.sleep_hours === undefined) ? '--' : `${r.sleep_hours} 小时`;
             sleepDetailEl.innerHTML = `<span class="font-mono text-neutral-400">·</span><span><b class="text-neutral-800 font-mono">${r.record_date}</b>　就寝 ${r.sleep_start_time || '--'} · 起床 ${r.sleep_end_time || '--'} · ${hours} · ${tagText}</span>`;
@@ -323,7 +336,7 @@ export async function loadDashboardData(days = dashRange) {
     }
 
       // 4. 步数趋势图（缺失日断点，不补 0；纵轴封顶 2 万）
-      const stepsData = records.map(r => (r.steps === null || r.steps === undefined) ? null : Number(r.steps));
+      const stepsData = seriesRecords.map(r => (r.steps === null || r.steps === undefined) ? null : Number(r.steps));
       const validSteps = stepsData.filter(v => v !== null);
       if (validSteps.length > 0) {
         const avgSteps = Math.round(validSteps.reduce((a, b) => a + b, 0) / validSteps.length);
@@ -380,9 +393,9 @@ export async function loadDashboardData(days = dashRange) {
           },
           onClick: (evt, elements) => {
             if (!elements || !elements.length) return;
-            const r = records[elements[0].index];
-            if (!r) return;
-            const v = (r.steps === null || r.steps === undefined) ? '--' : `${Number(r.steps).toLocaleString('en-US')} 步`;
+            const r = seriesRecords[elements[0].index];
+            if (!r || (r.steps === null || r.steps === undefined)) return;
+            const v = `${Number(r.steps).toLocaleString('en-US')} 步`;
             const ml = r.morning_light === true ? ' · 已见晨光' : '';
             stepsDetailEl.innerHTML = `<span class="font-mono text-neutral-400">·</span><span><b class="text-neutral-800 font-mono">${r.record_date}</b>　步数 ${v}${ml}</span>`;
           },
@@ -404,12 +417,12 @@ export async function loadDashboardData(days = dashRange) {
       });
     }
 
-      // 5. 活动流水
+      // 5. 活动流水（一次性拼接挂载，避免多次 DOM 重排）
       const listEl = document.getElementById('dash-activities-list');
-      listEl.innerHTML = '';
       if (records.length === 0) {
         listEl.innerHTML = '<p class="text-slate-400 text-center py-2">暂无记录</p>';
       } else {
+        const cardsHtml = [];
         records.slice().reverse().forEach(r => {
           const rowExTypes = exerciseTypesOf(r.exercise);
           if (r.journal_text || r.activity_tags || rowExTypes.length > 0 || (r.concerta && r.concerta.taken) || (r.cold_shower && r.cold_shower.enabled)) {
@@ -418,7 +431,7 @@ export async function loadDashboardData(days = dashRange) {
               try {
                 const tags = JSON.parse(r.activity_tags);
                 if (Array.isArray(tags)) {
-                  tagsHtml += tags.map(t => `<span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">${escapeHtml(t)}</span>`).join('');
+                  tagsHtml += tags.map(t => `<span class="bg-neutral-100 text-neutral-700 border border-neutral-200 px-1.5 py-0.5 rounded text-[10px] font-medium font-mono mr-1">${escapeHtml(t)}</span>`).join('');
                 }
               } catch(e){}
             }
@@ -448,17 +461,20 @@ export async function loadDashboardData(days = dashRange) {
               tagsHtml += `<span class="bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-1.5 py-0.5 rounded text-[10px] font-medium font-mono">专注达${cDose}</span>`;
             }
 
-            listEl.innerHTML += `
-              <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+            cardsHtml.push(`
+              <div class="p-2.5 bg-neutral-50 rounded-xl border border-neutral-200/70">
                 <div class="flex justify-between items-start gap-2 mb-1.5">
-                  <span class="font-bold text-slate-800 font-mono text-xs shrink-0">${escapeHtml(r.record_date || '')}</span>
+                  <span class="font-bold text-neutral-800 font-mono text-xs shrink-0">${escapeHtml(r.record_date || '')}</span>
                   <div class="flex flex-wrap gap-1 items-center justify-end">${tagsHtml}</div>
                 </div>
-                <p class="text-slate-600 line-clamp-2">${escapeHtml(r.journal_text || '无文字备注')}</p>
+                <p class="text-neutral-600 line-clamp-2">${escapeHtml(r.journal_text || '无文字备注')}</p>
               </div>
-            `;
+            `);
           }
         });
+        listEl.innerHTML = cardsHtml.length > 0
+          ? cardsHtml.join('')
+          : '<p class="text-neutral-400 text-center py-2 font-mono text-xs">暂无活动记录</p>';
       }
     }
 
@@ -576,7 +592,7 @@ export async function loadDashboardData(days = dashRange) {
       if (detailEl) {
         detailEl.innerHTML = lastIdx >= 0
           ? '<span class="font-mono text-[10px] text-neutral-400">↑ 点击节点查看该周均值与区间</span>'
-          : '<span>ℹ️</span><span>近 12 周暂无该指标数据，记录几天后再来看看</span>';
+          : '<span class="font-mono text-[10px] text-neutral-400">近 12 周暂无该指标数据，记录几天后再来看看</span>';
       }
 
       const canvas = document.getElementById('chart-trend');
@@ -666,7 +682,7 @@ export async function loadDashboardData(days = dashRange) {
             if (idx < 0) return;
             const a = aggs[idx], b = buckets[idx];
             if (!a || a.n === 0) return;
-            detailEl.innerHTML = `<span class="font-mono text-neutral-400">·</span><span><b class="text-slate-700">${b.start} ~ ${b.end}</b>　均值 ${a.avg.toFixed(1)} ${cfg.unit} · 区间 ${a.min.toFixed(1)}~${a.max.toFixed(1)} · ${a.n} 天${a.n <= 3 ? '（低置信）' : ''}</span>`;
+            detailEl.innerHTML = `<span class="font-mono text-neutral-400">·</span><span><b class="text-neutral-800 font-mono">${b.start} ~ ${b.end}</b>　均值 ${fmtTrend(a.avg)} ${cfg.unit} · 区间 ${fmtTrend(a.min)}~${fmtTrend(a.max)} · ${a.n} 天${a.n <= 3 ? '（低置信）' : ''}</span>`;
           }
         }
       });

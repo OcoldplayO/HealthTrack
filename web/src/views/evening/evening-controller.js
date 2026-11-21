@@ -5,6 +5,7 @@
  */
 import templateHtml from './evening-view.html?raw';
 import { api } from '../../services/api.js';
+import { streamChatSSE } from '../../services/sse.js';
 import { store } from '../../services/state.js';
 import { localDateStr } from '../../utils/date.js';
 import { showToast } from '../../components/Toast.js';
@@ -508,6 +509,10 @@ function evoStopInsight() {
 }
 
 async function evGenerateInsight() {
+  if (evoInsightAbort) {
+    evoStopInsight();
+    return;
+  }
   if (evoState.insightBusy) return;
   const date = evoState.date || evoToday();
   const btn = document.getElementById('ev-insight-btn');
@@ -517,10 +522,10 @@ async function evGenerateInsight() {
 
   evoStopInsight();
   evoState.insightBusy = true;
+  const originalBtnClass = btn ? btn.className : '';
   if (btn) {
-    btn.disabled = true;
-    btn.classList.add('opacity-60');
-    btn.innerHTML = '<span>AI正在全盘深度分析中...</span>';
+    btn.className = 'mt-3 w-full h-10 bg-white border border-rose-300 hover:bg-rose-50 text-rose-600 font-mono text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99]';
+    btn.innerHTML = '<span>停止生成</span>';
   }
 
   emptyEl?.classList.add('hidden');
@@ -537,79 +542,75 @@ async function evGenerateInsight() {
   document.getElementById('think-body')?.classList.remove('open');
   document.getElementById('think-arrow')?.classList.remove('rotate-90');
 
-  let thinkingText = '', responseText = '', hasError = false;
-  function updateUI() {
-    if (body) {
-      body.innerHTML = responseText
-        ? renderMarkdown(responseText)
-        : '<p class="text-neutral-400 font-mono text-xs">（正在推导…）</p>';
+  let autoCollapsed = false;
+  let lastContent = '';
+  const updateUI = ({ thinking, content }) => {
+    if (body && content && content !== lastContent) {
+      lastContent = content;
+      body.innerHTML = renderMarkdown(content);
     }
-    if (thinkingText && thinkTextEl) {
-      thinkTextEl.innerText = thinkingText;
-      const open = !responseText;
-      document.getElementById('think-body')?.classList.toggle('open', open);
-      document.getElementById('think-arrow')?.classList.toggle('rotate-90', open);
+    if (thinking && thinkTextEl) {
+      thinkTextEl.innerText = thinking;
+      if (!content) {
+        document.getElementById('think-body')?.classList.add('open');
+        document.getElementById('think-arrow')?.classList.add('rotate-90');
+      } else if (!autoCollapsed) {
+        autoCollapsed = true;
+        document.getElementById('think-body')?.classList.remove('open');
+        document.getElementById('think-arrow')?.classList.remove('rotate-90');
+      }
     }
-  }
+  };
 
   const controller = new AbortController();
   evoInsightAbort = controller;
+  const tzOffset = -new Date().getTimezoneOffset();
+  const stopBtn = document.getElementById('ev-insight-stop-btn');
+  const resetBtn = document.getElementById('ev-insight-reset-btn');
+  stopBtn?.classList.remove('hidden');
+  resetBtn?.classList.add('hidden');
+
   try {
-    const response = await fetch(`/api/v1/evening/insight/stream?date=${encodeURIComponent(date)}&days=${evoState.insightRange}`, { signal: controller.signal });
-    if (!response.ok) throw new Error('HTTP ' + response.status);
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let buffer = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-      for (let line of lines) {
-        line = line.trim();
-        if (!line || !line.startsWith('data:')) continue;
-        const dataStr = line.slice(5).trim();
-        if (dataStr === '[DONE]') continue;
-        try {
-          const parsed = JSON.parse(dataStr);
-          if (parsed.error) {
-            responseText += '\n> ⚠️ **服务提示**: ' + parsed.error + '\n';
-            hasError = true;
-          } else if (parsed.choices && parsed.choices.length) {
-            const delta = parsed.choices[0].delta || {};
-            if (delta.reasoning_content) thinkingText += delta.reasoning_content;
-            if (delta.content) responseText += delta.content;
-          }
-          updateUI();
-        } catch (e) { /* 忽略心跳等非 JSON 帧 */ }
+    const res = await streamChatSSE({
+      url: `/api/v1/evening/insight/stream?date=${encodeURIComponent(date)}&days=${evoState.insightRange}&tz_offset=${tzOffset}`,
+      signal: controller.signal,
+      onUpdate: updateUI,
+      onDone: ({ thinking, content, hasError }) => {
+        if (hasError) {
+          if (metaEl) metaEl.innerText = `${evoMmdd(date)} · ${evoRangeLabel(evoState.insightRange)} · 生成失败`;
+        } else if (content || thinking) {
+          if (metaEl) metaEl.innerText = `${evoMmdd(date)} · ${evoRangeLabel(evoState.insightRange)} · 生成于 ${evoFmtTime(new Date())}`;
+        } else if (body) {
+          body.innerHTML = '<p class="text-neutral-400 text-xs">未能获取到分析内容，请检查大模型配置。</p>';
+        }
+      },
+      onError: (err, { thinking, content }) => {
+        if (content || thinking) {
+          updateUI({ thinking, content: content + '\n\n> **注意**: 网络连接中断' });
+        } else if (err instanceof TypeError) {
+          if (body) body.innerHTML = '<p class="text-rose-500 text-xs font-mono">无法连接本地服务，请确认 HealthTrack 正在运行。</p>';
+        } else if (body) {
+          body.innerHTML = '<p class="text-rose-500 text-xs font-mono">生成失败：' + escapeHtml(err.message) + '</p>';
+        }
+      },
+    });
+    if (res.aborted) {
+      if (res.content || res.thinking) {
+        updateUI({ thinking: res.thinking, content: res.content + '\n\n> **已手动停止生成**' });
+        if (metaEl) metaEl.innerText = `${evoMmdd(date)} · ${evoRangeLabel(evoState.insightRange)} · 已停止`;
+      } else {
+        panel?.classList.add('hidden');
+        emptyEl?.classList.remove('hidden');
       }
-    }
-    if (hasError) {
-      if (metaEl) metaEl.innerText = `${evoMmdd(date)} · ${evoRangeLabel(evoState.insightRange)} · 生成失败`;
-    } else if (responseText || thinkingText) {
-      if (metaEl) metaEl.innerText = `${evoMmdd(date)} · ${evoRangeLabel(evoState.insightRange)} · 生成于 ${evoFmtTime(new Date())}`;
-    } else if (body) {
-      body.innerHTML = '<p class="text-neutral-400 text-xs">未能获取到分析内容，请检查大模型配置。</p>';
-    }
-  } catch (err) {
-    if (err && err.name === 'AbortError') {
-      // 主动中止，不报错
-    } else if (responseText || thinkingText) {
-      responseText += '\n\n> ⚠️ *[网络连接中断]*';
-      updateUI();
-    } else if (err instanceof TypeError) {
-      if (body) body.innerHTML = '<p class="text-rose-500 text-xs font-mono">无法连接本地服务，请确认 HealthTrack 正在运行。</p>';
-    } else if (body) {
-      body.innerHTML = '<p class="text-rose-500 text-xs font-mono">生成失败：' + escapeHtml(err.message) + '</p>';
     }
   } finally {
     if (evoInsightAbort === controller) evoInsightAbort = null;
     if (body) body.classList.remove('typing-cursor');
     evoState.insightBusy = false;
+    stopBtn?.classList.add('hidden');
+    resetBtn?.classList.remove('hidden');
     if (btn) {
-      btn.disabled = false;
-      btn.classList.remove('opacity-60');
+      btn.className = originalBtnClass;
       btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>生成小结深度洞察</span>';
     }
   }
@@ -980,6 +981,7 @@ window.evoSubmit = evSave;
 window.evSetInsightRange = evSetInsightRange;
 window.evGenerateInsight = evGenerateInsight;
 window.evoGenerateInsight = evGenerateInsight;
+window.evStopInsight = evoStopInsight;
 window.evResetInsight = evResetInsight;
 window.evToggleThinking = evToggleThinking;
 window.evSetDateFilter = evSetDateFilter;

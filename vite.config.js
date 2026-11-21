@@ -15,6 +15,9 @@ function cleanAssetsPlugin() {
 export default defineConfig({
   root: 'web/src',
   base: './', // 确保生成相对路径，完美适配 Android WebView 和本地嵌入
+  css: {
+    postcss: __dirname,
+  },
   plugins: [cleanAssetsPlugin()],
   build: {
     outDir: path.resolve(__dirname, 'web/static'),

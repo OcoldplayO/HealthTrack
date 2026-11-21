@@ -26,10 +26,10 @@ export function appConfirm(message, options) {
     okBtn.innerText = opts.confirmText || '确定';
     if (opts.danger === false) {
       okBtn.className =
-        'flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors';
+        'flex-1 py-2.5 rounded-xl bg-neutral-900 text-white font-mono font-semibold text-sm hover:bg-neutral-800 transition-colors';
     } else {
       okBtn.className =
-        'flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors';
+        'flex-1 py-2.5 rounded-xl bg-rose-600 text-white font-mono font-semibold text-sm hover:bg-rose-700 transition-colors';
     }
 
     const cleanup = () => {

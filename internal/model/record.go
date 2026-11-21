@@ -144,14 +144,14 @@ type SaveRecordDTO struct {
 
 // CalculateSleepTagWithThresholds 根据入睡时间与自定义阈值计算熬夜等级。
 // 就寝时间 < greenBefore 为 GREEN；[greenBefore, yellowBefore) 为 YELLOW；>= yellowBefore 为 RED。
-// 阈值与就寝时间均按 HH:mm 解析，凌晨(00:00-04:00)按跨日 +24h 归一化。
+// 阈值与就寝时间均按 HH:mm 解析，凌晨(00:00-06:00)按跨日 +24h 归一化。
 func CalculateSleepTagWithThresholds(startTimeStr, greenBefore, yellowBefore string) string {
-	total, ok := parseSleepTimeMinutes(startTimeStr)
+	total, ok := ParseSleepTimeMinutes(startTimeStr)
 	if !ok {
 		return "GREEN"
 	}
-	green, okG := parseSleepTimeMinutes(greenBefore)
-	yellow, okY := parseSleepTimeMinutes(yellowBefore)
+	green, okG := ParseSleepTimeMinutes(greenBefore)
+	yellow, okY := ParseSleepTimeMinutes(yellowBefore)
 	if !okG {
 		green = 23 * 60
 	}
@@ -168,8 +168,8 @@ func CalculateSleepTagWithThresholds(startTimeStr, greenBefore, yellowBefore str
 	return "RED"
 }
 
-// parseSleepTimeMinutes 将 HH:mm 折算为分钟；凌晨(00:00-04:00)按跨日后 +24h。
-func parseSleepTimeMinutes(s string) (int, bool) {
+// ParseSleepTimeMinutes 将 HH:mm 折算为分钟；凌晨(00:00-06:00)按跨日后 +24h。
+func ParseSleepTimeMinutes(s string) (int, bool) {
 	s = strings.TrimSpace(s)
 	parts := strings.Split(s, ":")
 	if len(parts) != 2 {
@@ -183,7 +183,7 @@ func parseSleepTimeMinutes(s string) (int, bool) {
 	if err != nil {
 		return 0, false
 	}
-	if minute < 0 || minute > 59 {
+	if hour < 0 || hour > 23 || minute < 0 || minute > 59 {
 		return 0, false
 	}
 	total := hour*60 + minute

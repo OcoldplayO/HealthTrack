@@ -4,6 +4,7 @@
  */
 import templateHtml from './insight-view.html?raw';
 import { api } from '../../services/api.js';
+import { streamChatSSE } from '../../services/sse.js';
 import { store } from '../../services/state.js';
 import { localDateStr, shiftDateStr } from '../../utils/date.js';
 import { showToast } from '../../components/Toast.js';
@@ -129,10 +130,62 @@ export function setInsightDays(days) {
       }
     }
 
+    let insightAbortController = null;
+
+    // 构建思维链与正文分离的流式容器：避免每次更新重写整个 innerHTML 重置 <details> 折叠态
+    function createStreamRenderers(contentEl) {
+      contentEl.innerHTML = '';
+      const thinkHost = document.createElement('div');
+      const bodyHost = document.createElement('div');
+      contentEl.appendChild(thinkHost);
+      contentEl.appendChild(bodyHost);
+
+      let detailsEl = null;
+      let summaryEl = null;
+      let thinkBodyEl = null;
+      let autoCollapsed = false;
+      let lastRenderedContent = '';
+
+      return ({ thinking, content }) => {
+        if (thinking) {
+          if (!detailsEl) {
+            detailsEl = document.createElement('details');
+            detailsEl.className = 'mb-4 bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-xs text-neutral-500';
+            detailsEl.open = true;
+
+            summaryEl = document.createElement('summary');
+            summaryEl.className = 'cursor-pointer font-mono font-medium text-neutral-600 select-none hover:text-neutral-900 transition-colors';
+
+            thinkBodyEl = document.createElement('div');
+            thinkBodyEl.className = 'mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-neutral-200 pt-2 text-neutral-600';
+
+            detailsEl.appendChild(summaryEl);
+            detailsEl.appendChild(thinkBodyEl);
+            thinkHost.appendChild(detailsEl);
+          }
+          summaryEl.textContent = `思维链推导 (${thinking.length} 字)`;
+          thinkBodyEl.textContent = thinking;
+          if (content && !autoCollapsed) {
+            detailsEl.open = false;
+            autoCollapsed = true;
+          }
+        }
+        if (content && content !== lastRenderedContent) {
+          lastRenderedContent = content;
+          bodyHost.innerHTML = renderMarkdown(content);
+        }
+      };
+    }
+
     async function generateInsightStream() {
       const contentEl = document.getElementById('insight-content');
       const statusTag = document.getElementById('insight-status-tag');
       const btn = document.getElementById('btn-generate-insight');
+
+      if (insightAbortController) {
+        insightAbortController.abort();
+        return;
+      }
 
       // 生成前按模式重算一次截止日（mode=today 在跨午夜后会自动滚动到新的今天）
       insightEndDate = resolveInsightEndDate();
@@ -147,145 +200,74 @@ export function setInsightDays(days) {
         if (!ok) return;
       }
 
-      const originalBtnText = btn.innerHTML;
-      btn.disabled = true;
-      btn.classList.add('opacity-50', 'cursor-not-allowed');
-      btn.innerHTML = `<span>AI正在全盘深度分析中...</span>`;
+      const originalBtnClass = btn.className;
+      btn.className = 'w-full h-11 bg-white border border-rose-300 hover:bg-rose-50 text-rose-600 font-mono text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99]';
+      btn.innerHTML = '<span>停止生成</span>';
 
       // 作废可能在途的回显请求，防止其覆盖本次流式内容；并锁定档位胶囊
       insightLoadSeq++;
       setInsightPillsDisabled(true);
 
-      contentEl.innerHTML = '';
       contentEl.classList.add('typing-cursor');
       statusTag.innerText = 'AI 正在推导生理因果...';
-
-      // 双通道分离状态
-      let thinkingText = '';
-      let responseText = '';
-      let hasError = false;
-
-      // 核心渲染函数：合并调度思考流与正文流
-      function updateUI() {
-        let fullHTML = '';
-
-        // 1. 如果存在思考内容，渲染可折叠的灰色现代卡片
-        if (thinkingText) {
-          // 正文未输出时默认展开思考过程；正文一旦开始输出，自动收起折叠框
-          const isOpen = !responseText ? 'open' : '';
-          fullHTML += `
-            <details class="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500" ${isOpen}>
-              <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">
-                思维链推导 (${thinkingText.length} 字)
-              </summary>
-              <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${escapeHtml(thinkingText)}</div>
-            </details>
-          `;
-        }
-
-        // 2. 如果存在正文，通过 Markdown 渲染引擎输出排版
-        if (responseText) {
-          fullHTML += renderMarkdown(responseText);
-        }
-
-        contentEl.innerHTML = fullHTML;
-      }
+      const updateStreamUI = createStreamRenderers(contentEl);
 
       // getTimezoneOffset() 返回"本地落后 UTC 的分钟数"（东八区为 -480），取反得到东向偏移。
       const tzOffset = -new Date().getTimezoneOffset();
+      const controller = new AbortController();
+      insightAbortController = controller;
 
+      let finalState = { aborted: false, thinking: '', content: '', hasError: false };
       try {
-        const response = await fetch(`/api/v1/insights/stream?days=${insightDays}&end_date=${insightEndDate}&tz_offset=${tzOffset}`);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop(); // 保留未完整的最后一行
-
-          for (let line of lines) {
-            line = line.trim();
-            if (!line || !line.startsWith('data:')) continue;
-
-            const dataStr = line.slice(5).trim();
-            if (dataStr === '[DONE]') {
-              statusTag.innerText = '复盘完成';
-              continue;
+        finalState = await streamChatSSE({
+          url: `/api/v1/insights/stream?days=${insightDays}&end_date=${insightEndDate}&tz_offset=${tzOffset}`,
+          signal: controller.signal,
+          onUpdate: updateStreamUI,
+          onDone: ({ thinking, content, hasError }) => {
+            if (hasError) {
+              statusTag.innerText = '分析失败';
+            } else if (content || thinking) {
+              applyInsightPeriodUI(content, thinking, new Date());
+            } else {
+              contentEl.innerHTML = '<p class="text-slate-400">未能获取到分析内容，请检查后端大模型连接。</p>';
+              statusTag.innerText = '暂无分析内容';
             }
-
-            try {
-              const parsed = JSON.parse(dataStr);
-              if (parsed.error) {
-                responseText += `\n> ⚠️ **服务提示**: ${parsed.error}\n`;
-                hasError = true;
-                updateUI();
-              } else if (parsed.choices && parsed.choices.length > 0) {
-                const delta = parsed.choices[0].delta || {};
-
-                let hasUpdate = false;
-                // 分流 1：提取思考链
-                if (delta.reasoning_content) {
-                  thinkingText += delta.reasoning_content;
-                  hasUpdate = true;
-                }
-                // 分流 2：提取正式正文
-                if (delta.content) {
-                  responseText += delta.content;
-                  hasUpdate = true;
-                }
-
-                if (hasUpdate) {
-                  updateUI();
-                }
-              }
-            } catch (e) {
-              // 忽略个别心跳非 JSON 帧
+          },
+          onError: (err, { thinking, content }) => {
+            if (content || thinking) {
+              updateStreamUI({ thinking, content: content + '\n\n> **注意**: 网络连接已完成或阶段传输结束' });
+              statusTag.innerText = '分析完成(部分)';
+            } else if (err instanceof TypeError) {
+              contentEl.innerHTML = `<p class="text-red-500">无法连接本地服务（${escapeHtml(location.host)}）。请确认 HealthTrack 程序正在运行，然后重试。</p>`;
+              statusTag.innerText = '本地服务未连接';
+            } else {
+              contentEl.innerHTML = `<p class="text-red-500">连接 AI 洞察服务失败: ${escapeHtml(err.message)}</p>`;
+              statusTag.innerText = '生成异常';
             }
+          },
+        });
+        if (finalState.aborted) {
+          if (finalState.content || finalState.thinking) {
+            updateStreamUI({ thinking: finalState.thinking, content: finalState.content + '\n\n> **已手动停止生成**' });
+            statusTag.innerText = '已手动停止';
+          } else {
+            applyEmptyInsightUI();
+            statusTag.innerText = '已取消生成';
           }
         }
-
-        // 流式正常传输结束判断
-        if (hasError) {
-          updateUI();
-          statusTag.innerText = '分析失败';
-        } else if (responseText || thinkingText) {
-          // 生成即已按「档位 + 截止日」存档一条：卡片、状态栏、按钮统一为该窗口的口径
-          applyInsightPeriodUI(responseText, thinkingText, new Date());
-        } else {
-          contentEl.innerHTML = '<p class="text-slate-400">未能获取到分析内容，请检查后端大模型连接。</p>';
-          statusTag.innerText = '暂无分析内容';
-        }
-      } catch (err) {
-        // 保护性容错：只要已经有文字打出，就不抹除内容报大红字，只在末尾优雅追加提示
-        if (responseText || thinkingText) {
-          responseText += `\n\n> ⚠️ *[网络连接已完成或阶段传输结束]*`;
-          updateUI();
-          statusTag.innerText = '分析完成(部分)';
-        } else if (err instanceof TypeError) {
-          // TypeError 表示请求在传输层就失败了（本地服务未启动/连接被拒），
-          // 与"服务端返回了错误"是两回事，分开提示避免误导。
-          contentEl.innerHTML = `<p class="text-red-500">无法连接本地服务（${location.host}）。请确认 HealthTrack 程序正在运行，然后重试。</p>`;
-          statusTag.innerText = '本地服务未连接';
-        } else {
-          contentEl.innerHTML = `<p class="text-red-500">连接 AI 洞察服务失败: ${err.message}</p>`;
-          statusTag.innerText = '生成异常';
-        }
       } finally {
+        if (insightAbortController === controller) insightAbortController = null;
         contentEl.classList.remove('typing-cursor');
-        btn.disabled = false;
-        btn.classList.remove('opacity-50', 'cursor-not-allowed');
         setInsightPillsDisabled(false);
-        // 有产出即说明已自动存档，按钮语义转为「重新生成」（同天同档位为追加保留）
-        btn.innerHTML = (responseText || thinkingText) ? '<span class="font-mono">重新生成</span>' : originalBtnText;
+        btn.className = originalBtnClass;
+        const hasSaved = !finalState.aborted && !finalState.hasError && (finalState.content || finalState.thinking);
+        if (hasSaved) {
+          btn.innerHTML = '<span class="font-mono">重新生成</span>';
+        } else if (insightPeriodGenerated) {
+          btn.innerHTML = '<span class="font-mono">重新生成</span>';
+        } else {
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>生成阶段深度洞察</span>';
+        }
       }
     }
 
@@ -958,8 +940,8 @@ export function setInsightDays(days) {
       [['a', cmpState.monthA, cmpState.metricsA], ['b', cmpState.monthB, cmpState.metricsB]].forEach(pair => {
         const ym = pair[1], m = pair[2];
         if (!m) return;
-        if (m.incomplete_month) parts.push(`⚠️ ${cmpMonthLabel(ym)}尚未过完，结论置信度低`);
-        else if (m.data_insufficient) parts.push(`⚠️ ${cmpMonthLabel(ym)}数据不足，结论置信度低`);
+        if (m.incomplete_month) parts.push(`提示：${cmpMonthLabel(ym)}尚未过完，结论置信度低`);
+        else if (m.data_insufficient) parts.push(`提示：${cmpMonthLabel(ym)}数据不足，结论置信度低`);
       });
       if (parts.length) {
         el.innerHTML = parts.join('<br>');
@@ -1033,8 +1015,14 @@ export function setInsightDays(days) {
       }
     }
 
-    // 生成阶段对比综述（SSE，复用洞察页的消费写法：思维链折叠在上、正文在下）
+    let cmpAbortController = null;
+
+    // 生成阶段对比综述（SSE，双持久容器防折叠闪烁 + AbortController 停止支持）
     async function cmpGenerateStream() {
+      if (cmpAbortController) {
+        cmpAbortController.abort();
+        return;
+      }
       if (cmpState.busy) return;
       const contentEl = document.getElementById('compare-insight-card');
       const statusTag = document.getElementById('cmp-status-tag');
@@ -1049,105 +1037,71 @@ export function setInsightDays(days) {
         if (!ok) return;
       }
 
-      const originalBtnText = btn.innerHTML;
+      const originalBtnClass = btn.className;
       cmpState.busy = true;
-      btn.disabled = true;
-      btn.classList.add('opacity-50', 'cursor-not-allowed');
-      btn.innerHTML = '<span>AI正在全盘深度分析中...</span>';
+      btn.className = 'w-full h-11 bg-white border border-rose-300 hover:bg-rose-50 text-rose-600 font-mono text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.99]';
+      btn.innerHTML = '<span>停止生成</span>';
       cmpSetControlsDisabled(true);
 
       cmpState.loadSeq++; // 作废在途回显请求，防止覆盖本次流式内容
-      contentEl.innerHTML = '';
       contentEl.classList.add('typing-cursor');
       statusTag.innerText = 'AI 正在推导两月差异...';
-
-      let thinkingText = '';
-      let responseText = '';
-      let hasError = false;
-
-      function updateUI() {
-        let fullHTML = '';
-        if (thinkingText) {
-          // 正文未输出时默认展开思维链；正文一开始输出就自动收起
-          const isOpen = !responseText ? 'open' : '';
-          fullHTML += `
-            <details class="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500" ${isOpen}>
-              <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">
-                思维链推导 (${thinkingText.length} 字)
-              </summary>
-              <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${escapeHtml(thinkingText)}</div>
-            </details>
-          `;
-        }
-        if (responseText) fullHTML += renderMarkdown(responseText);
-        contentEl.innerHTML = fullHTML;
-      }
+      const updateStreamUI = createStreamRenderers(contentEl);
 
       const tzOffset = -new Date().getTimezoneOffset();
-      try {
-        const response = await fetch(`/api/v1/insights/compare/stream?month_a=${cmpState.monthA}&month_b=${cmpState.monthB}&tz_offset=${tzOffset}`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const controller = new AbortController();
+      cmpAbortController = controller;
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let buffer = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop();
-          for (let line of lines) {
-            line = line.trim();
-            if (!line || !line.startsWith('data:')) continue;
-            const dataStr = line.slice(5).trim();
-            if (dataStr === '[DONE]') { statusTag.innerText = '对比完成'; continue; }
-            try {
-              const parsed = JSON.parse(dataStr);
-              if (parsed.error) {
-                responseText += `\n> ⚠️ **服务提示**: ${parsed.error}\n`;
-                hasError = true;
-                updateUI();
-              } else if (parsed.choices && parsed.choices.length > 0) {
-                const delta = parsed.choices[0].delta || {};
-                let hasUpdate = false;
-                if (delta.reasoning_content) { thinkingText += delta.reasoning_content; hasUpdate = true; }
-                if (delta.content) { responseText += delta.content; hasUpdate = true; }
-                if (hasUpdate) updateUI();
-              }
-            } catch (e) { /* 忽略心跳等非 JSON 帧 */ }
+      let finalState = { aborted: false, thinking: '', content: '', hasError: false };
+      try {
+        finalState = await streamChatSSE({
+          url: `/api/v1/insights/compare/stream?month_a=${cmpState.monthA}&month_b=${cmpState.monthB}&tz_offset=${tzOffset}`,
+          signal: controller.signal,
+          onUpdate: updateStreamUI,
+          onDone: ({ thinking, content, hasError }) => {
+            if (hasError) {
+              statusTag.innerText = '分析失败';
+            } else if (content || thinking) {
+              cmpApplyInsightUI(content, thinking, new Date());
+            } else {
+              contentEl.innerHTML = '<p class="text-slate-400">未能获取到对比内容，请检查后端大模型连接。</p>';
+              statusTag.innerText = '暂无对比内容';
+            }
+          },
+          onError: (err, { thinking, content }) => {
+            if (content || thinking) {
+              updateStreamUI({ thinking, content: content + '\n\n> **注意**: 网络连接已完成或阶段传输结束' });
+              statusTag.innerText = '分析完成(部分)';
+            } else if (err instanceof TypeError) {
+              contentEl.innerHTML = `<p class="text-red-500">无法连接本地服务（${escapeHtml(location.host)}）。请确认 HealthTrack 程序正在运行，然后重试。</p>`;
+              statusTag.innerText = '本地服务未连接';
+            } else {
+              contentEl.innerHTML = `<p class="text-red-500">连接 AI 对比服务失败: ${escapeHtml(err.message)}</p>`;
+              statusTag.innerText = '生成异常';
+            }
+          },
+        });
+        if (finalState.aborted) {
+          if (finalState.content || finalState.thinking) {
+            updateStreamUI({ thinking: finalState.thinking, content: finalState.content + '\n\n> **已手动停止生成**' });
+            statusTag.innerText = '已手动停止';
+          } else {
+            cmpApplyEmptyUI();
+            statusTag.innerText = '已取消生成';
           }
         }
-
-        if (hasError) {
-          updateUI();
-          statusTag.innerText = '分析失败';
-        } else if (responseText || thinkingText) {
-          cmpApplyInsightUI(responseText, thinkingText, new Date());
-        } else {
-          contentEl.innerHTML = '<p class="text-slate-400">未能获取到对比内容，请检查后端大模型连接。</p>';
-          statusTag.innerText = '暂无对比内容';
-        }
-      } catch (err) {
-        if (responseText || thinkingText) {
-          responseText += `\n\n> ⚠️ *[网络连接已完成或阶段传输结束]*`;
-          updateUI();
-          statusTag.innerText = '分析完成(部分)';
-        } else if (err instanceof TypeError) {
-          contentEl.innerHTML = `<p class="text-red-500">无法连接本地服务（${location.host}）。请确认 HealthTrack 程序正在运行，然后重试。</p>`;
-          statusTag.innerText = '本地服务未连接';
-        } else {
-          contentEl.innerHTML = `<p class="text-red-500">连接 AI 对比服务失败: ${err.message}</p>`;
-          statusTag.innerText = '生成异常';
-        }
       } finally {
+        if (cmpAbortController === controller) cmpAbortController = null;
         contentEl.classList.remove('typing-cursor');
         cmpState.busy = false;
         cmpSetControlsDisabled(false);
-        btn.disabled = false;
-        btn.classList.remove('opacity-50', 'cursor-not-allowed');
-        // 仅在「确实产出且无错误」时才说明已自动存档，按钮语义才转为「重新生成」
-        btn.innerHTML = (!hasError && (responseText || thinkingText)) ? '<span class="font-mono">重新生成阶段对比</span>' : originalBtnText;
+        btn.className = originalBtnClass;
+        const hasSaved = !finalState.aborted && !finalState.hasError && (finalState.content || finalState.thinking);
+        if (hasSaved || cmpState.generated) {
+          btn.innerHTML = '<span class="font-mono">重新生成阶段对比</span>';
+        } else {
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>生成阶段对比综述</span>';
+        }
       }
     }
 

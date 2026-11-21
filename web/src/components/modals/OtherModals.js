@@ -27,8 +27,8 @@ export function selectExportType(btn) {
   document.querySelectorAll('#export-type-pills button').forEach((p) => {
     const active = p === btn;
     p.className = active
-      ? 'py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm transition-all'
-      : 'py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+      ? 'py-2 rounded-lg text-xs font-mono font-semibold bg-neutral-900 text-white transition-all'
+      : 'py-2 rounded-lg text-xs font-mono font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all';
   });
   const isJSON = exportType === 'json';
   const isArchive = exportType === 'archive';
@@ -70,8 +70,8 @@ export function exportCurrent() {
       document.querySelectorAll('#export-range-pills button').forEach(p => {
         const active = p === btn;
         p.className = active
-          ? 'py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm transition-all'
-          : 'py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
+          ? 'py-2 rounded-lg text-xs font-mono font-semibold bg-neutral-900 text-white transition-all'
+          : 'py-2 rounded-lg text-xs font-mono font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-all';
       });
       resetExportResult();
     }
@@ -91,7 +91,10 @@ export function exportCurrent() {
     }
 
     async function startExport() {
-      const url = '/api/v1/export' + (exportRange === 'all' ? '' : `?range=${exportRange}`);
+      const tzOffset = -new Date().getTimezoneOffset();
+      const qs = new URLSearchParams({ tz_offset: String(tzOffset) });
+      if (exportRange !== 'all') qs.set('range', exportRange);
+      const url = `/api/v1/export?${qs.toString()}`;
 
       // 手机 App：交给原生 DownloadListener → DownloadManager 下载，结果由原生回调 onExportResult
       if (window.HealthTrack) {
@@ -187,7 +190,10 @@ export function exportCurrent() {
 
     // 图文归档：所选范围内的小结表格 + 全部难忘图片，服务端流式打包为 ZIP。
     async function startArchiveExport() {
-      const url = '/api/v1/export/summaries.zip' + (exportRange === 'all' ? '' : `?range=${exportRange}`);
+      const tzOffset = -new Date().getTimezoneOffset();
+      const qs = new URLSearchParams({ tz_offset: String(tzOffset) });
+      if (exportRange !== 'all') qs.set('range', exportRange);
+      const url = `/api/v1/export/summaries.zip?${qs.toString()}`;
 
       // 手机 App：交给原生 DownloadListener → DownloadManager 下载
       if (window.HealthTrack) {
@@ -431,7 +437,7 @@ export function exportCurrent() {
       const sourceLabel = data.source_type === 'json' ? 'JSON 备份' : (data.source_type === 'memo' ? '备忘录粘贴' : 'CSV 文件');
       const size = data.file_size ? formatBytes(data.file_size) : '';
       const reselect = data.source_type === 'memo' ? '' :
-        ' · <button type="button" onclick="impReselectFile()" class="text-blue-600 underline underline-offset-2">重新选择</button>';
+        ' · <button type="button" onclick="impReselectFile()" class="text-neutral-900 font-semibold underline underline-offset-2">重新选择</button>';
       document.getElementById('import-file-meta').innerHTML =
         `<span class="font-bold text-slate-700">${impEsc(data.file_name || sourceLabel)}</span> · ${sourceLabel}${size ? ' · ' + size : ''} · 编码 ${impEsc(data.encoding || '—')}${reselect}`;
 
@@ -503,7 +509,7 @@ export function exportCurrent() {
         return `<div class="rounded-lg bg-white border border-slate-100 px-2.5 py-1.5">
           <div class="flex items-center justify-between text-[11px]">
             <span class="font-bold text-slate-700">${impEsc(d.date)}</span>
-            <span class="${isInsert ? 'text-emerald-600' : 'text-blue-600'}">${isInsert ? '新增' : '更新'}</span>
+            <span class="${isInsert ? 'text-emerald-600' : 'text-neutral-900 font-semibold'}">${isInsert ? '新增' : '更新'}</span>
           </div>
           ${changes ? `<p class="text-[10px] text-slate-400 mt-0.5 break-all">${impEsc(changes)}</p>` : ''}
         </div>`;
@@ -516,8 +522,8 @@ export function exportCurrent() {
       document.querySelectorAll('#import-step-options button[data-mode]').forEach(b => {
         const active = b === btn;
         b.className = active
-          ? 'w-full text-left px-3.5 py-2.5 rounded-xl border-2 border-blue-500 bg-blue-50 transition-all'
-          : 'w-full text-left px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white transition-all';
+          ? 'w-full text-left px-3.5 py-2.5 rounded-xl border border-neutral-900 ring-1 ring-neutral-900 bg-neutral-50 transition-all'
+          : 'w-full text-left px-3.5 py-2.5 rounded-xl border border-neutral-200 bg-white transition-all';
       });
     }
 
@@ -712,9 +718,9 @@ export function exportCurrent() {
           actions.push(`<button type="button" onclick="downloadFailedRows(${b.id})" class="px-2.5 py-1 rounded-lg bg-amber-100 text-[11px] font-bold text-amber-700 hover:bg-amber-200">失败行</button>`);
         }
         if (b.retryable) {
-          actions.push(`<button type="button" onclick="impRetryBatch(${b.id})" class="px-2.5 py-1 rounded-lg bg-blue-600 text-[11px] font-bold text-white hover:bg-blue-700">重试</button>`);
+          actions.push(`<button type="button" onclick="impRetryBatch(${b.id})" class="px-2.5 py-1 rounded-lg bg-neutral-900 text-[11px] font-mono font-medium text-white hover:bg-neutral-800">重试</button>`);
         }
-        return `<div class="rounded-2xl border border-slate-100 px-3.5 py-3">
+        return `<div class="rounded-xl border border-neutral-200 px-3.5 py-3">
           <div class="flex items-start justify-between gap-2">
             <p class="text-sm font-bold text-slate-800 truncate">${impEsc(b.file_name || source)}</p>
             <span class="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${st.cls}">${st.label}</span>

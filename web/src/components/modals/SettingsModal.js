@@ -110,8 +110,8 @@ async function loadConfig() {
     if (modelEl) modelEl.value = cfg.model || '';
     if (statusEl) {
       statusEl.innerText = cfg.api_key_configured
-        ? `✓ 当前 Key: ${cfg.api_key_masked}（留空可保留）`
-        : '⚠️ 尚未配置 API Key';
+        ? `当前 Key: ${cfg.api_key_masked}（留空可保留）`
+        : '尚未配置 API Key';
     }
 
     const greenEl = document.getElementById('setting-sleep-green');
