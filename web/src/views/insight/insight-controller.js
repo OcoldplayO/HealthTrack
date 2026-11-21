@@ -178,7 +178,7 @@ export function setInsightDays(days) {
               <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">
                 思维链推导 (${thinkingText.length} 字)
               </summary>
-              <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${thinkingText}</div>
+              <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${escapeHtml(thinkingText)}</div>
             </details>
           `;
         }
@@ -1075,7 +1075,7 @@ export function setInsightDays(days) {
               <summary class="cursor-pointer font-medium text-slate-600 select-none hover:text-slate-800 transition-colors">
                 思维链推导 (${thinkingText.length} 字)
               </summary>
-              <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${thinkingText}</div>
+              <div class="mt-2 whitespace-pre-wrap font-mono leading-relaxed border-t border-slate-200 pt-2 text-slate-600">${escapeHtml(thinkingText)}</div>
             </details>
           `;
         }

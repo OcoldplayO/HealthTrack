@@ -5,6 +5,7 @@ import modalsHtml from './other-modals.html?raw';
 import { api } from '../../services/api.js';
 import { showToast } from '../Toast.js';
 import { appConfirm, appCopyText, appToast } from '../../utils/dialog.js';
+import { loadRecordForDate } from '../../views/log/log-controller.js';
 
 let exportRange = 'all';
 let exportType = 'excel';
@@ -592,7 +593,8 @@ export function exportCurrent() {
     // 导入后刷新当前视图，让看板/趋势/洞察立即反映新数据。
     function impRefreshData() {
       if (currentTab === 'log') {
-        loadRecordForDate(document.getElementById('input-date').value);
+        const dateVal = document.getElementById('input-date')?.value;
+        if (dateVal) loadRecordForDate(dateVal);
       } else {
         switchTab(currentTab);
       }
@@ -832,6 +834,7 @@ window.closeImport = closeImport;
 window.closeImportModal = closeImportModal;
 window.closeImportOnBackdrop = closeImportOnBackdrop;
 window.impPickFile = impPickFile;
+window.impReselectFile = impReselectFile;
 window.impFileSelected = impFileSelected;
 window.impSelectMode = impSelectMode;
 window.impToggleSkipErrors = impToggleSkipErrors;
@@ -850,11 +853,8 @@ window.openImportBatchesFromSheet = openImportBatchesFromSheet;
 window.closeBatches = closeBatches;
 window.closeImportBatchesModal = closeImportBatchesModal;
 window.closeBatchesOnBackdrop = closeBatchesOnBackdrop;
+window.impToggleBatchDetail = impToggleBatchDetail;
 window.impRetryBatch = impRetryBatch;
 window.retryBatch = impRetryBatch;
 window.downloadFailedRows = downloadFailedRows;
 window.downloadImportTemplate = downloadImportTemplate;
-
-window.evoClosePhoto = function () {
-  document.getElementById('ev-photo-viewer')?.classList.add('hidden');
-};

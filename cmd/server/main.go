@@ -182,7 +182,7 @@ func main() {
 		staticHandler = http.FileServer(http.FS(staticSub))
 	}
 
-	// 内嵌静态资源下发缓存策略：HTML 禁用缓存，vendor/ 下的第三方库长期强缓存。
+	// 内嵌静态资源下发缓存策略：HTML 禁用缓存，vendor/ 与带内容哈希的 assets/ 长期强缓存。
 	staticHandler = staticCachePolicy(staticHandler)
 	mux.Handle("/", staticHandler)
 
@@ -243,7 +243,7 @@ func staticCachePolicy(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
 		switch {
-		case strings.HasPrefix(p, "/vendor/"):
+		case strings.HasPrefix(p, "/vendor/") || strings.HasPrefix(p, "/assets/"):
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		case p == "/" || strings.HasSuffix(p, ".html"):
 			w.Header().Set("Cache-Control", "no-cache, must-revalidate")

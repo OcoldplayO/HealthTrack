@@ -3,10 +3,12 @@ package repository
 import (
 	"database/sql"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -16,17 +18,31 @@ type DBManager struct {
 	DB *sql.DB
 }
 
+var allowedMigrationTables = map[string]bool{
+	"health_records": true,
+	"ai_insights":    true,
+}
+
+type columnMigration struct {
+	table    string
+	column   string
+	alterSQL string
+}
+
+var backupFilenamePattern = regexp.MustCompile(`^health_backup_(\d{8})\.db$`)
+
 func InitDB(dbPath, backupDir string) (*DBManager, error) {
-	// 确保数据库所在目录存在
-	dir := filepath.Dir(dbPath)
-	if dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return nil, fmt.Errorf("创建数据库目录失败: %w", err)
+	isMemory := dbPath == ":memory:" || strings.HasPrefix(dbPath, "file::memory:")
+	if !isMemory {
+		dir := filepath.Dir(dbPath)
+		if dir != "." && dir != "" {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return nil, fmt.Errorf("创建数据库目录失败: %w", err)
+			}
 		}
 	}
 
-	// 启动时自动执行冷备份
-	runAutoBackup(dbPath, backupDir)
+	existedBefore := !isMemory && fileExists(dbPath)
 
 	// 使用 pure Go sqlite 驱动连接
 	db, err := sql.Open("sqlite", dbPath)
@@ -40,16 +56,51 @@ func InitDB(dbPath, backupDir string) (*DBManager, error) {
 	db.SetConnMaxLifetime(0)
 
 	if err := db.Ping(); err != nil {
+		_ = db.Close()
 		return nil, fmt.Errorf("Ping SQLite 失败: %w", err)
+	}
+
+	if err := configureSQLitePragmas(db, isMemory); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("配置 SQLite PRAGMA 失败: %w", err)
 	}
 
 	mgr := &DBManager{DB: db}
 	if err := mgr.migrate(); err != nil {
+		_ = db.Close()
 		return nil, fmt.Errorf("初始化数据库表结构失败: %w", err)
+	}
+
+	// 在数据库完成连接、WAL 配置与表迁移后，使用 VACUUM INTO 生成事务一致且紧凑的每日冷备份
+	if existedBefore && backupDir != "" {
+		runAutoBackup(db, backupDir, time.Now())
 	}
 
 	slog.Info("SQLite 数据库初始化就绪", "path", dbPath)
 	return mgr, nil
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+func configureSQLitePragmas(db *sql.DB, isMemory bool) error {
+	var pragmas []string
+	if !isMemory {
+		pragmas = append(pragmas, `PRAGMA journal_mode=WAL;`)
+	}
+	pragmas = append(pragmas,
+		`PRAGMA busy_timeout=5000;`,
+		`PRAGMA synchronous=NORMAL;`,
+		`PRAGMA foreign_keys=ON;`,
+	)
+	for _, stmt := range pragmas {
+		if _, err := db.Exec(stmt); err != nil {
+			return fmt.Errorf("%s: %w", stmt, err)
+		}
+	}
+	return nil
 }
 
 // AutoMigrate 确保数据库表结构平滑演进
@@ -153,30 +204,70 @@ func (m *DBManager) migrate() error {
 		return err
 	}
 
-	// 平滑增量扩展字段 (忽略已存在列错误，保证向后兼容)
-	alterStatements := []string{
-		`ALTER TABLE health_records ADD COLUMN sleep_bed_time TEXT DEFAULT '';`,
-		`ALTER TABLE health_records ADD COLUMN sleep_wake_time TEXT DEFAULT '';`,
-		`ALTER TABLE health_records ADD COLUMN exercise_json TEXT DEFAULT '{}';`,
-		`ALTER TABLE health_records ADD COLUMN cold_shower_json TEXT DEFAULT '{}';`,
-		`ALTER TABLE health_records ADD COLUMN concerta_json TEXT DEFAULT '{}';`,
+	// 平滑增量扩展字段（先查 table_info 再按需迁移，避免静默吞掉真实 SQL 错误）
+	migrations := []columnMigration{
+		{"health_records", "sleep_bed_time", `ALTER TABLE health_records ADD COLUMN sleep_bed_time TEXT DEFAULT '';`},
+		{"health_records", "sleep_wake_time", `ALTER TABLE health_records ADD COLUMN sleep_wake_time TEXT DEFAULT '';`},
+		{"health_records", "exercise_json", `ALTER TABLE health_records ADD COLUMN exercise_json TEXT DEFAULT '{}';`},
+		{"health_records", "cold_shower_json", `ALTER TABLE health_records ADD COLUMN cold_shower_json TEXT DEFAULT '{}';`},
+		{"health_records", "concerta_json", `ALTER TABLE health_records ADD COLUMN concerta_json TEXT DEFAULT '{}';`},
 		// 晨光 / 步数 / 午餐：晨光与步数允许 NULL，NULL 即「当天未记录」（图表断点，不按 0 计）
-		`ALTER TABLE health_records ADD COLUMN morning_light INTEGER;`,
-		`ALTER TABLE health_records ADD COLUMN steps INTEGER;`,
-		`ALTER TABLE health_records ADD COLUMN lunch_json TEXT DEFAULT '{}';`,
+		{"health_records", "morning_light", `ALTER TABLE health_records ADD COLUMN morning_light INTEGER;`},
+		{"health_records", "steps", `ALTER TABLE health_records ADD COLUMN steps INTEGER;`},
+		{"health_records", "lunch_json", `ALTER TABLE health_records ADD COLUMN lunch_json TEXT DEFAULT '{}';`},
 		// scope 区分洞察归属：health（生理周期洞察）/ evening（睡前小结洞察）/ compare（阶段对比）
-		`ALTER TABLE ai_insights ADD COLUMN scope TEXT NOT NULL DEFAULT 'health';`,
+		{"ai_insights", "scope", `ALTER TABLE ai_insights ADD COLUMN scope TEXT NOT NULL DEFAULT 'health';`},
 		// meta_json 保存阶段对比（scope=compare）的两月边界与七项聚合指标快照
-		`ALTER TABLE ai_insights ADD COLUMN meta_json TEXT DEFAULT '{}';`,
+		{"ai_insights", "meta_json", `ALTER TABLE ai_insights ADD COLUMN meta_json TEXT DEFAULT '{}';`},
 	}
 
-	for _, stmt := range alterStatements {
-		_, _ = m.DB.Exec(stmt)
+	for _, mig := range migrations {
+		if err := ensureColumn(m.DB, mig.table, mig.column, mig.alterSQL); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
+func ensureColumn(db *sql.DB, table, column, alterSQL string) error {
+	if !allowedMigrationTables[table] {
+		return fmt.Errorf("非法的迁移表名: %s", table)
+	}
+	rows, err := db.Query(fmt.Sprintf(`PRAGMA table_info(%s);`, table))
+	if err != nil {
+		return fmt.Errorf("检查表结构失败 (%s): %w", table, err)
+	}
+	exists := false
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull int
+		var dfltValue sql.NullString
+		var pk int
+		if scanErr := rows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); scanErr != nil {
+			_ = rows.Close()
+			return fmt.Errorf("读取表字段失败 (%s): %w", table, scanErr)
+		}
+		if name == column {
+			exists = true
+			break
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("遍历表结构失败 (%s): %w", table, err)
+	}
+	_ = rows.Close()
+
+	if exists {
+		return nil
+	}
+	if _, err := db.Exec(alterSQL); err != nil {
+		return fmt.Errorf("新增字段失败 (%s.%s): %w", table, column, err)
+	}
+	return nil
+}
 
 func (m *DBManager) Close() error {
 	if m.DB != nil {
@@ -185,36 +276,104 @@ func (m *DBManager) Close() error {
 	return nil
 }
 
-// runAutoBackup 自动冷备份与滚动归档
-func runAutoBackup(dbPath, backupDir string) {
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		return
-	}
+// runAutoBackup 使用 VACUUM INTO 执行事务一致且紧凑的每日冷备份，并按策略滚动清理旧备份
+func runAutoBackup(db *sql.DB, backupDir string, now time.Time) {
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		slog.Warn("创建备份目录失败", "err", err)
 		return
 	}
 
-	today := time.Now().Format("20060102")
+	today := now.Format("20060102")
 	backupFile := filepath.Join(backupDir, fmt.Sprintf("health_backup_%s.db", today))
 
-	if _, err := os.Stat(backupFile); err == nil {
-		return // 今日已备份
+	if _, err := os.Stat(backupFile); os.IsNotExist(err) {
+		tmpFile := backupFile + ".tmp"
+		_ = os.Remove(tmpFile)
+		if _, err := db.Exec(`VACUUM INTO ?`, tmpFile); err != nil {
+			_ = os.Remove(tmpFile)
+			slog.Warn("执行每日数据库冷备份失败", "err", err)
+		} else if err := os.Rename(tmpFile, backupFile); err != nil {
+			_ = os.Remove(tmpFile)
+			slog.Warn("重命名备份文件失败", "err", err)
+		} else {
+			slog.Info("已执行自动每日数据库冷备份", "backup_file", backupFile)
+		}
 	}
 
-	src, err := os.Open(dbPath)
+	pruneOldBackups(backupDir, now)
+}
+
+type datedBackup struct {
+	name string
+	path string
+	date time.Time
+}
+
+// pruneOldBackups 滚动保留最近 14 天日备 + 第 15~42 天内（近 4 周）每周最早 1 份，清理更早历史备份
+func pruneOldBackups(backupDir string, now time.Time) {
+	entries, err := os.ReadDir(backupDir)
 	if err != nil {
+		slog.Warn("扫描备份目录失败", "err", err)
 		return
 	}
-	defer src.Close()
 
-	dst, err := os.Create(backupFile)
-	if err != nil {
-		return
+	todayMidnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	var weeklyCandidates []datedBackup
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		// 清理超过 24 小时的残留临时文件
+		if strings.HasPrefix(name, "health_backup_") && strings.HasSuffix(name, ".db.tmp") {
+			if info, statErr := entry.Info(); statErr == nil && now.Sub(info.ModTime()) > 24*time.Hour {
+				_ = os.Remove(filepath.Join(backupDir, name))
+			}
+			continue
+		}
+
+		matches := backupFilenamePattern.FindStringSubmatch(name)
+		if len(matches) != 2 {
+			continue
+		}
+		fileDate, parseErr := time.ParseInLocation("20060102", matches[1], now.Location())
+		if parseErr != nil {
+			continue
+		}
+
+		dayDiff := int(todayMidnight.Sub(fileDate).Hours() / 24)
+		if dayDiff < 14 {
+			continue // 未来日期或近 14 天日备一律保留
+		}
+		fullPath := filepath.Join(backupDir, name)
+		if dayDiff >= 42 {
+			if rmErr := os.Remove(fullPath); rmErr == nil {
+				slog.Info("已清理超期数据库冷备份", "file", name)
+			}
+			continue
+		}
+		weeklyCandidates = append(weeklyCandidates, datedBackup{
+			name: name,
+			path: fullPath,
+			date: fileDate,
+		})
 	}
-	defer dst.Close()
 
-	if _, err := io.Copy(dst, src); err == nil {
-		slog.Info("已执行自动每日数据库冷备份", "backup_file", backupFile)
+	// 按日期升序排序，同一 ISO 周保留最早的一份
+	sort.Slice(weeklyCandidates, func(i, j int) bool {
+		return weeklyCandidates[i].date.Before(weeklyCandidates[j].date)
+	})
+	keptWeek := make(map[string]bool)
+	for _, item := range weeklyCandidates {
+		isoYear, isoWeek := item.date.ISOWeek()
+		weekKey := fmt.Sprintf("%04d-W%02d", isoYear, isoWeek)
+		if !keptWeek[weekKey] {
+			keptWeek[weekKey] = true
+			continue
+		}
+		if rmErr := os.Remove(item.path); rmErr == nil {
+			slog.Info("已滚动归并周内多余数据库备份", "file", item.name, "week", weekKey)
+		}
 	}
 }

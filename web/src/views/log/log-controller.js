@@ -1029,10 +1029,15 @@ function bindEvents() {
     });
   }
 
-  document.getElementById('btn-clear-journal')?.addEventListener('click', () => {
+  document.getElementById('btn-clear-journal')?.addEventListener('click', async () => {
     const jEl = document.getElementById('input-journal');
     if (!jEl || !jEl.value) return;
-    if (confirm('确定清空自由记录吗？')) {
+    const ok = await appConfirm('确定清空自由记录吗？', {
+      title: '清空自由记录',
+      confirmText: '清空',
+      danger: true,
+    });
+    if (ok) {
       jEl.value = '';
       autoResizeJournal();
       syncJournalClearBtn();

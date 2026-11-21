@@ -42,7 +42,8 @@ export const api = {
   saveSleepThresholds: (thresholds) => request('/api/config/sleep', { method: 'POST', body: JSON.stringify(thresholds) }),
 
   // ── AI 洞察相关 (Insights) ──
-  checkInsightPeriod: (days, endDate) => request(`/api/v1/insights/period?days=${days}&end_date=${encodeURIComponent(endDate)}`),
+  checkInsightPeriod: (rangeDays, endDate, tzOffset = -new Date().getTimezoneOffset()) =>
+    request(`/api/v1/insights/period?range_days=${rangeDays}&end_date=${encodeURIComponent(endDate)}&tz_offset=${tzOffset}`),
   getInsightHistory: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/api/v1/insights${qs ? '?' + qs : ''}`);

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,10 +29,32 @@ type AIHandler struct {
 	compare     *service.CompareService
 	insightRepo *repository.InsightRepository
 	eveningRepo *repository.EveningRepository
+	httpClient  *http.Client
+}
+
+func newAIHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 0, // 长连接 SSE 流式转发不设全局总超时，由大模型传输结束或客户端取消为止
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+			TLSHandshakeTimeout:   15 * time.Second,
+			ResponseHeaderTimeout: 30 * time.Second,
+			IdleConnTimeout:       90 * time.Second,
+		},
+	}
 }
 
 func NewAIHandler(configs *config.RuntimeStore, insight *service.InsightService, repoSvc *service.RecordService, compare *service.CompareService, insightRepo *repository.InsightRepository, eveningRepo *repository.EveningRepository) *AIHandler {
-	return &AIHandler{configs: configs, insight: insight, repoSvc: repoSvc, compare: compare, insightRepo: insightRepo, eveningRepo: eveningRepo}
+	return &AIHandler{
+		configs:     configs,
+		insight:     insight,
+		repoSvc:     repoSvc,
+		compare:     compare,
+		insightRepo: insightRepo,
+		eveningRepo: eveningRepo,
+		httpClient:  newAIHTTPClient(),
+	}
 }
 
 // systemInstruction 以 system 角色下发硬性约束。
@@ -88,15 +111,13 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 	}
 	et, err := time.Parse("2006-01-02", endDate)
 	if err != nil {
-		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"截止日参数非法，应为 YYYY-MM-DD。\"}}]}\n\n")
-		fmt.Fprintf(w, "data: [DONE]\n\n")
+		sseFail(w, "截止日参数非法，应为 YYYY-MM-DD。")
 		flusher.Flush()
 		return
 	}
 	// 不支持未来日期。ISO 日期可直接做字符串比较。
 	if endDate > today {
-		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"不支持生成未来日期的洞察，请选择今天或更早的截止日。\"}}]}\n\n")
-		fmt.Fprintf(w, "data: [DONE]\n\n")
+		sseFail(w, "不支持生成未来日期的洞察，请选择今天或更早的截止日。")
 		flusher.Flush()
 		return
 	}
@@ -105,8 +126,7 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 	userID := int64(1)
 	records, err := h.repoSvc.GetHistoryRecords(userID, startDate, endDate)
 	if err != nil || len(records) == 0 {
-		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"该分析周期内暂未检索到健康数据，请调整截止日后重试，或先在【记一笔】中打卡。\"}}]}\n\n")
-		fmt.Fprintf(w, "data: [DONE]\n\n")
+		sseFail(w, "该分析周期内暂未检索到健康数据，请调整截止日后重试，或先在【记一笔】中打卡。")
 		flusher.Flush()
 		return
 	}
@@ -129,8 +149,7 @@ func (h *AIHandler) StreamInsight(w http.ResponseWriter, r *http.Request) {
 	fullUserContent := fmt.Sprintf("%s\n\n%s%s", string(promptTpl), windowLine, dataContext)
 
 	if cfg.AI.APIKey == "" || strings.Contains(cfg.AI.APIKey, "your_api_key") {
-		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"未检测到有效的大模型 API Key，请在 config.yaml 中配置 AI.APIKey。\"}}]}\n\n")
-		fmt.Fprintf(w, "data: [DONE]\n\n")
+		sseFail(w, "未检测到有效的大模型 API Key，请在设置中配置 API Key。")
 		flusher.Flush()
 		return
 	}
@@ -364,9 +383,13 @@ func (h *AIHandler) StreamEveningInsight(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	date := r.URL.Query().Get("date")
+	tzOffset := atoiDefault(r.URL.Query().Get("tz_offset"), 0)
+	if tzOffset < -720 || tzOffset > 840 {
+		tzOffset = 0
+	}
+	date := strings.TrimSpace(r.URL.Query().Get("date"))
 	if date == "" {
-		date = time.Now().Format("2006-01-02")
+		date = clientToday(tzOffset)
 	}
 	// 关联生理数据的窗口长度：前端可选 7 / 30 天，默认 7 天。
 	days := 7
@@ -379,13 +402,12 @@ func (h *AIHandler) StreamEveningInsight(w http.ResponseWriter, r *http.Request)
 
 	summary, err := h.eveningRepo.GetByDate(userID, date)
 	if err != nil {
-		fmt.Fprintf(w, "data: {\"error\":\"读取睡前小结失败: %s\"}\n\n", err.Error())
+		sseFail(w, "读取睡前小结失败: "+err.Error())
 		flusher.Flush()
 		return
 	}
 	if summary == nil {
-		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"这一天还没有写下睡前小结，请先保存小结后再生成洞察。\"}}]}\n\n")
-		fmt.Fprintf(w, "data: [DONE]\n\n")
+		sseFail(w, "这一天还没有写下睡前小结，请先保存小结后再生成洞察。")
 		flusher.Flush()
 		return
 	}
@@ -401,8 +423,7 @@ func (h *AIHandler) StreamEveningInsight(w http.ResponseWriter, r *http.Request)
 	userContent := buildEveningInsightPrompt(loadEveningPromptTemplate(), date, days, startDate, summary, physioContext)
 
 	if cfg.AI.APIKey == "" || strings.Contains(cfg.AI.APIKey, "your_api_key") {
-		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"未检测到有效的大模型 API Key，请在 config.yaml 中配置 AI.APIKey。\"}}]}\n\n")
-		fmt.Fprintf(w, "data: [DONE]\n\n")
+		sseFail(w, "未检测到有效的大模型 API Key，请在设置中配置 API Key。")
 		flusher.Flush()
 		return
 	}
@@ -497,7 +518,7 @@ func (h *AIHandler) proxyChat(ctx context.Context, w http.ResponseWriter, flushe
 
 	jsonPayload, err := json.Marshal(requestBody)
 	if err != nil {
-		fmt.Fprintf(w, "data: {\"error\":\"序列化 AI 请求失败: %s\"}\n\n", err.Error())
+		sseFail(w, "序列化 AI 请求失败: "+err.Error())
 		flusher.Flush()
 		return
 	}
@@ -505,28 +526,30 @@ func (h *AIHandler) proxyChat(ctx context.Context, w http.ResponseWriter, flushe
 	reqURL := strings.TrimRight(aiCfg.BaseURL, "/") + "/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewBuffer(jsonPayload))
 	if err != nil {
-		fmt.Fprintf(w, "data: {\"error\":\"创建 AI 请求失败: %s\"}\n\n", err.Error())
+		sseFail(w, "创建 AI 请求失败: "+err.Error())
 		flusher.Flush()
 		return
 	}
 	req.Header.Set("Authorization", "Bearer "+aiCfg.APIKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	// 长连接 SSE 流式转发不能设死客户端全局超时，设为 0 由大模型自然传输结束
-	client := &http.Client{Timeout: 0}
+	client := h.httpClient
+	if client == nil {
+		client = newAIHTTPClient()
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		slog.Error("上游大模型通信失败", "err", err)
-		fmt.Fprintf(w, "data: {\"error\":\"上游大模型通信失败: %s\"}\n\n", err.Error())
+		sseFail(w, "上游大模型通信失败: "+err.Error())
 		flusher.Flush()
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		slog.Error("上游大模型拒绝响应", "status", resp.StatusCode, "body", string(bodyBytes))
-		fmt.Fprintf(w, "data: {\"error\":\"上游大模型拒绝响应 (状态码 %d): %s\"}\n\n", resp.StatusCode, string(bodyBytes))
+		sseFail(w, fmt.Sprintf("上游大模型拒绝响应 (状态码 %d): %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes))))
 		flusher.Flush()
 		return
 	}
