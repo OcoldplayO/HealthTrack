@@ -67,6 +67,64 @@ export function switchTab(tab) {
 
 window.switchTab = switchTab;
 
+function isVisibleModal(id) {
+  const el = document.getElementById(id);
+  return !!(el && !el.classList.contains('hidden'));
+}
+
+export function handleNativeBack() {
+  if (isVisibleModal('ev-photo-viewer')) {
+    window.evoClosePhoto?.();
+    return true;
+  }
+  if (isVisibleModal('app-confirm-modal')) {
+    document.getElementById('app-confirm-cancel')?.click();
+    return true;
+  }
+  if (isVisibleModal('settings-modal')) {
+    window.closeSettings?.();
+    return true;
+  }
+  if (isVisibleModal('data-sheet')) {
+    window.closeDataSheet?.();
+    return true;
+  }
+  if (isVisibleModal('export-modal')) {
+    window.closeExport?.();
+    return true;
+  }
+  if (isVisibleModal('import-modal')) {
+    window.closeImport?.();
+    return true;
+  }
+  if (isVisibleModal('memo-import-modal')) {
+    window.closeMemo?.();
+    return true;
+  }
+  if (isVisibleModal('import-batches-modal')) {
+    window.closeBatches?.();
+    return true;
+  }
+
+  const tab = store.state.currentTab || 'log';
+  if (tab === 'compare') {
+    if (typeof window.cmpBack === 'function') window.cmpBack();
+    else switchTab('insight');
+    return true;
+  }
+  if (tab === 'history') {
+    switchTab('insight');
+    return true;
+  }
+  if (tab === 'trend' || tab === 'trend-detail') {
+    switchTab('dash');
+    return true;
+  }
+  return false;
+}
+
+window.handleNativeBack = handleNativeBack;
+
 document.addEventListener('DOMContentLoaded', () => {
   const frame = document.getElementById('app-frame');
   const main = document.getElementById('main-content');

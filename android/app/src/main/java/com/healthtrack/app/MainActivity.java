@@ -4,9 +4,9 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.DownloadManager;
-import android.content.Intent;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
@@ -15,9 +15,11 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.DownloadListener;
 import android.webkit.ValueCallback;
@@ -26,27 +28,27 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.json.JSONObject;
-
+import com.healthtrack.app.step.StepBaselineJobService;
 import com.healthtrack.app.step.StepManager;
 
+import org.json.JSONObject;
+
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Arrays;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class MainActivity extends Activity {
     private static final String CONFIG_ASSET = "config.yaml";
@@ -59,6 +61,8 @@ public final class MainActivity extends Activity {
     private static final String CONFIG_FILE = "config.yaml";
     private static final String HEALTH_URL = "http://127.0.0.1:8080/healthz";
     private static final String APP_URL = "http://127.0.0.1:8080";
+    private static final long MAX_SERVER_LOG_BYTES = 2L * 1024L * 1024L;
+    private static final long BACK_EXIT_WINDOW_MS = 2000L;
     private static final int REQUEST_FILE_CHOOSER = 2001;
     private static final int REQUEST_ACTIVITY_RECOGNITION = 2002;
 
@@ -71,13 +75,20 @@ public final class MainActivity extends Activity {
     private ValueCallback<Uri[]> fileChooserCallback;
     private StepManager stepManager;
 
+    private volatile boolean webLoaded = false;
+    private volatile boolean isRecoveringServer = false;
+    private long lastBackPressMs = 0L;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         stepManager = StepManager.getInstance(this);
         requestLegacyStoragePermissionIfNeeded();
-        enableFullscreen();
         setContentView(createContentView());
+        configureSystemBars();
+
+        stepManager.setListener(this::postStepsUpdated);
+        StepBaselineJobService.scheduleNextMidnight(this);
         startServerAndLoadWebView();
     }
 
@@ -85,6 +96,7 @@ public final class MainActivity extends Activity {
     private View createContentView() {
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.WHITE);
+        root.setFitsSystemWindows(true);
 
         webView = new WebView(this);
         webView.getSettings().setJavaScriptEnabled(true);
@@ -124,6 +136,12 @@ public final class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return false;
             }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                webLoaded = true;
+            }
         });
         // 拦截导出 CSV 下载（Content-Disposition: attachment），交由系统 DownloadManager 处理。
         webView.setDownloadListener(new DownloadListener() {
@@ -132,7 +150,7 @@ public final class MainActivity extends Activity {
                 handleExportDownload(url, contentDisposition);
             }
         });
-        // 暴露导出辅助桥：网页可调用 window.HealthTrack.openDownloads() 跳到系统下载目录。
+        // 暴露导出与计步桥：网页可调用 window.HealthTrack.*。
         webView.addJavascriptInterface(new ExportBridge(), "HealthTrack");
         root.addView(webView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -152,13 +170,31 @@ public final class MainActivity extends Activity {
         return root;
     }
 
-    private void enableFullscreen() {
+    /**
+     * 配置白底浅色系统栏，同时避免 FLAG_FULLSCREEN 破坏 adjustResize 导致软键盘遮挡底部输入框。
+     */
+    @SuppressWarnings("deprecation")
+    private void configureSystemBars() {
         Window window = getWindow();
-        window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        window.getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        window.setStatusBarColor(Color.WHITE);
+        window.setNavigationBarColor(Color.WHITE);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsetsController controller = window.getInsetsController();
+            if (controller != null) {
+                int lightBars = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                        | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+                controller.setSystemBarsAppearance(lightBars, lightBars);
+            }
+        } else {
+            int flags = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            }
+            window.getDecorView().setSystemUiVisibility(flags);
+        }
     }
 
     private void startServerAndLoadWebView() {
@@ -179,24 +215,38 @@ public final class MainActivity extends Activity {
                 }
                 startServer(serverBin, configFile, filesDir);
 
-                if (!waitForServer()) {
+                if (!isHealthy() && !waitForServer()) {
                     throw new IOException("服务未能在 15 秒内启动。请重新打开应用。\n日志：" + new File(filesDir, "server.log"));
                 }
 
                 mainHandler.post(() -> {
+                    if (isDestroyed()) {
+                        return;
+                    }
                     statusView.setVisibility(View.GONE);
                     webView.loadUrl(APP_URL);
                 });
             } catch (Exception error) {
-                mainHandler.post(() -> showStartupError(error));
+                mainHandler.post(() -> {
+                    if (!isDestroyed()) {
+                        showStartupError(error);
+                    }
+                });
             }
         });
     }
 
-    private void startServer(File serverBin, File configFile, File filesDir) throws IOException {
+    private synchronized void startServer(File serverBin, File configFile, File filesDir) throws IOException {
         if (serverProcess != null && serverProcess.isAlive()) {
             return;
         }
+        // 若已有同机健康服务存活（例如异常重启遗留实例），直接复用避免占口失败砖死。
+        if (isHealthy()) {
+            return;
+        }
+
+        File logFile = new File(filesDir, "server.log");
+        rotateServerLogIfNeeded(logFile);
 
         ProcessBuilder processBuilder = new ProcessBuilder(Arrays.asList(
                 serverBin.getAbsolutePath(),
@@ -205,13 +255,31 @@ public final class MainActivity extends Activity {
                 "-port", "8080"));
         processBuilder.directory(filesDir);
         processBuilder.redirectErrorStream(true);
-        processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(new File(filesDir, "server.log")));
+        processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile));
         serverProcess = processBuilder.start();
+    }
+
+    private void rotateServerLogIfNeeded(File logFile) {
+        if (!logFile.exists() || logFile.length() <= MAX_SERVER_LOG_BYTES) {
+            return;
+        }
+        File backup = new File(logFile.getParentFile(), "server.log.1");
+        if (backup.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            backup.delete();
+        }
+        if (!logFile.renameTo(backup)) {
+            try (FileOutputStream fos = new FileOutputStream(logFile, false)) {
+                // 重命名失败时直接截断旧日志，防止无限增长
+            } catch (IOException ignored) {
+            }
+        }
     }
 
     private boolean waitForServer() {
         for (int attempt = 0; attempt < 60; attempt++) {
-            if (serverProcess == null || !serverProcess.isAlive()) {
+            Process proc = serverProcess;
+            if ((proc == null || !proc.isAlive()) && !isHealthy()) {
                 return false;
             }
             if (isHealthy()) {
@@ -242,6 +310,51 @@ public final class MainActivity extends Activity {
                 connection.disconnect();
             }
         }
+    }
+
+    private void recoverServerIfNeeded() {
+        if (!webLoaded || isRecoveringServer) {
+            return;
+        }
+        if (serverProcess != null && serverProcess.isAlive()) {
+            return;
+        }
+        isRecoveringServer = true;
+        startupExecutor.execute(() -> {
+            try {
+                if (isHealthy()) {
+                    return;
+                }
+                File filesDir = getFilesDir();
+                File configFile = new File(filesDir, CONFIG_FILE);
+                File serverBin = new File(getApplicationInfo().nativeLibraryDir, "libhealthtrack.so");
+                if (!serverBin.exists()) {
+                    return;
+                }
+                startServer(serverBin, configFile, filesDir);
+                if (waitForServer()) {
+                    mainHandler.post(() -> {
+                        if (isDestroyed()) {
+                            return;
+                        }
+                        if (webView != null) {
+                            webView.evaluateJavascript(
+                                    "window.dispatchEvent(new CustomEvent('healthtrack-server-restarted'));",
+                                    null);
+                        }
+                        Toast.makeText(MainActivity.this, "本地服务已自动恢复", Toast.LENGTH_SHORT).show();
+                    });
+                }
+            } catch (Exception ignored) {
+                mainHandler.post(() -> {
+                    if (!isDestroyed()) {
+                        Toast.makeText(MainActivity.this, "本地服务恢复失败，请尝试重启应用", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } finally {
+                isRecoveringServer = false;
+            }
+        });
     }
 
     private void writeBundledConfig(File target) throws IOException {
@@ -362,15 +475,26 @@ public final class MainActivity extends Activity {
                 object.put("message", message);
             }
             final String script = "if (window.onExportResult) window.onExportResult(" + object.toString() + ");";
-            mainHandler.post(new Runnable() {
-                @Override
-                public void run() {
+            mainHandler.post(() -> {
+                if (webView != null && !isDestroyed()) {
                     webView.evaluateJavascript(script, null);
                 }
             });
         } catch (Exception ignored) {
             // JS 回调失败不影响下载本身。
         }
+    }
+
+    private void postStepsUpdated(final int steps) {
+        if (steps < 0) {
+            return;
+        }
+        final String script = "if (window.onNativeStepsUpdated) window.onNativeStepsUpdated(" + steps + ");";
+        mainHandler.post(() -> {
+            if (webLoaded && webView != null && !isDestroyed()) {
+                webView.evaluateJavascript(script, null);
+            }
+        });
     }
 
     private String extractFilename(String contentDisposition) {
@@ -387,21 +511,32 @@ public final class MainActivity extends Activity {
     private final class ExportBridge {
         @android.webkit.JavascriptInterface
         public void openDownloads() {
-            try {
-                Intent intent = new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS);
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent);
-            } catch (Exception ignored) {
-                Toast.makeText(MainActivity.this, "未找到系统下载管理器", Toast.LENGTH_SHORT).show();
-            }
+            mainHandler.post(() -> {
+                if (isDestroyed()) {
+                    return;
+                }
+                try {
+                    Intent intent = new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                } catch (Exception ignored) {
+                    Toast.makeText(MainActivity.this, "未找到系统下载管理器", Toast.LENGTH_SHORT).show();
+                }
+            });
         }
 
         // 原生剪贴板：WebView 的 navigator.clipboard 在部分机型/失焦场景下不可用，这里兜底。
         @android.webkit.JavascriptInterface
-        public void copyText(String text) {
-            ClipboardManager manager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            if (manager == null || text == null) return;
-            manager.setPrimaryClip(ClipData.newPlainText("HealthTrack", text));
+        public void copyText(final String text) {
+            if (text == null) {
+                return;
+            }
+            mainHandler.post(() -> {
+                ClipboardManager manager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                if (manager != null) {
+                    manager.setPrimaryClip(ClipData.newPlainText("HealthTrack", text));
+                }
+            });
         }
 
         @android.webkit.JavascriptInterface
@@ -417,12 +552,7 @@ public final class MainActivity extends Activity {
         @android.webkit.JavascriptInterface
         public void requestStepPermission() {
             if (stepManager != null) {
-                mainHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        stepManager.requestPermission(MainActivity.this, REQUEST_ACTIVITY_RECOGNITION);
-                    }
-                });
+                mainHandler.post(() -> stepManager.requestPermission(MainActivity.this, REQUEST_ACTIVITY_RECOGNITION));
             }
         }
 
@@ -438,8 +568,12 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        recoverServerIfNeeded();
         if (stepManager != null) {
             stepManager.start();
+            if (stepManager.isAvailable() && stepManager.hasPermission()) {
+                postStepsUpdated(stepManager.getTodaySteps());
+            }
         }
     }
 
@@ -458,14 +592,12 @@ public final class MainActivity extends Activity {
             boolean granted = grantResults != null && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
             if (granted && stepManager != null) {
                 stepManager.start();
+                StepBaselineJobService.scheduleNextMidnight(this, true);
             }
             final String script = "if (window.onStepPermissionResult) window.onStepPermissionResult(" + granted + ");";
-            mainHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (webView != null) {
-                        webView.evaluateJavascript(script, null);
-                    }
+            mainHandler.post(() -> {
+                if (webView != null && !isDestroyed()) {
+                    webView.evaluateJavascript(script, null);
                 }
             });
         }
@@ -497,17 +629,43 @@ public final class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
+        if (!webLoaded || webView == null) {
+            finish();
             return;
         }
-        super.onBackPressed();
+        webView.evaluateJavascript(
+                "(function(){ return typeof window.handleNativeBack === 'function' ? Boolean(window.handleNativeBack()) : false; })()",
+                value -> {
+                    if (isDestroyed()) {
+                        return;
+                    }
+                    if ("true".equals(value)) {
+                        return;
+                    }
+                    if (webView.canGoBack()) {
+                        webView.goBack();
+                        return;
+                    }
+                    long now = SystemClock.uptimeMillis();
+                    if (now - lastBackPressMs < BACK_EXIT_WINDOW_MS) {
+                        finish();
+                    } else {
+                        lastBackPressMs = now;
+                        Toast.makeText(MainActivity.this, "再按一次退出 HealthTrack", Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 
     @Override
     protected void onDestroy() {
+        webLoaded = false;
+        mainHandler.removeCallbacksAndMessages(null);
+        if (stepManager != null) {
+            stepManager.setListener(null);
+        }
         if (serverProcess != null) {
             serverProcess.destroy();
             try {

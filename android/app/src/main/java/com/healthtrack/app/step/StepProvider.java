@@ -6,6 +6,10 @@ package com.healthtrack.app.step;
  * 智能手表/健康中枢提供者（如 Google Health Connect）。
  */
 public interface StepProvider {
+    interface StepUpdateListener {
+        void onStepsUpdated(int todaySteps);
+    }
+
     /**
      * 获取今天截至目前的步数
      * @return 今日步数；若传感器不可用或尚未初始化则返回 -1
@@ -31,4 +35,18 @@ public interface StepProvider {
      * 后台暂停监听
      */
     void stop();
+
+    /**
+     * 注册实时步数变化回调
+     */
+    default void setUpdateListener(StepUpdateListener listener) {}
+
+    /**
+     * 触发单次采样（用于零点定时打基线）
+     */
+    default void sampleOnce(Runnable onComplete) {
+        if (onComplete != null) {
+            onComplete.run();
+        }
+    }
 }

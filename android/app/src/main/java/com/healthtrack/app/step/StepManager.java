@@ -5,7 +5,6 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.util.Log;
 
 /**
  * 步数中心管理器。
@@ -13,11 +12,11 @@ import android.util.Log;
  * 并提供运行时权限请求与统一状态查询。
  */
 public final class StepManager {
-    private static final String TAG = "StepManager";
     private static volatile StepManager instance;
 
     private final Context context;
     private StepProvider activeProvider;
+    private StepProvider.StepUpdateListener updateListener;
 
     private StepManager(Context context) {
         this.context = context.getApplicationContext();
@@ -42,10 +41,19 @@ public final class StepManager {
     public synchronized void setProvider(StepProvider provider) {
         if (provider != null) {
             if (this.activeProvider != null) {
+                this.activeProvider.setUpdateListener(null);
                 this.activeProvider.stop();
             }
             this.activeProvider = provider;
+            this.activeProvider.setUpdateListener(this.updateListener);
             this.activeProvider.start();
+        }
+    }
+
+    public synchronized void setListener(StepProvider.StepUpdateListener listener) {
+        this.updateListener = listener;
+        if (activeProvider != null) {
+            activeProvider.setUpdateListener(listener);
         }
     }
 
@@ -74,6 +82,16 @@ public final class StepManager {
             return -1;
         }
         return activeProvider.getTodaySteps();
+    }
+
+    public synchronized void sampleOnce(Runnable onComplete) {
+        if (activeProvider == null) {
+            if (onComplete != null) {
+                onComplete.run();
+            }
+            return;
+        }
+        activeProvider.sampleOnce(onComplete);
     }
 
     public void requestPermission(Activity activity, int requestCode) {

@@ -117,7 +117,7 @@ export async function loadRecordForDate(dateStr) {
       if (hasNativeStepBridge() && typeof window.HealthTrack.hasStepPermission === 'function' && window.HealthTrack.hasStepPermission()) {
         const rawSteps = window.HealthTrack.getTodaySteps();
         if (rawSteps > 0) {
-          stepsState.value = Math.max(0, Math.min(20000, Math.round(rawSteps / 500) * 500));
+          stepsState.value = Math.max(0, Math.min(30000, Math.round(rawSteps)));
           stepsState.autoDetected = true;
           syncStepsSlider();
           updateLogCompleteness();
@@ -388,15 +388,15 @@ function syncNativeSteps(interactive = false) {
     return;
   }
 
-  const rounded = Math.max(0, Math.min(20000, Math.round(rawSteps / 500) * 500));
-  stepsState.value = rounded;
+  const exactSteps = Math.max(0, Math.min(30000, Math.round(rawSteps)));
+  stepsState.value = exactSteps;
   stepsState.autoDetected = true;
   syncStepsSlider();
   updateStepsSourceUI(true);
   updateLogCompleteness();
   markDirty();
   if (interactive) {
-    showToast(`已同步手机计步 ${rawSteps.toLocaleString('en-US')} 步`);
+    showToast(`已同步手机计步 ${exactSteps.toLocaleString('en-US')} 步`);
   }
 }
 
@@ -421,7 +421,8 @@ function syncStepsSlider() {
   const slider = document.getElementById('input-steps');
   if (!slider) return;
   stepsState.prefilled = stepsState.value === null ? prevStepsValue : null;
-  slider.value = stepsState.value === null ? (prevStepsValue === null ? 0 : prevStepsValue) : stepsState.value;
+  const rawDisplay = stepsState.value === null ? (prevStepsValue === null ? 0 : prevStepsValue) : stepsState.value;
+  slider.value = Math.max(0, Math.min(20000, Math.round(rawDisplay / 500) * 500));
   updateStepsDisplay();
 }
 
@@ -977,6 +978,19 @@ function bindEvents() {
     updateStepsSourceUI(loadedDate === localDateStr(new Date()));
   };
 
+  window.onNativeStepsUpdated = (rawSteps) => {
+    const isToday = (loadedDate === localDateStr(new Date()));
+    if (!isToday || typeof rawSteps !== 'number' || rawSteps <= 0) return;
+    if (stepsState.value !== null && !stepsState.autoDetected) return;
+    const exactSteps = Math.max(0, Math.min(30000, Math.round(rawSteps)));
+    if (stepsState.value === exactSteps) return;
+    stepsState.value = exactSteps;
+    stepsState.autoDetected = true;
+    syncStepsSlider();
+    updateStepsSourceUI(true);
+    updateLogCompleteness();
+  };
+
   // 输入监听标记脏状态
   const inputIds = [
     'input-weight-am',
@@ -1012,7 +1026,7 @@ function bindEvents() {
   if (journalEl) {
     journalEl.addEventListener('focus', () => {
       if (mainContent) {
-        mainContent.style.paddingBottom = '320px';
+        mainContent.style.paddingBottom = '96px';
       }
       setTimeout(() => {
         journalEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
