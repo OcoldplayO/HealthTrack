@@ -47,17 +47,23 @@ export function initEveningHistory(options) {
     if (actionTarget) {
       const action = actionTarget.dataset.action;
       if (action === 'ev-open-photo') {
+        e.stopPropagation();
         if (actionTarget instanceof HTMLImageElement) {
-          deps.openPhoto(actionTarget.src, actionTarget.dataset.alt || actionTarget.alt || '小结图片');
+          const src = actionTarget.getAttribute('src');
+          if (src) {
+            deps.openPhoto(actionTarget.src, actionTarget.dataset.alt || actionTarget.alt || '小结图片');
+          }
         }
         return;
       }
       if (action === 'ev-delete') {
+        e.stopPropagation();
         const date = actionTarget.dataset.date;
         if (date) evAskDelete(date);
         return;
       }
       if (action === 'ev-copy') {
+        e.stopPropagation();
         const date = actionTarget.dataset.date;
         if (date) evCopyEntry(date);
         return;

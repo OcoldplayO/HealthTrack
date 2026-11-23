@@ -91,8 +91,10 @@ function bindEveningEvents() {
         evSetToday();
         break;
       case 'ev-open-photo': {
+        if (target.id !== 'photo-preview') break;
         const preview = imgById('photo-preview');
-        if (preview) evoOpenPhoto(preview.src, '今日图片');
+        const rawSrc = preview?.getAttribute('src');
+        if (preview && rawSrc) evoOpenPhoto(preview.src, '今日图片');
         break;
       }
       case 'ev-remove-photo':
@@ -370,7 +372,10 @@ function evUpdateDoneCount() {
 
 function evoShowPhoto(src, meta) {
   const preview = imgById('photo-preview');
-  if (preview) preview.src = src || '';
+  if (preview) {
+    if (src) preview.src = src;
+    else preview.removeAttribute('src');
+  }
   byId('photo-empty')?.classList.add('hidden');
   byId('photo-filled')?.classList.remove('hidden');
   const metaEl = byId('photo-meta');
@@ -383,7 +388,7 @@ function evoResetPhotoUI() {
   const input = inputById('photo-input');
   if (input) input.value = '';
   const preview = imgById('photo-preview');
-  if (preview) preview.src = '';
+  if (preview) preview.removeAttribute('src');
   byId('photo-filled')?.classList.add('hidden');
   byId('photo-empty')?.classList.remove('hidden');
   const metaEl = byId('photo-meta');
