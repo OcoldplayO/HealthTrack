@@ -88,7 +88,7 @@ public final class MainActivity extends Activity {
         configureSystemBars();
 
         stepManager.setListener(this::postStepsUpdated);
-        StepBaselineJobService.scheduleNextMidnight(this);
+        StepBaselineJobService.scheduleAll(this, false);
         startServerAndLoadWebView();
     }
 
@@ -486,7 +486,11 @@ public final class MainActivity extends Activity {
     }
 
     private void postStepsUpdated(final int steps) {
-        if (steps < 0) {
+        postStepsUpdated(steps, false);
+    }
+
+    private void postStepsUpdated(final int steps, final boolean allowNegative) {
+        if (!allowNegative && steps < 0) {
             return;
         }
         final String script = "if (window.onNativeStepsUpdated) window.onNativeStepsUpdated(" + steps + ");";
@@ -563,6 +567,23 @@ public final class MainActivity extends Activity {
             }
             return stepManager.getTodaySteps();
         }
+
+        @android.webkit.JavascriptInterface
+        public void refreshSteps() {
+            if (stepManager != null && stepManager.isAvailable() && stepManager.hasPermission()) {
+                stepManager.refreshNow(() -> postStepsUpdated(stepManager.getTodaySteps(), true));
+            } else {
+                postStepsUpdated(-1, true);
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        public String getStepDebugInfo() {
+            if (stepManager == null) {
+                return "";
+            }
+            return stepManager.getDebugInfo();
+        }
     }
 
     @Override
@@ -592,7 +613,7 @@ public final class MainActivity extends Activity {
             boolean granted = grantResults != null && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
             if (granted && stepManager != null) {
                 stepManager.start();
-                StepBaselineJobService.scheduleNextMidnight(this, true);
+                StepBaselineJobService.scheduleAll(this, true);
             }
             final String script = "if (window.onStepPermissionResult) window.onStepPermissionResult(" + granted + ");";
             mainHandler.post(() -> {

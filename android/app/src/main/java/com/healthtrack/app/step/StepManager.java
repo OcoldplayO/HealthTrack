@@ -94,6 +94,33 @@ public final class StepManager {
         activeProvider.sampleOnce(onComplete);
     }
 
+    public synchronized void sampleMidnightBaseline(Runnable onComplete) {
+        if (activeProvider == null) {
+            if (onComplete != null) {
+                onComplete.run();
+            }
+            return;
+        }
+        activeProvider.sampleMidnightBaseline(onComplete);
+    }
+
+    public synchronized void refreshNow(Runnable onComplete) {
+        if (activeProvider == null) {
+            if (onComplete != null) {
+                onComplete.run();
+            }
+            return;
+        }
+        activeProvider.refreshNow(onComplete);
+    }
+
+    public synchronized String getDebugInfo() {
+        if (activeProvider == null) {
+            return "";
+        }
+        return activeProvider.getDebugInfo();
+    }
+
     public void requestPermission(Activity activity, int requestCode) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             if (activity.checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {

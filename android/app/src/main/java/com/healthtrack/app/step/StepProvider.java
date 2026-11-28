@@ -42,11 +42,32 @@ public interface StepProvider {
     default void setUpdateListener(StepUpdateListener listener) {}
 
     /**
-     * 触发单次采样（用于零点定时打基线）
+     * 触发单次常规采样（用于周期快照、关机前刷盘等）
      */
     default void sampleOnce(Runnable onComplete) {
         if (onComplete != null) {
             onComplete.run();
         }
+    }
+
+    /**
+     * 触发每日零点基准采样（仅在零点窗口内强制重置今日基准）
+     */
+    default void sampleMidnightBaseline(Runnable onComplete) {
+        sampleOnce(onComplete);
+    }
+
+    /**
+     * 立即刷新硬件缓冲并获取最新步数
+     */
+    default void refreshNow(Runnable onComplete) {
+        sampleOnce(onComplete);
+    }
+
+    /**
+     * 获取当前计步状态诊断信息
+     */
+    default String getDebugInfo() {
+        return "";
     }
 }

@@ -41,6 +41,8 @@ let yesterdayRecord = null;
 let morningLightState = null;
 let stepsState = { value: null, prefilled: null, autoDetected: false };
 let prevStepsValue = null;
+let pendingManualStepSync = false;
+let manualStepSyncTimer = null;
 let lunchState = { touched: false };
 
 let exerciseState = {
@@ -385,6 +387,24 @@ function updateStepsSourceUI(isToday) {
   }
 }
 
+function applySyncedSteps(rawSteps, interactive) {
+  if (typeof rawSteps !== 'number' || rawSteps < 0) {
+    if (interactive) showToast('未读取到有效步数');
+    return;
+  }
+
+  const exactSteps = Math.max(0, Math.min(30000, Math.round(rawSteps)));
+  stepsState.value = exactSteps;
+  stepsState.autoDetected = true;
+  syncStepsSlider();
+  updateStepsSourceUI(true);
+  updateLogCompleteness();
+  markDirty();
+  if (interactive) {
+    showToast(`已同步手机计步 ${exactSteps.toLocaleString('en-US')} 步`);
+  }
+}
+
 function syncNativeSteps(interactive = false) {
   if (!hasNativeStepBridge()) {
     if (interactive) showToast('当前环境未检测到计步传感器');
@@ -406,22 +426,26 @@ function syncNativeSteps(interactive = false) {
     return;
   }
 
-  const rawSteps = window.HealthTrack.getTodaySteps();
-  if (rawSteps < 0) {
-    if (interactive) showToast('未读取到有效步数');
+  if (interactive && typeof window.HealthTrack.refreshSteps === 'function') {
+    pendingManualStepSync = true;
+    if (manualStepSyncTimer) {
+      clearTimeout(manualStepSyncTimer);
+    }
+    manualStepSyncTimer = setTimeout(() => {
+      if (!pendingManualStepSync) return;
+      pendingManualStepSync = false;
+      manualStepSyncTimer = null;
+      const fallbackSteps = typeof window.HealthTrack.getTodaySteps === 'function'
+        ? window.HealthTrack.getTodaySteps()
+        : -1;
+      applySyncedSteps(fallbackSteps, true);
+    }, 1500);
+    window.HealthTrack.refreshSteps();
     return;
   }
 
-  const exactSteps = Math.max(0, Math.min(30000, Math.round(rawSteps)));
-  stepsState.value = exactSteps;
-  stepsState.autoDetected = true;
-  syncStepsSlider();
-  updateStepsSourceUI(true);
-  updateLogCompleteness();
-  markDirty();
-  if (interactive) {
-    showToast(`已同步手机计步 ${exactSteps.toLocaleString('en-US')} 步`);
-  }
+  const rawSteps = window.HealthTrack.getTodaySteps();
+  applySyncedSteps(rawSteps, interactive);
 }
 
 function onStepsInput(raw) {
@@ -1033,6 +1057,16 @@ function bindEvents() {
 
   window.onNativeStepsUpdated = (rawSteps) => {
     const isToday = (loadedDate === localDateStr(new Date()));
+    if (pendingManualStepSync) {
+      pendingManualStepSync = false;
+      if (manualStepSyncTimer) {
+        clearTimeout(manualStepSyncTimer);
+        manualStepSyncTimer = null;
+      }
+      if (!isToday) return;
+      applySyncedSteps(rawSteps, true);
+      return;
+    }
     if (!isToday || typeof rawSteps !== 'number' || rawSteps <= 0) return;
     if (stepsState.value !== null && !stepsState.autoDetected) return;
     const exactSteps = Math.max(0, Math.min(30000, Math.round(rawSteps)));

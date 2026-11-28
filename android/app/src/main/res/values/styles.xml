@@ -3,10 +3,57 @@
     <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:fontFamily">sans</item>
+        <item name="android:colorPrimary">#171717</item>
+        <item name="android:colorPrimaryDark">#171717</item>
         <item name="android:colorAccent">#171717</item>
+        <item name="android:colorControlActivated">#171717</item>
+        <item name="android:colorControlHighlight">#1F171717</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:statusBarColor">#FFFFFF</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:datePickerDialogTheme">@style/AppDatePickerDialogTheme</item>
+        <item name="android:timePickerDialogTheme">@style/AppTimePickerDialogTheme</item>
+        <item name="android:alertDialogTheme">@style/AppAlertDialogTheme</item>
+        <item name="android:dialogTheme">@style/AppAlertDialogTheme</item>
+    </style>
+
+    <style name="AppAlertDialogTheme" parent="android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorPrimary">#171717</item>
+        <item name="android:colorPrimaryDark">#171717</item>
+        <item name="android:colorAccent">#171717</item>
+        <item name="android:colorControlActivated">#171717</item>
+        <item name="android:colorControlHighlight">#1F171717</item>
+    </style>
+
+    <style name="AppDatePickerDialogTheme" parent="android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorPrimary">#171717</item>
+        <item name="android:colorPrimaryDark">#171717</item>
+        <item name="android:colorAccent">#171717</item>
+        <item name="android:colorControlActivated">#171717</item>
+        <item name="android:colorControlHighlight">#1F171717</item>
+        <item name="android:datePickerStyle">@style/AppDatePickerStyle</item>
+    </style>
+
+    <style name="AppDatePickerStyle" parent="android:style/Widget.Material.Light.DatePicker">
+        <item name="android:headerBackground">#171717</item>
+        <item name="android:dayOfWeekBackground">#FFFFFF</item>
+        <item name="android:yearListSelectorColor">#171717</item>
+    </style>
+
+    <style name="AppTimePickerDialogTheme" parent="android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorPrimary">#171717</item>
+        <item name="android:colorPrimaryDark">#171717</item>
+        <item name="android:colorAccent">#171717</item>
+        <item name="android:colorControlActivated">#171717</item>
+        <item name="android:colorControlHighlight">#1F171717</item>
+        <item name="android:timePickerStyle">@style/AppTimePickerStyle</item>
+    </style>
+
+    <style name="AppTimePickerStyle" parent="android:style/Widget.Material.Light.TimePicker">
+        <item name="android:headerBackground">#171717</item>
+        <item name="android:numbersSelectorColor">#171717</item>
+        <item name="android:numbersBackgroundColor">#F5F5F5</item>
+        <item name="android:numbersTextColor">#171717</item>
     </style>
 </resources>

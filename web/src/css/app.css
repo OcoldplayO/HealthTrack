@@ -592,6 +592,16 @@
   min-width: 138px;
 }
 
+input[type="date"],
+input[type="time"] {
+  color-scheme: light;
+  accent-color: #171717;
+}
+
+input[type="date"] {
+  cursor: pointer;
+}
+
 /* ── 指标卡底部“较昨日”行 ──
    三列布局下单卡内容宽仅 78px，`↑ 较昨日 +0.6` + `晨测` 正好在临界值附近，
    字体度量略有差异就会折行。这里禁止折行，并把右侧状态小字压到 8px 且不参与收缩。 */
@@ -618,6 +628,8 @@
 /* ── 字体：JetBrains Mono 降级回退链 ── */
 :root {
   --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+  color-scheme: light;
+  accent-color: #171717;
 
   /* 极简中性色 Design Tokens */
   --ht-bg:         #fafafa;    /* neutral-50 */

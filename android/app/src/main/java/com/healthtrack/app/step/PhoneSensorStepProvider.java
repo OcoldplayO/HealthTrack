@@ -11,18 +11,17 @@ import android.hardware.SensorManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
+import android.provider.Settings;
 import android.util.Log;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 基于 Android 原生硬件传感器 TYPE_STEP_COUNTER 的计步实现。
- * 具备跨日基准点统一消歧、关机重启步数累加补偿以及单次定时采样打基线能力。
+ * 委托 StepCounterEngine 处理零点基准、跨日消歧与重启补偿，并支持硬件 FIFO flush 与同步落盘。
  */
 public final class PhoneSensorStepProvider implements StepProvider, SensorEventListener {
     private static final String TAG = "PhoneStepProvider";
@@ -32,7 +31,13 @@ public final class PhoneSensorStepProvider implements StepProvider, SensorEventL
     private static final String KEY_REBOOT_OFFSET = "reboot_offset";
     private static final String KEY_LAST_RAW = "last_raw";
     private static final String KEY_TODAY_STEPS = "today_steps";
+    private static final String KEY_LAST_BOOT_COUNT = "last_boot_count";
+    private static final String KEY_LAST_RAW_TIME = "last_raw_time";
+    private static final String KEY_BASELINE_TIME = "baseline_time";
+    private static final String KEY_BASELINE_SOURCE = "baseline_source";
+
     private static final long SAMPLE_TIMEOUT_MS = 5000L;
+    private static final long REFRESH_TIMEOUT_MS = 2500L;
 
     private final Context context;
     private final SensorManager sensorManager;
@@ -79,12 +84,15 @@ public final class PhoneSensorStepProvider implements StepProvider, SensorEventL
             return;
         }
         if (!isListening && sensorManager != null && stepSensor != null) {
-            boolean ok = sensorManager.registerListener(this, stepSensor, SensorManager.SENSOR_DELAY_UI);
+            boolean ok = sensorManager.registerListener(this, stepSensor, SensorManager.SENSOR_DELAY_UI, 0);
             if (ok) {
                 isListening = true;
+                sensorManager.flush(this);
             } else {
                 Log.w(TAG, "注册计步传感器监听失败");
             }
+        } else if (isListening && sensorManager != null) {
+            sensorManager.flush(this);
         }
     }
 
@@ -101,19 +109,8 @@ public final class PhoneSensorStepProvider implements StepProvider, SensorEventL
         if (!isAvailable()) {
             return -1;
         }
-        String today = getTodayDateStr();
-        String savedDate = prefs.getString(KEY_LAST_DATE, null);
-        if (savedDate == null) {
-            return -1;
-        }
-        if (!savedDate.equals(today)) {
-            long gap = daysBetween(savedDate, today);
-            if (gap == 1) {
-                rolloverIfNeeded(today, -1L);
-            }
-            return 0;
-        }
-        return prefs.getInt(KEY_TODAY_STEPS, -1);
+        StepCounterEngine.StepState state = loadState();
+        return StepCounterEngine.readCachedTodaySteps(state, System.currentTimeMillis(), TimeZone.getDefault());
     }
 
     @Override
@@ -122,53 +119,54 @@ public final class PhoneSensorStepProvider implements StepProvider, SensorEventL
             return;
         }
         long raw = (long) event.values[0];
-        if (raw < 0) {
+        if (raw < 0L) {
             return;
         }
-
-        int notified = -1;
-        StepUpdateListener listenerSnapshot;
-        synchronized (this) {
-            String today = getTodayDateStr();
-            rolloverIfNeeded(today, raw);
-
-            long baseline = prefs.getLong(KEY_BASELINE, raw);
-            long rebootOffset = prefs.getLong(KEY_REBOOT_OFFSET, 0);
-            long lastRaw = prefs.getLong(KEY_LAST_RAW, raw);
-
-            // 设备重启补偿：当前累计步数小于上次记录的 lastRaw
-            if (lastRaw > 0 && raw < lastRaw) {
-                rebootOffset += lastRaw;
-            }
-
-            long calculated = (raw + rebootOffset) - baseline;
-            if (calculated < 0) {
-                calculated = 0;
-            }
-            int todaySteps = (int) Math.min(calculated, 100000L);
-
-            prefs.edit()
-                    .putString(KEY_LAST_DATE, today)
-                    .putLong(KEY_BASELINE, baseline)
-                    .putLong(KEY_REBOOT_OFFSET, rebootOffset)
-                    .putLong(KEY_LAST_RAW, raw)
-                    .putInt(KEY_TODAY_STEPS, todaySteps)
-                    .apply();
-
-            listenerSnapshot = updateListener;
-            if (listenerSnapshot != null && todaySteps != lastNotifiedSteps) {
-                lastNotifiedSteps = todaySteps;
-                notified = todaySteps;
-            }
-        }
-
-        if (listenerSnapshot != null && notified >= 0) {
-            listenerSnapshot.onStepsUpdated(notified);
-        }
+        processRawSample(raw, false, false);
     }
 
     @Override
     public void sampleOnce(Runnable onComplete) {
+        sampleInternal(false, true, SAMPLE_TIMEOUT_MS, onComplete);
+    }
+
+    @Override
+    public void sampleMidnightBaseline(Runnable onComplete) {
+        sampleInternal(true, true, SAMPLE_TIMEOUT_MS, onComplete);
+    }
+
+    @Override
+    public void refreshNow(Runnable onComplete) {
+        synchronized (this) {
+            if (isListening && sensorManager != null) {
+                sensorManager.flush(this);
+            }
+        }
+        sampleInternal(false, false, REFRESH_TIMEOUT_MS, onComplete);
+    }
+
+    @Override
+    public synchronized String getDebugInfo() {
+        StepCounterEngine.StepState s = loadState();
+        return String.format(
+                Locale.US,
+                "date=%s,steps=%d,raw=%d,base=%d,off=%d,src=%s,bc=%d->%d,up=%dms",
+                s.lastDate,
+                s.todaySteps,
+                s.lastRaw,
+                s.baseline,
+                s.rebootOffset,
+                s.baselineSource,
+                s.lastBootCount,
+                readBootCount(),
+                SystemClock.elapsedRealtime());
+    }
+
+    private void sampleInternal(
+            boolean isMidnightJob,
+            boolean syncCommit,
+            long timeoutMs,
+            Runnable onComplete) {
         if (!isAvailable() || !hasPermission() || sensorManager == null || stepSensor == null) {
             if (onComplete != null) {
                 onComplete.run();
@@ -180,7 +178,12 @@ public final class PhoneSensorStepProvider implements StepProvider, SensorEventL
         final SensorEventListener oneShotListener = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
-                PhoneSensorStepProvider.this.onSensorChanged(event);
+                if (event != null && event.values != null && event.values.length > 0) {
+                    long raw = (long) event.values[0];
+                    if (raw >= 0L) {
+                        processRawSample(raw, isMidnightJob, syncCommit);
+                    }
+                }
                 if (finished.compareAndSet(false, true)) {
                     sensorManager.unregisterListener(this);
                     if (onComplete != null) {
@@ -194,97 +197,122 @@ public final class PhoneSensorStepProvider implements StepProvider, SensorEventL
             }
         };
 
-        boolean registered = sensorManager.registerListener(oneShotListener, stepSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        boolean registered = sensorManager.registerListener(
+                oneShotListener,
+                stepSensor,
+                SensorManager.SENSOR_DELAY_UI,
+                0);
         if (!registered) {
             if (finished.compareAndSet(false, true) && onComplete != null) {
                 onComplete.run();
             }
             return;
         }
+        sensorManager.flush(oneShotListener);
 
         mainHandler.postDelayed(() -> {
             if (finished.compareAndSet(false, true)) {
                 sensorManager.unregisterListener(oneShotListener);
+                Log.w(TAG, "单次计步采样超时 (midnight=" + isMidnightJob + ", timeoutMs=" + timeoutMs + ")");
                 if (onComplete != null) {
                     onComplete.run();
                 }
             }
-        }, SAMPLE_TIMEOUT_MS);
+        }, timeoutMs);
     }
 
-    /**
-     * 统一跨日基线切换逻辑，消除 getTodaySteps() 与 onSensorChanged() 之间的时序竞态：
-     * - 若恰为正常跨日（gap == 1）且存在昨日 lastRaw，则沿用昨日 lastRaw 作为今日基线（不丢今晨未开 App 前步数）；
-     *   同时保留 KEY_LAST_RAW 原值以便紧随其后的重启补偿逻辑继续生效。
-     * - 若首次初始化或多日未打开 / 系统时间回拨（gap != 1），仅当拿到真实 raw 时将其设为今日新基线。
-     */
-    private synchronized void rolloverIfNeeded(String today, long currentRawOrNeg) {
-        String savedDate = prefs.getString(KEY_LAST_DATE, null);
-        long baseline = prefs.getLong(KEY_BASELINE, -1);
-        long lastRaw = prefs.getLong(KEY_LAST_RAW, -1);
+    private void processRawSample(long raw, boolean isMidnightJob, boolean syncCommit) {
+        int notified = -1;
+        StepUpdateListener listenerSnapshot;
 
-        if (savedDate == null || baseline < 0 || lastRaw < 0) {
-            if (currentRawOrNeg < 0) {
-                return;
+        synchronized (this) {
+            StepCounterEngine.StepState prev = loadState();
+            long nowMs = System.currentTimeMillis();
+            long elapsedMs = SystemClock.elapsedRealtime();
+            int bootCount = readBootCount();
+
+            StepCounterEngine.StepState next = StepCounterEngine.applySample(
+                    prev,
+                    raw,
+                    nowMs,
+                    elapsedMs,
+                    bootCount,
+                    isMidnightJob,
+                    TimeZone.getDefault());
+
+            saveState(next, syncCommit);
+
+            boolean baselineChanged = prev.baseline != next.baseline
+                    || !next.baselineSource.equals(prev.baselineSource)
+                    || (prev.lastDate == null || !prev.lastDate.equals(next.lastDate));
+            if (baselineChanged || isMidnightJob || syncCommit) {
+                Log.i(TAG, String.format(
+                        Locale.US,
+                        "sample midnight=%b sync=%b date=%s raw=%d base=%d off=%d steps=%d src=%s bc=%d",
+                        isMidnightJob,
+                        syncCommit,
+                        next.lastDate,
+                        next.lastRaw,
+                        next.baseline,
+                        next.rebootOffset,
+                        next.todaySteps,
+                        next.baselineSource,
+                        next.lastBootCount));
             }
-            prefs.edit()
-                    .putString(KEY_LAST_DATE, today)
-                    .putLong(KEY_BASELINE, currentRawOrNeg)
-                    .putLong(KEY_REBOOT_OFFSET, 0L)
-                    .putLong(KEY_LAST_RAW, currentRawOrNeg)
-                    .putInt(KEY_TODAY_STEPS, 0)
-                    .apply();
-            return;
+
+            listenerSnapshot = updateListener;
+            if (listenerSnapshot != null && next.todaySteps != lastNotifiedSteps) {
+                lastNotifiedSteps = next.todaySteps;
+                notified = next.todaySteps;
+            }
         }
 
-        if (savedDate.equals(today)) {
-            return;
+        if (listenerSnapshot != null && notified >= 0) {
+            listenerSnapshot.onStepsUpdated(notified);
         }
+    }
 
-        long gap = daysBetween(savedDate, today);
-        if (gap == 1) {
-            // 正常跨日：以昨日最后硬件读数作基线，不早退、不覆写 lastRaw，保留重启补偿能力
-            prefs.edit()
-                    .putString(KEY_LAST_DATE, today)
-                    .putLong(KEY_BASELINE, lastRaw)
-                    .putLong(KEY_REBOOT_OFFSET, 0L)
-                    .putInt(KEY_TODAY_STEPS, 0)
-                    .apply();
-            return;
+    private StepCounterEngine.StepState loadState() {
+        return new StepCounterEngine.StepState(
+                prefs.getString(KEY_LAST_DATE, null),
+                prefs.getLong(KEY_BASELINE, -1L),
+                prefs.getLong(KEY_REBOOT_OFFSET, 0L),
+                prefs.getLong(KEY_LAST_RAW, -1L),
+                prefs.getInt(KEY_TODAY_STEPS, -1),
+                prefs.getInt(KEY_LAST_BOOT_COUNT, -1),
+                prefs.getLong(KEY_LAST_RAW_TIME, -1L),
+                prefs.getLong(KEY_BASELINE_TIME, -1L),
+                prefs.getString(KEY_BASELINE_SOURCE, ""));
+    }
+
+    private void saveState(StepCounterEngine.StepState state, boolean syncCommit) {
+        SharedPreferences.Editor editor = prefs.edit()
+                .putString(KEY_LAST_DATE, state.lastDate)
+                .putLong(KEY_BASELINE, state.baseline)
+                .putLong(KEY_REBOOT_OFFSET, state.rebootOffset)
+                .putLong(KEY_LAST_RAW, state.lastRaw)
+                .putInt(KEY_TODAY_STEPS, state.todaySteps)
+                .putInt(KEY_LAST_BOOT_COUNT, state.lastBootCount)
+                .putLong(KEY_LAST_RAW_TIME, state.lastRawTime)
+                .putLong(KEY_BASELINE_TIME, state.baselineTime)
+                .putString(KEY_BASELINE_SOURCE, state.baselineSource);
+        if (syncCommit) {
+            editor.commit();
+        } else {
+            editor.apply();
         }
+    }
 
-        if (currentRawOrNeg >= 0) {
-            prefs.edit()
-                    .putString(KEY_LAST_DATE, today)
-                    .putLong(KEY_BASELINE, currentRawOrNeg)
-                    .putLong(KEY_REBOOT_OFFSET, 0L)
-                    .putLong(KEY_LAST_RAW, currentRawOrNeg)
-                    .putInt(KEY_TODAY_STEPS, 0)
-                    .apply();
+    private int readBootCount() {
+        try {
+            return Settings.Global.getInt(context.getContentResolver(), Settings.Global.BOOT_COUNT, -1);
+        } catch (Throwable ignored) {
+            return -1;
         }
     }
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
         // 计步器无需处理精度变化
-    }
-
-    private String getTodayDateStr() {
-        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-    }
-
-    private static long daysBetween(String fromYmd, String toYmd) {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-        try {
-            Date from = sdf.parse(fromYmd);
-            Date to = sdf.parse(toYmd);
-            if (from == null || to == null) {
-                return -1;
-            }
-            return (to.getTime() - from.getTime()) / 86400000L;
-        } catch (ParseException e) {
-            return -1;
-        }
     }
 }

@@ -12,6 +12,7 @@ import { renderHeader } from './components/Header.js';
 import { renderBottomNav } from './components/BottomNav.js';
 import { renderSettingsModal, closeSettings } from './components/modals/SettingsModal.js';
 import { renderDataSheetModal, closeDataSheet } from './components/modals/DataSheetModal.js';
+import { initDatePickerModal, closeDatePicker } from './components/modals/DatePickerModal.js';
 import {
   renderOtherModals,
   closeExport,
@@ -84,6 +85,10 @@ function isVisibleModal(id) {
 }
 
 export function handleNativeBack() {
+  if (isVisibleModal('ht-date-picker-modal')) {
+    closeDatePicker();
+    return true;
+  }
   if (isVisibleModal('ev-photo-viewer')) {
     closeEveningPhoto();
     return true;
@@ -148,11 +153,12 @@ document.addEventListener('DOMContentLoaded', () => {
   renderDataSheetModal(document.body);
   renderOtherModals(document.body);
 
-  // 2. 初始化 4 大核心视图
+  // 2. 初始化 4 大核心视图与全站极简日历拦截弹窗
   initLogView(main);
   initDashView(main);
   initInsightView(main);
   initEveningView(main);
+  initDatePickerModal(document.body);
 
   // 3. 初始展示「记一笔」
   switchTab('log');

@@ -9,6 +9,8 @@ declare global {
     hasStepPermission?: () => boolean;
     requestStepPermission?: () => void;
     getTodaySteps?: () => number;
+    refreshSteps?: () => void;
+    getStepDebugInfo?: () => string;
     isStepSensorAvailable?: () => boolean;
   }
 

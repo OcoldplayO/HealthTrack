@@ -11,16 +11,24 @@ import android.util.Log;
 import java.util.Calendar;
 
 /**
- * 每日零点（00:05）定时对硬件计步器采样打基线的系统 JobService（纯 Android Framework 实现）。
+ * 每日零点（00:05）打基线与每 2 小时定期采样快照的系统 JobService（纯 Android Framework 实现）。
  */
 public final class StepBaselineJobService extends JobService {
     private static final String TAG = "StepBaselineJob";
     public static final int JOB_ID = 20261;
+    public static final int PERIODIC_JOB_ID = 20262;
     private static final long MIN_DELAY_MS = 60_000L;
-    private static final long FLEX_WINDOW_MS = 30L * 60_000L;
+    private static final long FLEX_WINDOW_MS = 15L * 60_000L;
+    private static final long PERIODIC_INTERVAL_MS = 2L * 60L * 60_000L;
+    private static final long PERIODIC_FLEX_MS = 30L * 60_000L;
 
     public static void scheduleNextMidnight(Context context) {
         scheduleNextMidnight(context, false);
+    }
+
+    public static void scheduleAll(Context context, boolean forceReschedule) {
+        scheduleNextMidnight(context, forceReschedule);
+        schedulePeriodicSnapshot(context, forceReschedule);
     }
 
     public static void scheduleNextMidnight(Context context, boolean forceReschedule) {
@@ -54,6 +62,35 @@ public final class StepBaselineJobService extends JobService {
         }
     }
 
+    public static void schedulePeriodicSnapshot(Context context, boolean forceReschedule) {
+        if (context == null) {
+            return;
+        }
+        Context appCtx = context.getApplicationContext();
+        StepManager manager = StepManager.getInstance(appCtx);
+        if (!manager.isAvailable() || !manager.hasPermission()) {
+            return;
+        }
+
+        JobScheduler scheduler = (JobScheduler) appCtx.getSystemService(Context.JOB_SCHEDULER_SERVICE);
+        if (scheduler == null) {
+            return;
+        }
+        if (!forceReschedule && scheduler.getPendingJob(PERIODIC_JOB_ID) != null) {
+            return;
+        }
+
+        JobInfo job = new JobInfo.Builder(PERIODIC_JOB_ID, new ComponentName(appCtx, StepBaselineJobService.class))
+                .setPeriodic(PERIODIC_INTERVAL_MS, PERIODIC_FLEX_MS)
+                .setPersisted(true)
+                .build();
+
+        int result = scheduler.schedule(job);
+        if (result != JobScheduler.RESULT_SUCCESS) {
+            Log.w(TAG, "调度周期计步快照任务失败: " + result);
+        }
+    }
+
     private static long computeDelayToNextMidnight() {
         Calendar now = Calendar.getInstance();
         Calendar next = (Calendar) now.clone();
@@ -70,12 +107,21 @@ public final class StepBaselineJobService extends JobService {
     @Override
     public boolean onStartJob(JobParameters params) {
         StepManager manager = StepManager.getInstance(this);
+        int jobId = params != null ? params.getJobId() : JOB_ID;
+
         if (!manager.isAvailable() || !manager.hasPermission()) {
-            scheduleNextMidnight(this, true);
+            if (jobId == JOB_ID) {
+                scheduleNextMidnight(this, true);
+            }
             return false;
         }
 
-        manager.sampleOnce(() -> {
+        if (jobId == PERIODIC_JOB_ID) {
+            manager.sampleOnce(() -> jobFinished(params, false));
+            return true;
+        }
+
+        manager.sampleMidnightBaseline(() -> {
             scheduleNextMidnight(getApplicationContext(), true);
             jobFinished(params, false);
         });

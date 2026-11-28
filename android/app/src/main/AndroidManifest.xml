@@ -31,5 +31,13 @@
             android:name=".step.StepBaselineJobService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+        <receiver
+            android:name=".step.StepSystemReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.ACTION_SHUTDOWN" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
